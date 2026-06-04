@@ -1,0 +1,543 @@
+/* ============================================================
+   app.css — shop-core 공통 스타일
+   기존 auth/login.html, home/home.html, error/error.html 인라인 스타일 통합
+   CSS 프레임워크 미사용 (자체 최소 CSS)
+   ============================================================ */
+
+/* ── 기본 초기화 ── */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+/* ── blank 레이아웃 body (로그인·에러: 중앙 정렬) ── */
+body.blank-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+/* ── 헤더 ── */
+header {
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0 24px;
+}
+
+.header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+}
+
+.site-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #337ab7;
+    text-decoration: none;
+}
+
+.header-auth {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.header-user {
+    color: #555;
+}
+
+.header-logout-form {
+    display: inline;
+    margin: 0;
+}
+
+/* ── 네비게이션 ── */
+nav {
+    background-color: #f8f8f8;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 0 24px;
+}
+
+.nav-list {
+    max-width: 1200px;
+    margin: 0 auto;
+    list-style: none;
+    display: flex;
+    gap: 0;
+}
+
+.nav-item {
+    display: flex;
+}
+
+.nav-link {
+    display: block;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-link:hover {
+    color: #337ab7;
+}
+
+.nav-link-active {
+    color: #337ab7;
+    border-bottom-color: #337ab7;
+}
+
+/* ── 플래시 메시지 영역 ── */
+.flash-region {
+    max-width: 1200px;
+    margin: 16px auto 0;
+    padding: 0 24px;
+}
+
+/* ── 공통 메인 래퍼 ── */
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* ── 푸터 ── */
+footer {
+    margin-top: auto;
+    padding: 16px 24px;
+    text-align: center;
+    border-top: 1px solid #e0e0e0;
+    background-color: #fff;
+}
+
+.footer-copy {
+    font-size: 13px;
+    color: #888;
+}
+
+/* ── 공통 버튼 링크 ── */
+.btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #337ab7;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.btn-link:hover {
+    color: #286090;
+}
+
+/* ── 알림(Alert) ── */
+.alert {
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.alert-success {
+    background-color: #f0fff4;
+    border: 1px solid #9ae6b4;
+    color: #276749;
+}
+
+.alert-error {
+    background-color: #fdf2f2;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.alert-info {
+    background-color: #f0f7ff;
+    border: 1px solid #b8d8f5;
+    color: #1a4971;
+}
+
+/* ── 폼 공통 ── */
+.form-group {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #444;
+}
+
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: #337ab7;
+}
+
+/* ── 로그인 컨테이너 ── */
+.login-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 40px 36px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.login-container h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 28px;
+    text-align: center;
+    color: #222;
+}
+
+.login-container button[type="submit"] {
+    width: 100%;
+    padding: 11px;
+    background-color: #337ab7;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background-color 0.2s;
+}
+
+.login-container button[type="submit"]:hover {
+    background-color: #286090;
+}
+
+/* ── 홈 컨테이너 ── */
+.home-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 48px 40px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.home-container h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #222;
+}
+
+.welcome {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 36px;
+    line-height: 1.6;
+}
+
+.welcome strong {
+    color: #337ab7;
+}
+
+.home-container form {
+    display: inline-block;
+}
+
+.home-container button[type="submit"] {
+    padding: 10px 24px;
+    background-color: #d9534f;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.home-container button[type="submit"]:hover {
+    background-color: #c9302c;
+}
+
+/* ── 에러 컨테이너 ── */
+.error-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 48px 40px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.error-status {
+    font-size: 72px;
+    font-weight: 700;
+    color: #d9534f;
+    line-height: 1;
+    margin-bottom: 16px;
+}
+
+.error-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #222;
+}
+
+.error-message {
+    font-size: 15px;
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 32px;
+}
+
+.home-link {
+    display: inline-block;
+    padding: 10px 24px;
+    background-color: #337ab7;
+    color: #fff;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.home-link:hover {
+    background-color: #286090;
+}
+
+/* ── 폼 하단 링크 (로그인·회원가입 화면 공통) ── */
+.form-footer-link {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 14px;
+    color: #555;
+}
+
+.form-footer-link a {
+    color: #337ab7;
+    text-decoration: none;
+}
+
+.form-footer-link a:hover {
+    text-decoration: underline;
+}
+
+/* ── 폼 필드 검증 에러 메시지 ── */
+.field-error {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #721c24;
+}
+
+/* ── 선택 입력 레이블 보조 텍스트 ── */
+.optional {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+}
+
+/* ── input[type="email"] — text 스타일 상속 ── */
+input[type="email"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input[type="email"]:focus {
+    border-color: #337ab7;
+}
+
+/* ── 관리자 회원 관리 ── */
+.admin-members-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #222;
+    margin-bottom: 24px;
+}
+
+.search-form {
+    margin-bottom: 20px;
+}
+
+.search-form-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.search-keyword input[type="text"] {
+    width: 240px;
+}
+
+.search-role select {
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-submit {
+    padding-bottom: 0;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.btn-primary {
+    background-color: #337ab7;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #286090;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background-color: #565e64;
+}
+
+.btn-outline {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    color: #555;
+}
+
+.btn-outline:hover {
+    background-color: #f0f0f0;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+    margin-bottom: 16px;
+}
+
+.members-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.members-table th,
+.members-table td {
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.members-table thead th {
+    background-color: #f8f8f8;
+    font-weight: 600;
+    color: #444;
+}
+
+.members-table tbody tr:hover {
+    background-color: #fafafa;
+}
+
+.empty-msg {
+    text-align: center;
+    color: #888;
+    padding: 24px;
+}
+
+.role-change-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.role-select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.page-info {
+    font-size: 14px;
+    color: #555;
+}
+
+.page-nav {
+    display: flex;
+    gap: 8px;
+}

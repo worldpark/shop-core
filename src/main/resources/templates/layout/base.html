@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<!--
+    공통 풀 레이아웃: layout(title, content) 프래그먼트.
+    body 조립 순서: header → nav → messages → main(content) → footer.
+
+    사용 예 (도메인 화면):
+      <html ... th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+        <head><title>페이지 제목</title></head>
+        <body><main>본문 내용</main></body>
+      </html>
+-->
+<html th:fragment="layout(title, content)"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:replace="${title}">shop-core</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/app.js}" defer></script>
+</head>
+<body>
+    <th:block th:replace="~{fragments/header :: header}"></th:block>
+    <th:block th:replace="~{fragments/nav :: nav('home')}"></th:block>
+    <div class="flash-region">
+        <th:block th:replace="~{fragments/messages :: messages}"></th:block>
+    </div>
+    <main th:replace="${content}">
+        <p>콘텐츠 슬롯</p>
+    </main>
+    <th:block th:replace="~{fragments/footer :: footer}"></th:block>
+</body>
+</html>

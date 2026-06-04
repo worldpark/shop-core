@@ -1,0 +1,84 @@
+spring:
+  application:
+    name: shop-core
+
+  datasource:
+    url: ${SHOP_CORE_DB_URL:jdbc:postgresql://localhost:5432/shop_core}
+    username: ${SHOP_CORE_DB_USERNAME:shop_core}
+    password: ${SHOP_CORE_DB_PASSWORD:shop_core}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate  # Flyway가 스키마 소유. Hibernate는 검증만 수행
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false  # 깨끗한 DB 전제 — 기존 schema_history 없는 상태에서 V1부터 적용
+
+  thymeleaf:
+    cache: false
+
+  modulith:
+    events:
+      externalization:
+        enabled: true  # Spring Modulith Event Publication Registry 기반 Kafka 외부화 활성
+      # JPA 변형(spring-modulith-starter-jpa) 사용 중이므로 아래 JDBC 전용 프로퍼티는 실효 없음.
+      # ddl-auto=validate가 Hibernate 자동 DDL을 이미 차단하므로 추가 비활성 플래그는 불필요.
+      # 단, Task 명시 사항을 준수하고 향후 JDBC 변형 전환 시에도 안전하도록 명시적으로 기재한다.
+      jdbc:
+        schema-initialization:
+          enabled: false
+
+  kafka:
+    # producer 설정: StringSerializer(key) + JsonSerializer(value) — Modulith 외부화 어댑터와 호환
+    bootstrap-servers: ${SHOP_CORE_KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  # Redis 접속 설정 — 로컬 단일 Redis, DB index 0(shop-core 전용)
+  # 운영 전환 시 SHOP_CORE_REDIS_HOST 환경변수로 인스턴스 분리 가능
+  data:
+    redis:
+      host: ${SHOP_CORE_REDIS_HOST:localhost}
+      port: ${SHOP_CORE_REDIS_PORT:6379}
+      database: ${SHOP_CORE_REDIS_DB:0}  # shop-core 전용 DB index (notification은 DB 1)
+      timeout: 2s
+
+shop:
+  security:
+    jwt:
+      # [필수] 운영 환경: SHOP_SECURITY_JWT_SECRET 환경변수로 주입. 코드/yml 하드코딩 금지.
+      # 부재 또는 32자 미만 시 애플리케이션 기동 실패 (JwtProperties 검증).
+      secret: ${SHOP_SECURITY_JWT_SECRET:}
+      # access token TTL (기본 30분)
+      access-ttl: ${SHOP_SECURITY_JWT_ACCESS_TTL:PT30M}
+      # refresh token TTL (기본 14일) — Redis refresh 키 TTL과 동기화 (JwtProperties가 SSOT)
+      refresh-ttl: ${SHOP_SECURITY_JWT_REFRESH_TTL:P14D}
+      issuer: ${SHOP_SECURITY_JWT_ISSUER:shop-core}
+
+  # Redis key namespace / TTL 설정 — 용도: JWT 로그인 상태 저장 + 분산락
+  redis:
+    auth:
+      # refresh token / 로그인 세션 상태 저장 — 키: {userId}
+      refresh-prefix: ${SHOP_REDIS_AUTH_REFRESH_PREFIX:shopcore:auth:refresh:}
+      # [주의] refresh-ttl은 코드에서 참조하지 않음. TTL SSOT = JwtProperties.refresh-ttl
+      refresh-ttl: ${SHOP_REDIS_AUTH_REFRESH_TTL:P14D}
+      # access token blacklist — 키: {jti}, TTL은 access 잔여 만료 시간(동적 산정)
+      blacklist-prefix: ${SHOP_REDIS_AUTH_BLACKLIST_PREFIX:shopcore:auth:blacklist:}
+      # [주의] blacklist-ttl은 코드에서 참조하지 않음. TTL은 access 잔여 만료 시간으로 동적 산정
+      blacklist-ttl: ${SHOP_REDIS_AUTH_BLACKLIST_TTL:PT30M}
+    lock:
+      # 분산락 — 키는 {resource}, 실제 락 획득/해제는 분산락 Task에서 구현(Redisson 재검토 포함)
+      prefix: ${SHOP_REDIS_LOCK_PREFIX:shopcore:lock:}
+      ttl: ${SHOP_REDIS_LOCK_TTL:PT10S}  # 10초 — 데드락 방지 짧은 TTL
+
+server:
+  port: 8080

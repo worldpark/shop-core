@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+    회원가입 화면.
+    view name: member/signup
+    레이아웃: layout/blank :: blank(title, content) — 비인증 경량 레이아웃 (login과 동일 패턴)
+
+    보존 계약:
+      - 폼 th:action="@{/signup}" method="post"
+      - 폼 백킹 객체: th:object="${signupForm}"
+      - 필드: email / password / passwordConfirm / name / phone
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - password/passwordConfirm value echo 금지 (ViewController가 검증 실패 시 null clear)
+      - 로그인 링크: th:href="@{/login}"
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/blank :: blank(title=~{::title}, content=~{::main})}">
+<head>
+    <title>회원가입</title>
+</head>
+<body>
+<main>
+    <div class="login-container">
+        <h1>회원가입</h1>
+
+        <!--
+            회원가입 폼.
+            th:action 사용 시 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
+            수동으로 _csrf 히든 필드를 추가하지 않는다.
+        -->
+        <form th:action="@{/signup}" method="post" th:object="${signupForm}">
+
+            <!-- 이메일 -->
+            <div class="form-group">
+                <label for="email">이메일</label>
+                <input type="email"
+                       id="email"
+                       th:field="*{email}"
+                       placeholder="이메일을 입력하세요"
+                       autocomplete="email">
+                <span class="field-error" th:if="${#fields.hasErrors('email')}"
+                      th:errors="*{email}"></span>
+            </div>
+
+            <!-- 비밀번호 -->
+            <div class="form-group">
+                <label for="password">비밀번호</label>
+                <input type="password"
+                       id="password"
+                       th:field="*{password}"
+                       placeholder="비밀번호를 입력하세요 (8자 이상)"
+                       autocomplete="new-password">
+                <span class="field-error" th:if="${#fields.hasErrors('password')}"
+                      th:errors="*{password}"></span>
+            </div>
+
+            <!-- 비밀번호 확인 -->
+            <div class="form-group">
+                <label for="passwordConfirm">비밀번호 확인</label>
+                <input type="password"
+                       id="passwordConfirm"
+                       th:field="*{passwordConfirm}"
+                       placeholder="비밀번호를 다시 입력하세요"
+                       autocomplete="new-password">
+                <span class="field-error" th:if="${#fields.hasErrors('passwordConfirm')}"
+                      th:errors="*{passwordConfirm}"></span>
+            </div>
+
+            <!-- 이름 -->
+            <div class="form-group">
+                <label for="name">이름</label>
+                <input type="text"
+                       id="name"
+                       th:field="*{name}"
+                       placeholder="이름을 입력하세요"
+                       autocomplete="name">
+                <span class="field-error" th:if="${#fields.hasErrors('name')}"
+                      th:errors="*{name}"></span>
+            </div>
+
+            <!-- 전화번호 (선택) -->
+            <div class="form-group">
+                <label for="phone">전화번호 <span class="optional">(선택)</span></label>
+                <input type="text"
+                       id="phone"
+                       th:field="*{phone}"
+                       placeholder="전화번호를 입력하세요"
+                       autocomplete="tel">
+            </div>
+
+            <button type="submit">회원가입</button>
+        </form>
+
+        <!-- 로그인 링크 -->
+        <p class="form-footer-link">
+            이미 계정이 있으신가요? <a th:href="@{/login}">로그인</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>

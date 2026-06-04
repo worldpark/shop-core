@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<!--
+    상품 등록/수정 화면.
+    view name: seller/product-form
+    레이아웃: layout/base :: layout(title, content) — 인증 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 폼 th:object="${productForm}"
+      - 등록 action: POST /seller/products  (productId 모델 키 없음)
+      - 수정 action: POST /seller/products/{productId}  (productId 모델 키 있음)
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - 필드: categoryId / name / description / basePrice / status
+      - 등록 화면(productId 없음): status 필드 비노출
+      - 수정 화면(productId 있음): status 필드 노출
+      - 검증 실패: th:errors로 필드별 메시지 echo, th:field로 입력값 유지
+      - Entity 직접 노출 금지 (ProductForm DTO만 모델에 담김)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="${productId != null} ? '상품 수정' : '상품 등록'">상품 등록/수정</title>
+</head>
+<body>
+<main>
+    <div class="product-form-container">
+        <h1 class="page-title" th:text="${productId != null} ? '상품 수정' : '상품 등록'">상품 등록/수정</h1>
+
+        <!--
+            상품 등록/수정 폼.
+            등록(productId 없음): POST /seller/products
+            수정(productId 있음): POST /seller/products/{productId}
+            th:action 사용 시 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
+            수동으로 _csrf 히든 필드를 추가하지 않는다.
+        -->
+        <form method="post"
+              th:action="${productId != null}
+                  ? @{/seller/products/{id}(id=${productId})}
+                  : @{/seller/products}"
+              th:object="${productForm}">
+
+            <!-- 카테고리 -->
+            <div class="form-group">
+                <label for="categoryId">카테고리</label>
+                <select id="categoryId"
+                        th:field="*{categoryId}">
+                    <option value="">-- 미분류 --</option>
+                    <option th:each="cat : ${categories}"
+                            th:value="${cat.categoryId}"
+                            th:text="${cat.name}">카테고리</option>
+                </select>
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('categoryId')}"
+                      th:errors="*{categoryId}"></span>
+            </div>
+
+            <!-- 상품명 -->
+            <div class="form-group">
+                <label for="name">상품명</label>
+                <input type="text"
+                       id="name"
+                       th:field="*{name}"
+                       placeholder="상품명을 입력하세요">
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('name')}"
+                      th:errors="*{name}"></span>
+            </div>
+
+            <!-- 설명 -->
+            <div class="form-group">
+                <label for="description">설명</label>
+                <textarea id="description"
+                          th:field="*{description}"
+                          placeholder="상품 설명을 입력하세요 (선택)"></textarea>
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('description')}"
+                      th:errors="*{description}"></span>
+            </div>
+
+            <!-- 기본 가격 -->
+            <div class="form-group">
+                <label for="basePrice">기본 가격</label>
+                <input type="number"
+                       id="basePrice"
+                       th:field="*{basePrice}"
+                       step="1"
+                       min="0"
+                       placeholder="0 이상의 가격을 입력하세요">
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('basePrice')}"
+                      th:errors="*{basePrice}"></span>
+            </div>
+
+            <!--
+                상태 (수정 화면에서만 노출 — productId 있을 때).
+                등록 화면에서는 status를 입력받지 않으며 Service가 DRAFT로 강제한다.
+            -->
+            <div class="form-group" th:if="${productId != null}">
+                <label for="status">상태</label>
+                <select id="status"
+                        th:field="*{status}">
+                    <option th:each="s : ${statuses}"
+                            th:value="${s}"
+                            th:text="${s}">상태</option>
+                </select>
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('status')}"
+                      th:errors="*{status}"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary"
+                    th:text="${productId != null} ? '수정' : '등록'">저장</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>

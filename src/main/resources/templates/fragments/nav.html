@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko">
+<body>
+<nav th:fragment="nav(active)">
+    <ul class="nav-list">
+        <li class="nav-item">
+            <a th:href="@{/}"
+               class="nav-link"
+               th:classappend="${active == 'home'} ? ' nav-link-active' : ''"
+               th:text="'홈'">홈</a>
+        </li>
+        <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+            <a th:href="@{/admin/members}"
+               class="nav-link"
+               th:classappend="${active == 'admin-members'} ? ' nav-link-active' : ''">회원 관리</a>
+        </li>
+        <li class="nav-item" sec:authorize="hasRole('SELLER')">
+            <a th:href="@{/seller/products/new}"
+               class="nav-link"
+               th:classappend="${active == 'seller-product-new'} ? ' nav-link-active' : ''">상품 등록</a>
+        </li>
+    </ul>
+</nav>
+</body>
+</html>

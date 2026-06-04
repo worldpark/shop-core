@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<!--
+    layout/blank :: blank(title, content) 기반 에러 화면.
+    보존 계약:
+      - 모델 키 status(int), message(String) 바인딩
+      - 뷰 이름: error/error
+      - ViewExceptionHandler 코드 미수정
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/blank :: blank(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="'오류 ' + ${status}">오류</title>
+</head>
+<body>
+<main>
+    <div class="error-container">
+        <div class="error-status" th:text="${status}">오류</div>
+        <div class="error-title">요청을 처리할 수 없습니다</div>
+        <div class="error-message"
+             th:text="${message} ?: '오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'">
+            오류가 발생했습니다. 잠시 후 다시 시도해 주세요.
+        </div>
+        <a th:href="@{/}" class="home-link">홈으로 이동</a>
+    </div>
+</main>
+</body>
+</html>

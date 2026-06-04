@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<!--
+    관리자 회원 관리 화면.
+    view name: admin/members
+    레이아웃: layout/base :: layout(title, content)
+    모델 키: members (Page<MemberSummaryResponse>), searchCondition (MemberSearchCondition)
+
+    보존 계약:
+      - 검색 폼: method="get" th:action="@{/admin/members}" th:object="${searchCondition}"
+      - 권한 변경 폼: method="post" th:action 자동 _csrf 주입 (th:action 사용)
+      - 권한 변경 role 셀렉트: SELLER/CONSUMER 옵션만 (ADMIN 옵션 절대 금지)
+      - 민감정보(passwordHash/token 등) 표시 금지
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>회원 관리</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">회원 관리</h1>
+
+        <!-- 검색 폼 (GET — CSRF 불요) -->
+        <form class="search-form"
+              method="get"
+              th:action="@{/admin/members}"
+              th:object="${searchCondition}">
+            <div class="search-form-row">
+                <div class="form-group search-keyword">
+                    <label for="keyword">검색어</label>
+                    <input type="text"
+                           id="keyword"
+                           th:field="*{keyword}"
+                           placeholder="이메일 또는 이름">
+                </div>
+                <div class="form-group search-role">
+                    <label for="role">권한</label>
+                    <select id="role" th:field="*{role}">
+                        <option value="">전체</option>
+                        <option value="ADMIN">ADMIN</option>
+                        <option value="SELLER">SELLER</option>
+                        <option value="CONSUMER">CONSUMER</option>
+                    </select>
+                </div>
+                <div class="form-group search-submit">
+                    <button type="submit" class="btn btn-primary">검색</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- 회원 목록 테이블 -->
+        <div class="table-wrapper">
+            <table class="members-table">
+                <thead>
+                <tr>
+                    <th>이메일</th>
+                    <th>이름</th>
+                    <th>권한</th>
+                    <th>가입일</th>
+                    <th>권한 변경</th>
+                </tr>
+                </thead>
+                <tbody>
+                <!-- 목록 없음 안내 -->
+                <tr th:if="${members.content.isEmpty()}">
+                    <td colspan="5" class="empty-msg">조회된 회원이 없습니다.</td>
+                </tr>
+                <!-- 회원 행 반복 -->
+                <tr th:each="m : ${members.content}">
+                    <td th:text="${m.email}"></td>
+                    <td th:text="${m.name}"></td>
+                    <td th:text="${m.role}"></td>
+                    <td th:text="${m.createdAt}"></td>
+                    <td>
+                        <!--
+                            권한 변경 폼 (POST — th:action 사용 시 _csrf 자동 주입).
+                            role 셀렉트는 SELLER/CONSUMER만 노출 (ADMIN 옵션 절대 금지 — Constraint).
+                        -->
+                        <form class="role-change-form"
+                              method="post"
+                              th:action="@{/admin/members/{id}/role(id=${m.memberId})}">
+                            <select name="role" class="role-select">
+                                <option value="SELLER" th:selected="${m.role == 'SELLER'}">SELLER</option>
+                                <option value="CONSUMER" th:selected="${m.role == 'CONSUMER'}">CONSUMER</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-secondary">변경</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <div class="pagination" th:if="${members.totalPages > 0}">
+            <span class="page-info">
+                <span th:text="${members.number + 1}">1</span> /
+                <span th:text="${members.totalPages}">1</span> 페이지
+                (총 <span th:text="${members.totalElements}">0</span>명)
+            </span>
+            <div class="page-nav">
+                <!-- 이전 페이지 -->
+                <a th:if="${members.number > 0}"
+                   th:href="@{/admin/members(keyword=${searchCondition.keyword}, role=${searchCondition.role}, page=${members.number - 1}, size=${members.size})}"
+                   class="btn btn-sm btn-outline">이전</a>
+                <span th:if="${members.number == 0}" class="btn btn-sm btn-outline disabled">이전</span>
+
+                <!-- 다음 페이지 -->
+                <a th:if="${members.number + 1 < members.totalPages}"
+                   th:href="@{/admin/members(keyword=${searchCondition.keyword}, role=${searchCondition.role}, page=${members.number + 1}, size=${members.size})}"
+                   class="btn btn-sm btn-outline">다음</a>
+                <span th:if="${members.number + 1 >= members.totalPages}" class="btn btn-sm btn-outline disabled">다음</span>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

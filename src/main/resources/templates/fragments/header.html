@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko">
+<body>
+<header th:fragment="header">
+    <div class="header-inner">
+        <a th:href="@{/}" class="site-name">shop-core</a>
+        <nav class="header-auth">
+            <span sec:authorize="isAuthenticated()">
+                <span class="header-user" sec:authentication="name"></span>
+                <form th:action="@{/logout}" method="post" class="header-logout-form">
+                    <button type="submit" class="btn-link">로그아웃</button>
+                </form>
+            </span>
+            <span sec:authorize="isAnonymous()">
+                <a th:href="@{/login}" class="btn-link">로그인</a>
+            </span>
+        </nav>
+    </div>
+</header>
+</body>
+</html>

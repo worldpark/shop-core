@@ -1,0 +1,31 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+      - org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration  # DB 없는 컨텍스트 로드 유지
+
+  flyway:
+    enabled: false  # 테스트 컨텍스트: DataSource 없으므로 Flyway 비활성 (FlywayAutoConfiguration 제외와 이중 보장)
+
+  modulith:
+    events:
+      externalization:
+        enabled: false  # 테스트 컨텍스트에서 Kafka 브로커 바인딩 시도 방지
+
+  thymeleaf:
+    check-template-location: false
+
+# 테스트용 JWT 설정
+# secret: 충분한 길이(32자 이상) 더미값 — 운영 환경 secret과 무관
+# TTL: 테스트 검증 편의를 위해 짧은 값 사용
+shop:
+  security:
+    jwt:
+      secret: test-secret-key-for-shop-core-test-environment-only-32chars
+      access-ttl: PT1H
+      refresh-ttl: P1D
+      issuer: shop-core-test

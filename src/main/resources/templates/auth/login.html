@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<!--
+    layout/blank :: blank(title, content) 기반 로그인 화면.
+    보존 계약:
+      - 폼 th:action="@{/login}" method="post"
+      - name="username", name="password"
+      - param.error / param.logout 분기
+      - 뷰 이름: auth/login
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/blank :: blank(title=~{::title}, content=~{::main})}">
+<head>
+    <title>로그인</title>
+</head>
+<body>
+<main>
+    <div class="login-container">
+        <h1>로그인</h1>
+
+        <!-- 로그인 실패 메시지 -->
+        <div class="alert alert-error" th:if="${param.error}">
+            아이디 또는 비밀번호가 올바르지 않습니다.
+        </div>
+
+        <!-- 로그아웃 완료 안내 -->
+        <div class="alert alert-info" th:if="${param.logout}">
+            로그아웃 되었습니다.
+        </div>
+
+        <!-- 회원가입 완료 안내 -->
+        <div class="alert alert-success" th:if="${param.signup}">
+            회원가입이 완료되었습니다. 로그인해 주세요.
+        </div>
+
+        <!--
+            th:action 을 사용하면 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
+            수동으로 _csrf 히든 필드를 추가하지 않는다.
+            username/password 필드명은 Spring Security UsernamePasswordAuthenticationFilter
+            기본 파라미터명과 동일해야 한다 — 변경 금지.
+        -->
+        <form th:action="@{/login}" method="post">
+            <div class="form-group">
+                <label for="username">아이디</label>
+                <input type="text" id="username" name="username"
+                       placeholder="아이디를 입력하세요" autocomplete="username" autofocus>
+            </div>
+            <div class="form-group">
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" name="password"
+                       placeholder="비밀번호를 입력하세요" autocomplete="current-password">
+            </div>
+            <button type="submit">로그인</button>
+        </form>
+
+        <!-- 회원가입 링크 -->
+        <p class="form-footer-link">
+            계정이 없으신가요? <a th:href="@{/signup}">회원가입</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>
