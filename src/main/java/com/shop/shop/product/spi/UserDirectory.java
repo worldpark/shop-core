@@ -11,9 +11,11 @@ package com.shop.shop.product.spi;
  * product는 member를 전혀 참조하지 않는다.
  *
  * <p>REST 진입점은 principal=userId(long)라 이 포트를 사용하지 않는다.
- * View(form-login) 진입점만 email→userId 변환이 필요해 이 포트를 사용한다.
+ * View(form-login) 흐름은 principal=email이라 email→userId 변환이 필요하며,
+ * 이 변환은 View 전용 facade 구현({@code product.service.SellerProductFacadeImpl})이 수행한다.
+ * (Task 003 이후 ViewController는 web 모듈로 분리되어 facade를 통해서만 이 포트를 간접 사용한다.)
  *
- * @see com.shop.shop.product.controller.SellerProductViewController
+ * @see com.shop.shop.product.spi.SellerProductFacade
  */
 public interface UserDirectory {
 

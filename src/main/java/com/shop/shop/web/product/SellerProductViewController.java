@@ -1,12 +1,9 @@
-package com.shop.shop.product.controller;
+package com.shop.shop.web.product;
 
-import com.shop.shop.product.domain.Product;
-import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductForm;
-import com.shop.shop.product.service.CategoryService;
-import com.shop.shop.product.service.ProductService;
-import com.shop.shop.product.spi.UserDirectory;
+import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.spi.SellerProductFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +18,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * SELLER 상품 등록/수정 View 진입점.
@@ -30,22 +26,26 @@ import java.util.stream.Collectors;
  * 비SELLER → 403, 비인증 → /login redirect.
  *
  * <p>principal 통일(View): form login session principal = UserDetails(username=email).
- * {@code userDirectory.findUserIdByEmail(auth.getName())}으로 actorId 획득
- * (product 소유 {@link UserDirectory} 포트 — member 직접 호출 없음, 의존 역전).
- * {@code actorIsAdmin}: authority 'ROLE_ADMIN' 직접 보유로 판정.
+ * {@code auth.getName()} → facade 내부에서 {@code UserDirectory.findUserIdByEmail}로 actorId 획득.
+ * {@code actorIsAdmin}: authority 'ROLE_ADMIN' 직접 보유로 판정 (순수 Spring Security 로직 — web 잔존).
  *
- * <p>레이어: SellerProductViewController → ProductService/CategoryService → Repository
- * (ServiceResponse 미사용 — architecture-rule: View ViewController → Service 직접).
- * 모델엔 DTO/ViewModel·enum·폼 객체만 담는다 (Entity 금지).
+ * <p>레이어: SellerProductViewController → {@link SellerProductFacade}(published port)
+ * → ProductService/CategoryService → Repository.
+ * 모델엔 DTO/ViewModel·폼 객체만 담는다 (Entity·enum 금지).
  *
  * <p>모델 키 계약 (view-implementor와 정합):
  * <ul>
  *   <li>{@code productForm} — {@link ProductForm} (@ModelAttribute + 수동 설정)</li>
  *   <li>{@code categories} — {@code List<CategoryResponse>} (flat 목록)</li>
- *   <li>{@code statuses} — {@code ProductStatus[]} (ProductStatus.values())</li>
+ *   <li>{@code statuses} — {@code List<String>} (ProductStatus.name() 목록)</li>
+ *   <li>{@code productId} — {@code long} (수정 화면용)</li>
  * </ul>
  * View name: {@code seller/product-form}
  * 성공 redirect: {@code redirect:/seller/products/{id}/edit}
+ *
+ * <p>원래 {@code product.controller.SellerProductViewController}에서 {@code web.product}로 이동.
+ * {@code ProductService}·{@code CategoryService}·{@code UserDirectory}·{@code Product}·{@code ProductStatus}
+ * 직접 의존 제거 → {@link SellerProductFacade} 사용.
  */
 @Slf4j
 @Controller
@@ -55,15 +55,13 @@ public class SellerProductViewController {
 
     private static final String PRODUCT_FORM_VIEW = "seller/product-form";
 
-    private final ProductService productService;
-    private final CategoryService categoryService;
-    private final UserDirectory userDirectory;
+    private final SellerProductFacade sellerProductFacade;
 
     /**
      * 상품 등록 화면.
      * GET /seller/products/new
      *
-     * <p>빈 ProductForm + categories(List&lt;CategoryResponse&gt;) + statuses(ProductStatus[]) 모델 바인딩.
+     * <p>빈 ProductForm + categories(List&lt;CategoryResponse&gt;) + statuses(List&lt;String&gt;) 모델 바인딩.
      *
      * @param model Spring MVC 모델
      * @return view name "seller/product-form"
@@ -80,7 +78,7 @@ public class SellerProductViewController {
      * POST /seller/products
      *
      * <p>검증 실패: categories/statuses 재주입 → "seller/product-form" 재렌더(입력값·메시지 유지).
-     * 성공: actorId = userDirectory.findUserIdByEmail(auth.getName()) → productService.register
+     * 성공: actorEmail = auth.getName() → facade.register → 신규 productId 반환
      *      → redirect:/seller/products/{id}/edit (PRG 패턴).
      *
      * @param form          폼 백킹 객체 (모델 키 "productForm")
@@ -101,24 +99,23 @@ public class SellerProductViewController {
             return PRODUCT_FORM_VIEW;
         }
 
-        long actorId = userDirectory.findUserIdByEmail(auth.getName());
-
-        Product product = productService.register(
-                actorId,
+        long id = sellerProductFacade.register(
+                auth.getName(),
                 form.getCategoryId(),
                 form.getName(),
                 form.getDescription(),
                 form.getBasePrice()
         );
 
-        return "redirect:/seller/products/" + product.getId() + "/edit";
+        return "redirect:/seller/products/" + id + "/edit";
     }
 
     /**
      * 상품 수정 화면.
      * GET /seller/products/{id}/edit
      *
-     * <p>소유권 검사 포함(타인/미존재 → ProductAccessDeniedException/ProductNotFoundException → ViewExceptionHandler error/error).
+     * <p>소유권 검사 포함(타인/미존재 → ProductAccessDeniedException/ProductNotFoundException →
+     * ViewExceptionHandler error/error).
      *
      * @param id    수정할 상품 ID
      * @param auth  SecurityContext 인증 객체
@@ -131,12 +128,9 @@ public class SellerProductViewController {
             Authentication auth,
             Model model) {
 
-        long actorId = userDirectory.findUserIdByEmail(auth.getName());
-        boolean actorIsAdmin = isAdmin(auth);
+        ProductFormView view = sellerProductFacade.getForEdit(auth.getName(), isAdmin(auth), id);
 
-        Product product = productService.getForEdit(actorId, actorIsAdmin, id);
-
-        ProductForm form = toForm(product);
+        ProductForm form = toForm(view);
         model.addAttribute("productForm", form);
         model.addAttribute("productId", id);
         populateFormModel(model);
@@ -148,7 +142,7 @@ public class SellerProductViewController {
      * POST /seller/products/{id}
      *
      * <p>검증 실패: categories/statuses 재주입 → "seller/product-form" 재렌더.
-     * 성공: productService.update → redirect:/seller/products/{id}/edit.
+     * 성공: facade.update → redirect:/seller/products/{id}/edit.
      *
      * @param id            수정할 상품 ID
      * @param form          폼 백킹 객체 (모델 키 "productForm")
@@ -176,20 +170,15 @@ public class SellerProductViewController {
             return PRODUCT_FORM_VIEW;
         }
 
-        long actorId = userDirectory.findUserIdByEmail(auth.getName());
-        boolean actorIsAdmin = isAdmin(auth);
-
-        ProductStatus status = form.getStatus();
-
-        productService.update(
-                actorId,
-                actorIsAdmin,
+        sellerProductFacade.update(
+                auth.getName(),
+                isAdmin(auth),
                 id,
                 form.getCategoryId(),
                 form.getName(),
                 form.getDescription(),
                 form.getBasePrice(),
-                status
+                form.getStatus()
         );
 
         return "redirect:/seller/products/" + id + "/edit";
@@ -197,33 +186,34 @@ public class SellerProductViewController {
 
     /**
      * 폼 공통 모델 데이터 주입.
-     * categories(List&lt;CategoryResponse&gt;) + statuses(ProductStatus[]).
+     * categories(List&lt;CategoryResponse&gt;) + statuses(List&lt;String&gt;).
      */
     private void populateFormModel(Model model) {
-        List<CategoryResponse> categories = categoryService.list().stream()
-                .map(CategoryResponse::from)
-                .collect(Collectors.toList());
+        List<CategoryResponse> categories = sellerProductFacade.listCategories();
+        List<String> statuses = sellerProductFacade.productStatusNames();
         model.addAttribute("categories", categories);
-        model.addAttribute("statuses", ProductStatus.values());
+        model.addAttribute("statuses", statuses);
     }
 
     /**
-     * Product Entity → ProductForm 변환 (수정 화면용).
+     * {@link ProductFormView} → {@link ProductForm} 변환 (수정 화면용).
      * Entity를 모델에 직접 담지 않음(Constraint).
+     * status는 String으로 그대로 매핑.
      */
-    private ProductForm toForm(Product product) {
+    private ProductForm toForm(ProductFormView view) {
         ProductForm form = new ProductForm();
-        form.setCategoryId(product.getCategory() == null ? null : product.getCategory().getId());
-        form.setName(product.getName());
-        form.setDescription(product.getDescription());
-        form.setBasePrice(product.getBasePrice());
-        form.setStatus(product.getStatus());
+        form.setCategoryId(view.categoryId());
+        form.setName(view.name());
+        form.setDescription(view.description());
+        form.setBasePrice(view.basePrice());
+        form.setStatus(view.status());
         return form;
     }
 
     /**
      * ROLE_ADMIN 직접 보유 여부 판정.
      * RoleHierarchy 함의가 아닌 원본 ROLE_ADMIN 직접 보유로 판정.
+     * 순수 Spring Security 로직이라 web에 잔존.
      */
     private boolean isAdmin(Authentication auth) {
         return auth.getAuthorities().stream()

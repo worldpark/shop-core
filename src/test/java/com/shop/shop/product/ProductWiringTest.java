@@ -6,9 +6,12 @@ import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.controller.AdminCategoryRestController;
 import com.shop.shop.product.controller.CategoryRestController;
 import com.shop.shop.product.controller.SellerProductRestController;
-import com.shop.shop.product.controller.SellerProductViewController;
+import com.shop.shop.web.product.SellerProductViewController;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.service.CategoryService;
 import com.shop.shop.product.service.CategoryServiceResponse;
 import com.shop.shop.product.service.ProductService;
@@ -63,6 +66,15 @@ class ProductWiringTest {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     // ============================================================
     // 신규 진입 빈 등록 단언
@@ -134,12 +146,12 @@ class ProductWiringTest {
     }
 
     @Test
-    @DisplayName("포트-어댑터 배선: SellerProductViewController가 UserDirectory(어댑터)를 주입받는다")
-    void sellerProductViewController_has_user_directory_injected() {
+    @DisplayName("포트-어댑터 배선: SellerProductViewController가 SellerProductFacade를 주입받아 운영에서 해결된다")
+    void sellerProductViewController_has_seller_product_facade_injected() {
         SellerProductViewController controller = context.getBean(SellerProductViewController.class);
-        // SellerProductViewController가 UserDirectory를 주입받아 운영에서 해결됨
+        // SellerProductViewController(web)가 SellerProductFacade를 주입받아 운영에서 해결됨
         assertThat(controller).isNotNull();
-        // UserDirectory 빈이 어댑터로 단일 해결됨을 간접 확인
+        // UserDirectory 빈이 어댑터로 단일 해결됨을 간접 확인 (SellerProductFacadeImpl 내부 사용)
         UserDirectory userDirectory = context.getBean(UserDirectory.class);
         assertThat(userDirectory).isInstanceOf(MemberUserDirectoryAdapter.class);
     }

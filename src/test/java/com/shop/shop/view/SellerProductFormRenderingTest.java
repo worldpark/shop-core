@@ -2,12 +2,13 @@ package com.shop.shop.view;
 
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
-import com.shop.shop.product.domain.Product;
-import com.shop.shop.product.domain.ProductStatus;
-import com.shop.shop.product.dto.CategoryResponse;
+import com.shop.shop.product.dto.ProductFormView;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
-import com.shop.shop.product.spi.UserDirectory;
+import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,9 +24,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +42,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>실제 Thymeleaf 템플릿(templates/seller/product-form.html)이
  * layout/base·프래그먼트와 함께 올바르게 렌더링되는지 검증한다.
+ *
+ * <p>SellerProductFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * (원래 UserDirectory + CategoryRepository + ProductRepository를 직접 Mock하던 방식에서 전환)
  *
  * <p>검증 항목:
  * <ul>
@@ -53,7 +61,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>패턴: LayoutRenderingTest 컨벤션 준수.
  * - @SpringBootTest + @AutoConfigureMockMvc + @ActiveProfiles("test")
  * - @Import(FakeRefreshTokenStore) + @MockBean JPA/DB 의존 격리
- * - UserDirectory @MockBean으로 member 의존 격리
+ * - SellerProductFacade @MockBean으로 product 도메인 내부 격리
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -77,7 +85,16 @@ class SellerProductFormRenderingTest {
     private ProductRepository productRepository;
 
     @MockBean
-    private UserDirectory userDirectory;
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
+
+    @MockBean
+    private SellerProductFacade sellerProductFacade;
 
     private static final long SELLER_ID = 2L;
     private static final long PRODUCT_ID = 10L;
@@ -88,11 +105,10 @@ class SellerProductFormRenderingTest {
 
     @BeforeEach
     void setUp() {
-        // 기본 stub: 카테고리 1개
-        CategoryResponse cat = new CategoryResponse(1L, null, "전자기기", "electronics", 1);
-        when(categoryRepository.findAllByOrderBySortOrderAscIdAsc())
-                .thenReturn(List.of());
-        when(userDirectory.findUserIdByEmail(SELLER_EMAIL)).thenReturn(SELLER_ID);
+        // 기본 stub: 카테고리 비어있음, statuses 목록 제공
+        when(sellerProductFacade.listCategories()).thenReturn(List.of());
+        when(sellerProductFacade.productStatusNames())
+                .thenReturn(List.of("DRAFT", "ON_SALE", "SOLD_OUT", "HIDDEN"));
     }
 
     // ============================================================
@@ -185,8 +201,9 @@ class SellerProductFormRenderingTest {
     @DisplayName("(P7) GET /seller/products/{id}/edit — 수정 화면에 status 필드 노출")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void edit_form_renders_status_field() throws Exception {
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductFormView view = new ProductFormView(null, "상품", "설명", new BigDecimal("10000"), "DRAFT");
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID)))
+                .thenReturn(view);
 
         String body = mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
                 .andExpect(status().isOk())
@@ -203,8 +220,9 @@ class SellerProductFormRenderingTest {
     @DisplayName("(P8) GET /seller/products/{id}/edit — 폼 action이 /seller/products/{id} 여야 함")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void edit_form_action_contains_product_id() throws Exception {
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductFormView view = new ProductFormView(null, "상품", "설명", new BigDecimal("10000"), "DRAFT");
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID)))
+                .thenReturn(view);
 
         String body = mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
                 .andExpect(status().isOk())
@@ -218,8 +236,9 @@ class SellerProductFormRenderingTest {
     @DisplayName("(P9) GET /seller/products/{id}/edit — CSRF 토큰 자동 주입")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void edit_form_includes_csrf_token() throws Exception {
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductFormView view = new ProductFormView(null, "상품", "설명", new BigDecimal("10000"), "DRAFT");
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID)))
+                .thenReturn(view);
 
         String body = mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
                 .andExpect(status().isOk())
@@ -287,21 +306,5 @@ class SellerProductFormRenderingTest {
 
         assertThat(body).as("nav에 /seller/products/new 링크가 있어야 함").contains("/seller/products/new");
         assertThat(body).as("nav에 상품 등록 텍스트가 있어야 함").contains("상품 등록");
-    }
-
-    // ============================================================
-    // helpers
-    // ============================================================
-
-    private Product sampleProduct(long ownerId, long productId) {
-        Product product = Product.create(ownerId, null, "상품", "설명", new BigDecimal("10000"));
-        try {
-            var idField = Product.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(product, productId);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return product;
     }
 }

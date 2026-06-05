@@ -1,10 +1,9 @@
 /**
  * 회원 모듈 — 컨트롤러 레이어.
  *
- * <p>REST 진입점: {@code @RestController → ServiceResponse → Service → Repository}.
- * View 진입점: {@code @Controller (ViewController) → Service → Repository}.
- *
- * <p>현재 {@link com.shop.shop.member.controller.LoginViewController}가 {@code /login} 화면을 담당한다.
+ * <p>REST 진입점만 담당한다: {@code @RestController → ServiceResponse → Service → Repository}.
+ * SSR 화면(ViewController)은 web 지원 모듈로 분리되었으며(Task 003),
+ * 화면 요청은 {@code member.spi}의 View 전용 facade를 통해 이 모듈에 도달한다.
  *
  * <p>가드레일:
  * <ul>

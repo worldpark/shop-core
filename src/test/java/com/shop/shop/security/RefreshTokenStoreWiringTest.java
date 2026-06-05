@@ -3,7 +3,10 @@ package com.shop.shop.security;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +48,15 @@ class RefreshTokenStoreWiringTest {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     @Test
     @DisplayName("운영 배선: FakeRefreshTokenStore 없이 RefreshTokenStore 빈이 RedisRefreshTokenStore로 등록된다")

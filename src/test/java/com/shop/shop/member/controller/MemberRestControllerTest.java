@@ -8,7 +8,10 @@ import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +83,15 @@ class MemberRestControllerTest {
 
     @MockBean
     private ProductRepository productRepository;
+
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
 
     private User testUser;
 

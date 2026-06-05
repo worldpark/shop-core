@@ -3,7 +3,10 @@ package com.shop.shop.view;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +53,15 @@ class LayoutRenderingTest {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     /** footer 프래그먼트 식별 마커 — fragments/footer.html 의 실제 텍스트와 일치 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

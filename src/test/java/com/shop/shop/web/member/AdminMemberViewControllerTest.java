@@ -1,13 +1,15 @@
-package com.shop.shop.member.controller;
+package com.shop.shop.web.member;
 
 import com.shop.shop.common.exception.RoleChangeNotAllowedException;
-import com.shop.shop.member.domain.Role;
-import com.shop.shop.member.domain.User;
+import com.shop.shop.member.dto.MemberSummaryResponse;
 import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.member.spi.AdminMemberFacade;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,15 +20,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -43,11 +44,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * AdminMemberViewController + SecurityConfig View 체인 MockMvc 통합 테스트.
  *
- * <p>템플릿 실제 렌더링 단언은 view-implementor 단계로 남겨두고,
- * 이 테스트는 컨트롤러 로직/권한 차단/redirect/flash/서비스 위임 검증에 집중한다.
+ * <p>web.member 패키지로 이동 (원래 member.controller 패키지).
+ * AdminMemberFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
  *
- * <p>MemberService: @MockBean으로 stub.
- * MemberRepository: @MockBean (JPA context 없이 기동).
+ * <p>MemberRepository: @MockBean (JPA context 없이 기동).
  * FakeRefreshTokenStore: Redis 미기동 비파괴.
  */
 @SpringBootTest
@@ -66,7 +66,7 @@ class AdminMemberViewControllerTest {
     private MemberUserDetailsService memberUserDetailsService;
 
     @MockBean
-    private MemberService memberService;
+    private AdminMemberFacade adminMemberFacade;
 
     @MockBean
     private CategoryRepository categoryRepository;
@@ -74,17 +74,19 @@ class AdminMemberViewControllerTest {
     @MockBean
     private ProductRepository productRepository;
 
-    private User adminUser;
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
 
     @BeforeEach
     void setUp() {
-        adminUser = userWithId(1L, "admin@example.com", Role.ADMIN);
-
-        // stub: getByEmail → adminUser (View principal 통일용)
-        when(memberService.getByEmail("admin@example.com")).thenReturn(adminUser);
-
         // stub: searchMembers → 빈 페이지
-        when(memberService.searchMembers(any(), any(), any(Pageable.class)))
+        when(adminMemberFacade.searchMembers(any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of()));
     }
 
@@ -121,13 +123,12 @@ class AdminMemberViewControllerTest {
     // ============================================================
 
     @Test
-    @DisplayName("GET /admin/members — ADMIN → 200, searchMembers 호출 (템플릿 렌더 단언)")
+    @DisplayName("GET /admin/members — ADMIN → 200, adminMemberFacade.searchMembers 호출")
     @WithMockUser(roles = "ADMIN", username = "admin@example.com")
     void get_list_admin_calls_searchMembers() throws Exception {
-        // 템플릿(templates/admin/members.html) 구현 완료 후 실제 200 렌더를 단언한다.
         mockMvc.perform(get("/admin/members"))
                 .andExpect(status().isOk());
-        verify(memberService).searchMembers(any(), any(), any(Pageable.class));
+        verify(adminMemberFacade).searchMembers(any(), any(), anyInt(), anyInt());
     }
 
     // ============================================================
@@ -147,9 +148,8 @@ class AdminMemberViewControllerTest {
                 .andExpect(redirectedUrl("/admin/members"))
                 .andExpect(flash().attribute("flashSuccess", "권한이 변경되었습니다."));
 
-        // adminUserId는 getByEmail로 통일됐는지 확인
-        verify(memberService).getByEmail("admin@example.com");
-        verify(memberService).changeRole(eq(1L), eq(targetId), eq(Role.SELLER));
+        // facade.changeRole에 adminEmail, targetMemberId, role(String) 전달 검증
+        verify(adminMemberFacade).changeRole(eq("admin@example.com"), eq(targetId), eq("SELLER"));
     }
 
     // ============================================================
@@ -162,7 +162,7 @@ class AdminMemberViewControllerTest {
     void post_changeRole_failure_redirects_with_flashError() throws Exception {
         long targetId = 1L;
         doThrow(RoleChangeNotAllowedException.selfDemotion())
-                .when(memberService).changeRole(anyLong(), eq(targetId), any(Role.class));
+                .when(adminMemberFacade).changeRole(anyString(), eq(targetId), anyString());
 
         mockMvc.perform(post("/admin/members/{id}/role", targetId)
                         .with(csrf())
@@ -178,7 +178,7 @@ class AdminMemberViewControllerTest {
     void post_changeRole_failure_is_not_json_response() throws Exception {
         long targetId = 1L;
         doThrow(RoleChangeNotAllowedException.selfDemotion())
-                .when(memberService).changeRole(anyLong(), eq(targetId), any(Role.class));
+                .when(adminMemberFacade).changeRole(anyString(), eq(targetId), anyString());
 
         String contentType = mockMvc.perform(post("/admin/members/{id}/role", targetId)
                         .with(csrf())
@@ -210,19 +210,5 @@ class AdminMemberViewControllerTest {
                         .with(csrf())
                         .param("role", "CONSUMER"))
                 .andExpect(status().isForbidden());
-    }
-
-    // helpers
-
-    private User userWithId(long id, String email, Role role) {
-        User user = User.of(email, "hash", "이름" + id, null, role);
-        try {
-            var idField = User.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(user, id);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return user;
     }
 }

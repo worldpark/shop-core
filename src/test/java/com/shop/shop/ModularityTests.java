@@ -15,7 +15,12 @@ import org.springframework.modulith.core.ApplicationModules;
  *   <li>OPEN 모듈(common)의 internal 참조는 허용</li>
  * </ul>
  *
- * <p>인식되는 모듈: member / product / cart / order / payment / inventory / common(OPEN) / security / home / platform
+ * <p>인식되는 모듈: member / product / cart / order / payment / inventory /
+ * common(OPEN) / security / web / platform
+ *
+ * <p>web — Thymeleaf ViewController·ViewModel·Form·화면 조립 전담 지원 모듈(Task 003).
+ * member.spi, member.dto, product.spi, product.dto named interface만 의존한다.
+ * 기존 home 모듈은 web으로 통합되어 제거되었다(HomeViewController → web.home).
  */
 class ModularityTests {
 

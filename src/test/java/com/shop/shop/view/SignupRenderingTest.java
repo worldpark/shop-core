@@ -1,10 +1,13 @@
 package com.shop.shop.view;
 
 import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.member.spi.MemberSignupFacade;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,13 +58,22 @@ class SignupRenderingTest {
     private MemberUserDetailsService memberUserDetailsService;
 
     @MockBean
-    private MemberService memberService;
+    private MemberSignupFacade memberSignupFacade;
 
     @MockBean
     private CategoryRepository categoryRepository;
 
     @MockBean
     private ProductRepository productRepository;
+
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
 
     /** footer 프래그먼트 식별 마커 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

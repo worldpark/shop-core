@@ -116,6 +116,24 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public Product getForEdit(long actorId, boolean actorIsAdmin, long productId) {
+        return getOwnedProduct(actorId, actorIsAdmin, productId);
+    }
+
+    /**
+     * 상품 로드 + 소유권 검사 (단일 출처 메서드).
+     *
+     * <p>옵션/variant 서비스 등 "상품 로드 + 소유권 검사"를 필요로 하는 모든 곳에서 이 메서드를 호출한다.
+     * 소유권 불변식(V12/V13)이 한 곳에 유지된다.
+     *
+     * @param actorId      행위자 userId
+     * @param actorIsAdmin 행위자가 ADMIN인지 여부 (true면 소유권 검사 스킵)
+     * @param productId    조회할 상품 ID
+     * @return 조회된 Product Entity (소유권 검사 통과)
+     * @throws ProductNotFoundException     상품 미존재(404) — V13
+     * @throws ProductAccessDeniedException 타인 상품 접근(404) — V12
+     */
+    @Transactional(readOnly = true)
+    public Product getOwnedProduct(long actorId, boolean actorIsAdmin, long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId));
 

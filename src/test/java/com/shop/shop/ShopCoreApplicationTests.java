@@ -3,7 +3,10 @@ package com.shop.shop;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -38,6 +41,15 @@ class ShopCoreApplicationTests {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     @Test
     void contextLoads() {

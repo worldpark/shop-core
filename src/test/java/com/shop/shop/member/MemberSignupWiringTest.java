@@ -1,12 +1,15 @@
 package com.shop.shop.member;
 
 import com.shop.shop.member.controller.MemberRestController;
-import com.shop.shop.member.controller.MemberSignupViewController;
+import com.shop.shop.web.member.MemberSignupViewController;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberServiceResponse;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +55,15 @@ class MemberSignupWiringTest {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     @Test
     @DisplayName("운영 배선: MemberRestController 빈이 컨텍스트에 등록된다")

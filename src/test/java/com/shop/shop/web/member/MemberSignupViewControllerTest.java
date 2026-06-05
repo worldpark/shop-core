@@ -1,11 +1,14 @@
-package com.shop.shop.member.controller;
+package com.shop.shop.web.member;
 
 import com.shop.shop.common.exception.DuplicateEmailException;
 import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.member.spi.MemberSignupFacade;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,9 +22,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -32,13 +35,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * MemberSignupViewController MockMvc 테스트.
  *
- * <p>참고: GET /signup, login 화면 렌더링(본문 단언)은 member/signup.html이 아직 없으므로
- * 실제 렌더 테스트는 view-implementor 단계로 남긴다.
- * 이 테스트는 컨트롤러 로직·검증·redirect·서비스 호출·비번 clear 위주로 작성.
+ * <p>web.member 패키지로 이동 (원래 member.controller 패키지).
+ * MemberSignupFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
  *
  * <p>검증 시나리오:
- * - POST /signup 정상(csrf) → 302 redirect:/login?signup, MemberService.signup 호출 검증
- * - POST /signup Bean Validation 실패 → 200 view member/signup, 필드 에러, 서비스 미호출
+ * - POST /signup 정상(csrf) → 302 redirect:/login?signup, MemberSignupFacade.signup 호출 검증
+ * - POST /signup Bean Validation 실패 → 200 view member/signup, 필드 에러, facade 미호출
  * - POST /signup 이메일 중복(DuplicateEmailException) → 200 member/signup, email 필드 에러
  * - POST /signup 비번 필드 clear 검증 (password/passwordConfirm null)
  * - POST /signup CSRF 없음 → 403
@@ -60,7 +62,7 @@ class MemberSignupViewControllerTest {
     private MemberRepository memberRepository;
 
     @MockBean
-    private MemberService memberService;
+    private MemberSignupFacade memberSignupFacade;
 
     @MockBean
     private MemberUserDetailsService memberUserDetailsService;
@@ -71,8 +73,17 @@ class MemberSignupViewControllerTest {
     @MockBean
     private ProductRepository productRepository;
 
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
+
     @Test
-    @DisplayName("POST /signup 정상 제출(csrf) → 302 redirect:/login?signup, MemberService.signup 호출")
+    @DisplayName("POST /signup 정상 제출(csrf) → 302 redirect:/login?signup, MemberSignupFacade.signup 호출")
     void signup_success_redirects_to_login_with_signup_param() throws Exception {
         mockMvc.perform(post("/signup")
                         .with(csrf())
@@ -83,11 +94,11 @@ class MemberSignupViewControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login?signup"));
 
-        verify(memberService).signup(EMAIL, PASSWORD, NAME, null);
+        verify(memberSignupFacade).signup(EMAIL, PASSWORD, NAME, null);
     }
 
     @Test
-    @DisplayName("POST /signup 이메일 형식 오류 → 200 view member/signup, email 필드 에러, 서비스 미호출")
+    @DisplayName("POST /signup 이메일 형식 오류 → 200 view member/signup, email 필드 에러, facade 미호출")
     void signup_invalid_email_rerenders_form_with_errors() throws Exception {
         mockMvc.perform(post("/signup")
                         .with(csrf())
@@ -99,7 +110,7 @@ class MemberSignupViewControllerTest {
                 .andExpect(view().name("member/signup"))
                 .andExpect(model().attributeHasFieldErrors("signupForm", "email"));
 
-        verify(memberService, never()).signup(anyString(), anyString(), anyString(), any());
+        verify(memberSignupFacade, never()).signup(anyString(), anyString(), anyString(), any());
     }
 
     @Test
@@ -115,7 +126,7 @@ class MemberSignupViewControllerTest {
                 .andExpect(view().name("member/signup"))
                 .andExpect(model().attributeHasFieldErrors("signupForm", "password"));
 
-        verify(memberService, never()).signup(anyString(), anyString(), anyString(), any());
+        verify(memberSignupFacade, never()).signup(anyString(), anyString(), anyString(), any());
     }
 
     @Test
@@ -131,14 +142,14 @@ class MemberSignupViewControllerTest {
                 .andExpect(view().name("member/signup"))
                 .andExpect(model().attributeHasFieldErrors("signupForm", "passwordConfirm"));
 
-        verify(memberService, never()).signup(anyString(), anyString(), anyString(), any());
+        verify(memberSignupFacade, never()).signup(anyString(), anyString(), anyString(), any());
     }
 
     @Test
     @DisplayName("POST /signup 이메일 중복(DuplicateEmailException) → 200 member/signup, email 필드 에러")
     void signup_duplicate_email_rerenders_form_with_email_error() throws Exception {
-        when(memberService.signup(anyString(), anyString(), anyString(), any()))
-                .thenThrow(new DuplicateEmailException());
+        doThrow(new DuplicateEmailException())
+                .when(memberSignupFacade).signup(anyString(), anyString(), anyString(), any());
 
         mockMvc.perform(post("/signup")
                         .with(csrf())
@@ -173,8 +184,8 @@ class MemberSignupViewControllerTest {
     @Test
     @DisplayName("POST /signup 이메일 중복 시 비번 필드 clear")
     void signup_duplicate_email_clears_password_fields() throws Exception {
-        when(memberService.signup(anyString(), anyString(), anyString(), any()))
-                .thenThrow(new DuplicateEmailException());
+        doThrow(new DuplicateEmailException())
+                .when(memberSignupFacade).signup(anyString(), anyString(), anyString(), any());
 
         mockMvc.perform(post("/signup")
                         .with(csrf())

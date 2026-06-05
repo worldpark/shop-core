@@ -10,4 +10,5 @@
  *   <li>Record 또는 {@code @Getter} + {@code @NoArgsConstructor} 사용.</li>
  * </ul>
  */
+@org.springframework.modulith.NamedInterface("dto")
 package com.shop.shop.product.dto;

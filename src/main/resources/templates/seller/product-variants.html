@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!--
+    상품 옵션/옵션값/Variant 관리 화면.
+    view name: seller/product-variants
+    레이아웃: layout/base :: layout(title, content) — 인증 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 모델 키: product(SellerProductRef) / options(List<ProductOptionResponse>) / variants(List<ProductVariantResponse>)
+      - 폼 객체: optionForm / optionValueForm / variantForm
+      - 옵션 생성 action: POST /seller/products/{productId}/options
+      - 옵션값 생성 action: POST /seller/products/{productId}/options/{optionId}/values
+      - Variant 생성 action: POST /seller/products/{productId}/variants
+      - Variant 수정 action: POST /seller/products/{productId}/variants/{variantId}
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - 검증 실패: th:errors로 필드별 메시지 echo
+      - Entity 직접 노출 금지 (DTO만 모델에 담김)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="'옵션/Variant 관리 - ' + ${product.name}">옵션/Variant 관리</title>
+</head>
+<body>
+<main>
+    <div class="variants-container">
+        <!-- 상품명 헤딩 -->
+        <h1 class="page-title" th:text="${product.name} + ' — 옵션/Variant 관리'">상품명 — 옵션/Variant 관리</h1>
+
+        <!-- ====================================================
+             옵션 영역
+             ==================================================== -->
+        <section class="variants-section">
+            <h2 class="section-title">옵션 목록</h2>
+
+            <!-- 옵션이 없을 때 -->
+            <p class="empty-msg" th:if="${#lists.isEmpty(options)}">등록된 옵션이 없습니다.</p>
+
+            <!-- 옵션 목록 -->
+            <div class="option-list" th:unless="${#lists.isEmpty(options)}">
+                <div class="option-item" th:each="option : ${options}">
+                    <div class="option-header">
+                        <span class="option-name" th:text="${option.name}">옵션명</span>
+                        <span class="option-values">
+                            <span th:if="${#lists.isEmpty(option.values)}" class="no-values">옵션값 없음</span>
+                            <span th:each="val, stat : ${option.values}">
+                                <span class="option-value-badge" th:text="${val.value}">옵션값</span>
+                            </span>
+                        </span>
+                    </div>
+
+                    <!-- 옵션값 생성 폼 (각 옵션마다) -->
+                    <div class="option-value-form-wrapper">
+                        <form method="post"
+                              th:action="@{/seller/products/{productId}/options/{optionId}/values(productId=${product.productId}, optionId=${option.optionId})}"
+                              th:object="${optionValueForm}">
+                            <div class="form-inline">
+                                <label th:for="'value-' + ${option.optionId}">옵션값 추가</label>
+                                <input type="text"
+                                       th:id="'value-' + ${option.optionId}"
+                                       th:name="value"
+                                       th:value="${optionValueForm.value}"
+                                       placeholder="옵션값을 입력하세요">
+                                <span class="field-error"
+                                      th:if="${failedOptionValueOptionId != null and failedOptionValueOptionId == option.optionId and #fields.hasErrors('value')}"
+                                      th:errors="*{value}"></span>
+                                <button type="submit" class="btn btn-secondary btn-sm">추가</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 옵션 생성 폼 -->
+            <div class="option-create-form">
+                <h3 class="subsection-title">새 옵션 추가</h3>
+                <form method="post"
+                      th:action="@{/seller/products/{productId}/options(productId=${product.productId})}"
+                      th:object="${optionForm}">
+                    <div class="form-group">
+                        <label for="optionName">옵션명</label>
+                        <input type="text"
+                               id="optionName"
+                               th:field="*{name}"
+                               placeholder="예: 색상, 사이즈">
+                        <span class="field-error"
+                              th:if="${#fields.hasErrors('name')}"
+                              th:errors="*{name}"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">옵션 추가</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ====================================================
+             Variant 영역
+             ==================================================== -->
+        <section class="variants-section">
+            <h2 class="section-title">Variant 목록</h2>
+
+            <!-- Variant 테이블 -->
+            <div class="table-wrapper" th:unless="${#lists.isEmpty(variants)}">
+                <table class="variants-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>가격</th>
+                            <th>재고</th>
+                            <th>활성</th>
+                            <th>옵션 조합</th>
+                            <th>수정</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="variant : ${variants}">
+                            <td th:text="${variant.sku}">SKU</td>
+                            <td th:text="${variant.price}">0</td>
+                            <td th:text="${variant.stock}">0</td>
+                            <td th:text="${variant.active} ? '활성' : '비활성'">활성</td>
+                            <td>
+                                <span th:if="${#lists.isEmpty(variant.optionValueLabels)}" class="no-values">-</span>
+                                <span th:each="label, stat : ${variant.optionValueLabels}">
+                                    <span class="option-value-badge" th:text="${label}">라벨</span>
+                                </span>
+                            </td>
+                            <td>
+                                <!-- Variant 수정 폼 (인라인) -->
+                                <form method="post"
+                                      th:action="@{/seller/products/{productId}/variants/{variantId}(productId=${product.productId}, variantId=${variant.variantId})}"
+                                      th:object="${variantForm}"
+                                      class="variant-update-form">
+                                    <input type="hidden" name="sku"
+                                           th:value="${variant.sku}">
+                                    <input type="hidden" name="price"
+                                           th:value="${variant.price}">
+                                    <input type="hidden" name="stock"
+                                           th:value="${variant.stock}">
+                                    <input type="hidden" name="active"
+                                           th:value="${variant.active}">
+                                    <input type="hidden" name="optionValueIds"
+                                           th:each="id : ${variant.optionValueIds}"
+                                           th:value="${id}">
+                                    <a th:href="@{/seller/products/{productId}/variants(productId=${product.productId})}"
+                                       class="btn btn-outline btn-sm"
+                                       th:attr="data-variant-id=${variant.variantId},data-sku=${variant.sku},data-price=${variant.price},data-stock=${variant.stock},data-active=${variant.active}">수정</a>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="empty-msg" th:if="${#lists.isEmpty(variants)}">등록된 variant가 없습니다.</p>
+
+            <!-- Variant 생성 폼 -->
+            <div class="variant-create-form" id="variant-edit-form">
+                <h3 class="subsection-title">새 Variant 추가</h3>
+                <form method="post"
+                      th:action="@{/seller/products/{productId}/variants(productId=${product.productId})}"
+                      th:object="${variantForm}">
+
+                    <!-- SKU -->
+                    <div class="form-group">
+                        <label for="variantSku">SKU</label>
+                        <input type="text"
+                               id="variantSku"
+                               th:field="*{sku}"
+                               placeholder="고유한 SKU를 입력하세요">
+                        <span class="field-error"
+                              th:if="${#fields.hasErrors('sku')}"
+                              th:errors="*{sku}"></span>
+                    </div>
+
+                    <!-- 가격 -->
+                    <div class="form-group">
+                        <label for="variantPrice">가격</label>
+                        <input type="number"
+                               id="variantPrice"
+                               th:field="*{price}"
+                               step="1"
+                               min="0"
+                               placeholder="0 이상의 가격을 입력하세요">
+                        <span class="field-error"
+                              th:if="${#fields.hasErrors('price')}"
+                              th:errors="*{price}"></span>
+                    </div>
+
+                    <!-- 재고 -->
+                    <div class="form-group">
+                        <label for="variantStock">재고</label>
+                        <input type="number"
+                               id="variantStock"
+                               th:field="*{stock}"
+                               step="1"
+                               min="0"
+                               placeholder="0 이상의 재고를 입력하세요">
+                        <span class="field-error"
+                              th:if="${#fields.hasErrors('stock')}"
+                              th:errors="*{stock}"></span>
+                    </div>
+
+                    <!-- 활성 여부 -->
+                    <div class="form-group form-check">
+                        <input type="checkbox"
+                               id="variantActive"
+                               th:field="*{active}">
+                        <label for="variantActive" class="check-label">활성</label>
+                    </div>
+
+                    <!-- 옵션값 선택 (각 옵션마다 값 체크박스) -->
+                    <div class="form-group" th:if="${not #lists.isEmpty(options)}">
+                        <label>옵션값 선택</label>
+                        <div class="option-value-checks" th:each="option : ${options}">
+                            <span class="option-group-label" th:text="${option.name}">옵션명</span>
+                            <div class="option-value-check-row">
+                                <span th:each="val : ${option.values}">
+                                    <input type="checkbox"
+                                           name="optionValueIds"
+                                           th:value="${val.optionValueId}"
+                                           th:id="'optionValue-' + ${val.optionValueId}">
+                                    <label th:for="'optionValue-' + ${val.optionValueId}"
+                                           th:text="${val.value}"
+                                           class="check-label">값</label>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Variant 추가</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- 상품 수정으로 돌아가기 -->
+        <div class="back-link">
+            <a th:href="@{/seller/products/{id}/edit(id=${product.productId})}" class="btn btn-outline">
+                상품 수정으로 돌아가기
+            </a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

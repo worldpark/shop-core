@@ -7,7 +7,10 @@ import com.shop.shop.product.domain.Category;
 import com.shop.shop.product.dto.CategoryCreateRequest;
 import com.shop.shop.product.dto.CategoryUpdateRequest;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import com.shop.shop.common.exception.DuplicateSlugException;
@@ -72,6 +75,15 @@ class CategoryRestControllerSecurityTest {
 
     @MockBean
     private ProductRepository productRepository;
+
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
 
     private String adminToken;
     private String sellerToken;

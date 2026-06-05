@@ -1,8 +1,8 @@
-package com.shop.shop.member.controller;
+package com.shop.shop.web.member;
 
 import com.shop.shop.common.exception.DuplicateEmailException;
 import com.shop.shop.member.dto.SignupForm;
-import com.shop.shop.member.service.MemberService;
+import com.shop.shop.member.spi.MemberSignupFacade;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 /**
  * 회원가입 View 진입점.
  *
- * <p>레이어: ViewController → MemberService → MemberRepository (ServiceResponse 미사용 — architecture-rule).
+ * <p>레이어: ViewController → {@link MemberSignupFacade}(published port) → MemberService → MemberRepository.
  * 모델엔 DTO/ViewModel만 담는다 (Entity 직접 전달 금지).
  *
  * <p>비밀번호 echo 차단 (§1.3):
@@ -23,14 +23,18 @@ import org.springframework.web.bind.annotation.PostMapping;
  * 이메일/name/phone은 유지하여 사용자 편의 제공.
  *
  * <p>이메일 중복 처리 (§1.4):
- * MemberService.signup이 DuplicateEmailException을 던지면 BindingResult.rejectValue("email", ...)로
- * email 필드 에러로 변환 후 재렌더 — REST JSON 반환 금지 (error-response-rule: View는 재렌더).
+ * {@link MemberSignupFacade#signup}이 {@link DuplicateEmailException}을 던지면
+ * BindingResult.rejectValue("email", ...)로 email 필드 에러로 변환 후 재렌더 —
+ * REST JSON 반환 금지 (error-response-rule: View는 재렌더).
+ *
+ * <p>원래 {@code member.controller.MemberSignupViewController}에서 {@code web.member}로 이동.
+ * {@code MemberService} 직접 의존 제거 → {@link MemberSignupFacade} 사용.
  */
 @Controller
 @RequiredArgsConstructor
 public class MemberSignupViewController {
 
-    private final MemberService memberService;
+    private final MemberSignupFacade memberSignupFacade;
 
     /**
      * 회원가입 화면 표시.
@@ -53,8 +57,8 @@ public class MemberSignupViewController {
      * <p>처리 흐름:
      * <ol>
      *   <li>@Valid 검증 실패 → 비번 clear → "member/signup" 재렌더 (필드 에러 표시)</li>
-     *   <li>MemberService.signup 호출</li>
-     *   <li>DuplicateEmailException → email 필드 에러 바인딩 → 비번 clear → "member/signup" 재렌더</li>
+     *   <li>{@link MemberSignupFacade#signup} 호출</li>
+     *   <li>{@link DuplicateEmailException} → email 필드 에러 바인딩 → 비번 clear → "member/signup" 재렌더</li>
      *   <li>성공 → "redirect:/login?signup"</li>
      * </ol>
      *
@@ -73,9 +77,9 @@ public class MemberSignupViewController {
             return "member/signup";
         }
 
-        // 2. 회원가입 도메인 로직 실행 (MemberService — 비즈니스 로직은 Service에)
+        // 2. 회원가입 도메인 로직 실행 (facade 경유 — 비즈니스 로직은 Service에)
         try {
-            memberService.signup(form.getEmail(), form.getPassword(), form.getName(), form.getPhone());
+            memberSignupFacade.signup(form.getEmail(), form.getPassword(), form.getName(), form.getPhone());
         } catch (DuplicateEmailException e) {
             // 3. 이메일 중복 — email 필드 에러로 변환 후 재렌더 (JSON 반환 금지)
             bindingResult.rejectValue("email", "duplicate", "이미 사용 중인 이메일입니다.");

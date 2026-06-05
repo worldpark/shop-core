@@ -1,12 +1,14 @@
 package com.shop.shop.view;
 
-import com.shop.shop.member.domain.Role;
-import com.shop.shop.member.domain.User;
+import com.shop.shop.member.dto.MemberSummaryResponse;
 import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.member.spi.AdminMemberFacade;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,16 +20,16 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -37,6 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>실제 Thymeleaf 템플릿(templates/admin/members.html)이 레이아웃·프래그먼트와 함께
  * 올바르게 렌더링되는지 검증한다.
+ *
+ * <p>AdminMemberFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * (원래 MemberService를 직접 Mock하던 방식에서 facade Mock 방식으로 전환)
  *
  * <p>검증 항목:
  * <ul>
@@ -68,7 +73,7 @@ class AdminMembersRenderingTest {
     private MemberUserDetailsService memberUserDetailsService;
 
     @MockBean
-    private MemberService memberService;
+    private AdminMemberFacade adminMemberFacade;
 
     @MockBean
     private CategoryRepository categoryRepository;
@@ -76,19 +81,26 @@ class AdminMembersRenderingTest {
     @MockBean
     private ProductRepository productRepository;
 
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
+
     /** 테스트용 비밀번호 hash — 본문에 절대 노출되면 안 됨 */
     private static final String SENSITIVE_PASSWORD_HASH = "SUPER_SECRET_HASH_SHOULD_NOT_APPEAR";
 
     @BeforeEach
     void setUp() {
-        // stub: searchMembers → 회원 1명이 포함된 페이지 반환
-        User member = createUserWithId(42L, "user@example.com", "홍길동", Role.SELLER);
-        Pageable pageable = PageRequest.of(0, 20);
-        when(memberService.searchMembers(any(), any(), any(Pageable.class)))
+        // stub: searchMembers → 회원 1명이 포함된 페이지 반환 (MemberSummaryResponse DTO 직접 사용)
+        MemberSummaryResponse member = new MemberSummaryResponse(
+                42L, "user@example.com", "홍길동", "SELLER", Instant.now());
+        PageRequest pageable = PageRequest.of(0, 20);
+        when(adminMemberFacade.searchMembers(any(), any(), anyInt(), anyInt()))
                 .thenReturn(new PageImpl<>(List.of(member), pageable, 1L));
-
-        // stub: getByEmail (권한 변경 POST용 — 이 테스트에서는 GET만 테스트하지만 컨텍스트 안전)
-        when(memberRepository.findByEmail(any())).thenReturn(Optional.empty());
     }
 
     // ============================================================
@@ -211,15 +223,11 @@ class AdminMembersRenderingTest {
                 .getResponse()
                 .getContentAsString();
 
-        // role-change-form 내의 셀렉트에 ADMIN value 옵션이 없어야 함
-        // 검색 폼 role 셀렉트(필터용)는 ADMIN 포함이 허용되므로, 변경 폼 셀렉트를 구분 검증.
         // role-change-form class 내에 value="ADMIN" 옵션이 없음을 단언.
-        // 단순 접근: "role-change-form" 섹션 이후 "<option value=\"ADMIN\"" 이 없음을 확인.
         int roleChangeFormIdx = body.indexOf("role-change-form");
         assertThat(roleChangeFormIdx).as("role-change-form이 본문에 존재해야 함").isGreaterThanOrEqualTo(0);
 
         // role-change-form 부분 추출 후 ADMIN value 옵션 부재 확인
-        // (권한 변경 폼은 행마다 생성되므로 첫 번째 form 기준으로 검증)
         String roleChangeFormSection = body.substring(roleChangeFormIdx);
         int formEndIdx = roleChangeFormSection.indexOf("</form>");
         String firstRoleChangeForm = formEndIdx > 0
@@ -269,8 +277,7 @@ class AdminMembersRenderingTest {
                 .getResponse()
                 .getContentAsString();
 
-        // stub에서 지정한 민감 해시 값이 렌더링된 본문에 노출되면 안 됨
-        // (MemberSummaryResponse DTO에 passwordHash 필드가 없음을 런타임에서 추가 확인)
+        // MemberSummaryResponse DTO에 passwordHash 필드가 없으므로 절대 노출되면 안 됨
         assertThat(body).as("민감 해시 값이 본문에 노출되면 안 됨 (DTO에 passwordHash 필드 없음)")
                 .doesNotContain(SENSITIVE_PASSWORD_HASH);
     }
@@ -287,21 +294,5 @@ class AdminMembersRenderingTest {
 
         assertThat(body).as("/css/app.css 링크가 있어야 함 (layout/base 연계)")
                 .contains("/css/app.css");
-    }
-
-    // ============================================================
-    // helpers
-    // ============================================================
-
-    private User createUserWithId(long id, String email, String name, Role role) {
-        User user = User.of(email, SENSITIVE_PASSWORD_HASH, name, null, role);
-        try {
-            var idField = User.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(user, id);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return user;
     }
 }

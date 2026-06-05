@@ -1,15 +1,17 @@
-package com.shop.shop.product.controller;
+package com.shop.shop.web.product;
 
-import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.MemberUserDetailsService;
-import com.shop.shop.product.domain.Product;
-import com.shop.shop.product.domain.ProductStatus;
-import com.shop.shop.product.repository.CategoryRepository;
-import com.shop.shop.product.repository.ProductRepository;
-import com.shop.shop.product.spi.UserDirectory;
-import com.shop.shop.security.support.FakeRefreshTokenStore;
 import com.shop.shop.common.exception.ProductAccessDeniedException;
 import com.shop.shop.common.exception.ProductNotFoundException;
+import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
+import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.product.spi.SellerProductFacade;
+import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -44,14 +45,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * SellerProductViewController + SecurityConfig View 체인 MockMvc 통합 테스트.
  *
- * <p>UserDirectory를 @MockBean으로 주입 — member 의존 없이 View 단독 검증(포트-어댑터 격리).
- * MemberUserDirectoryAdapter(운영 어댑터)는 이 테스트에서 검증되지 않음 (ProductWiringTest에서 별도 단언).
+ * <p>web.product 패키지로 이동 (원래 product.controller 패키지).
+ * SellerProductFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
  *
- * <p>뷰 실제 HTML 렌더링 단언은 view-implementor 단계로 미룬다 (템플릿 미작성 상태).
- * 이 테스트는 view name·model 속성·redirect·권한 차단·서비스 위임에 집중한다.
+ * <p>MemberRepository: @MockBean (JPA context 없이 기동).
+ * FakeRefreshTokenStore: Redis 미기동 비파괴.
+ * ProductRepository/CategoryRepository: @MockBean (직접 사용 없음 — facade Mock 경유).
  *
- * <!-- NOTE: HTML 렌더링 단언(th:errors echo, CSRF 히든 마커 실제 내용)은
- *      view-implementor가 seller/product-form.html 작성 후 별도 ViewRenderingTest에서 검증한다. -->
+ * <p>이 테스트는 view name·model 속성·redirect·권한 차단·facade 위임에 집중한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -74,13 +75,22 @@ class SellerProductViewControllerTest {
     @MockBean
     private ProductRepository productRepository;
 
+    @MockBean
+    private ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    private OptionValueRepository optionValueRepository;
+
+    @MockBean
+    private ProductVariantRepository productVariantRepository;
+
     /**
-     * UserDirectory를 @MockBean으로 대체 — product.spi 포트 격리.
-     * member.adapter.MemberUserDirectoryAdapter(운영 어댑터)는 이 테스트에서 mock으로 교체된다.
+     * SellerProductFacade를 @MockBean으로 대체 — product.spi facade 격리.
+     * SellerProductFacadeImpl(운영 구현체)은 이 테스트에서 mock으로 교체된다.
      * 운영 배선 검증은 ProductWiringTest에서 별도 수행.
      */
     @MockBean
-    private UserDirectory userDirectory;
+    private SellerProductFacade sellerProductFacade;
 
     private static final long SELLER_ID = 2L;
     private static final long PRODUCT_ID = 10L;
@@ -88,9 +98,8 @@ class SellerProductViewControllerTest {
 
     @BeforeEach
     void setUp() {
-        when(categoryRepository.findAllByOrderBySortOrderAscIdAsc()).thenReturn(List.of());
-        // View principal 통일: email → userId stub
-        when(userDirectory.findUserIdByEmail(SELLER_EMAIL)).thenReturn(SELLER_ID);
+        when(sellerProductFacade.listCategories()).thenReturn(List.of());
+        when(sellerProductFacade.productStatusNames()).thenReturn(List.of("DRAFT", "ON_SALE", "SOLD_OUT", "HIDDEN"));
     }
 
     // ============================================================
@@ -153,7 +162,6 @@ class SellerProductViewControllerTest {
     @DisplayName("GET /seller/products/new — ADMIN → 200(RoleHierarchy 함의)")
     @WithMockUser(username = "admin@example.com", roles = "ADMIN")
     void newForm_admin_returns_200() throws Exception {
-        when(userDirectory.findUserIdByEmail("admin@example.com")).thenReturn(1L);
         mockMvc.perform(get("/seller/products/new"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("seller/product-form"));
@@ -167,8 +175,8 @@ class SellerProductViewControllerTest {
     @DisplayName("POST /seller/products — 유효 폼(CSRF 포함) → 302 redirect:/seller/products/{id}/edit")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void register_valid_form_redirects_to_edit() throws Exception {
-        Product saved = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.save(any())).thenReturn(saved);
+        when(sellerProductFacade.register(anyString(), any(), anyString(), any(), any()))
+                .thenReturn(PRODUCT_ID);
 
         mockMvc.perform(post("/seller/products")
                         .with(csrf())
@@ -179,11 +187,11 @@ class SellerProductViewControllerTest {
     }
 
     @Test
-    @DisplayName("POST /seller/products — UserDirectory로 actorId 획득 후 ProductService.register 호출")
+    @DisplayName("POST /seller/products — facade.register(actorEmail, ...) 호출 검증")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
-    void register_calls_user_directory_and_product_service() throws Exception {
-        Product saved = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.save(any())).thenReturn(saved);
+    void register_calls_seller_product_facade() throws Exception {
+        when(sellerProductFacade.register(anyString(), any(), anyString(), any(), any()))
+                .thenReturn(PRODUCT_ID);
 
         mockMvc.perform(post("/seller/products")
                         .with(csrf())
@@ -191,7 +199,7 @@ class SellerProductViewControllerTest {
                         .param("basePrice", "10000"))
                 .andExpect(status().is3xxRedirection());
 
-        verify(userDirectory).findUserIdByEmail(SELLER_EMAIL);
+        verify(sellerProductFacade).register(eq(SELLER_EMAIL), any(), eq("상품A"), any(), any());
     }
 
     // ============================================================
@@ -205,7 +213,6 @@ class SellerProductViewControllerTest {
         mockMvc.perform(post("/seller/products")
                         .with(csrf())
                         .param("basePrice", "10000"))
-                // name 누락 → 검증 실패 → 재렌더
                 .andExpect(status().isOk())
                 .andExpect(view().name("seller/product-form"));
     }
@@ -242,8 +249,9 @@ class SellerProductViewControllerTest {
     @DisplayName("GET /seller/products/{id}/edit — 소유자 → 200, view seller/product-form")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void editForm_owner_returns_200() throws Exception {
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        ProductFormView view = new ProductFormView(null, "상품", "설명", new BigDecimal("10000"), "DRAFT");
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID)))
+                .thenReturn(view);
 
         mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
                 .andExpect(status().isOk())
@@ -257,12 +265,9 @@ class SellerProductViewControllerTest {
     @DisplayName("GET /seller/products/{id}/edit — 타인 상품 → 404(ProductAccessDeniedException)")
     @WithMockUser(username = "other@example.com", roles = "SELLER")
     void editForm_other_seller_returns_404() throws Exception {
-        when(userDirectory.findUserIdByEmail("other@example.com")).thenReturn(99L);
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID); // 소유자는 SELLER_ID
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(sellerProductFacade.getForEdit(eq("other@example.com"), eq(false), eq(PRODUCT_ID)))
+                .thenThrow(new ProductAccessDeniedException(PRODUCT_ID));
 
-        // ProductAccessDeniedException → ViewExceptionHandler → error/error view
-        // NOTE: 실제 뷰 렌더링(error/error.html 미작성)은 view-implementor 단계에서 검증
         mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
                 .andExpect(status().isNotFound());
     }
@@ -271,7 +276,8 @@ class SellerProductViewControllerTest {
     @DisplayName("GET /seller/products/{id}/edit — 미존재 → 404(ProductNotFoundException)")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void editForm_not_found_returns_404() throws Exception {
-        when(productRepository.findById(9999L)).thenReturn(Optional.empty());
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(9999L)))
+                .thenThrow(new ProductNotFoundException(9999L));
 
         mockMvc.perform(get("/seller/products/9999/edit"))
                 .andExpect(status().isNotFound());
@@ -285,9 +291,6 @@ class SellerProductViewControllerTest {
     @DisplayName("POST /seller/products/{id} — 성공 → 302 redirect:/seller/products/{id}/edit")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void update_valid_form_redirects_to_edit() throws Exception {
-        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
-
         mockMvc.perform(post("/seller/products/" + PRODUCT_ID)
                         .with(csrf())
                         .param("name", "수정상품")
@@ -295,6 +298,10 @@ class SellerProductViewControllerTest {
                         .param("status", "ON_SALE"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("/seller/products/*/edit"));
+
+        verify(sellerProductFacade).update(
+                eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID),
+                any(), eq("수정상품"), any(), any(), eq("ON_SALE"));
     }
 
     @Test
@@ -304,26 +311,9 @@ class SellerProductViewControllerTest {
         mockMvc.perform(post("/seller/products/" + PRODUCT_ID)
                         .with(csrf())
                         .param("basePrice", "1000"))
-                // name 누락 → 검증 실패
                 .andExpect(status().isOk())
                 .andExpect(view().name("seller/product-form"))
                 .andExpect(model().attributeExists("categories"))
                 .andExpect(model().attributeExists("statuses"));
-    }
-
-    // ============================================================
-    // helpers
-    // ============================================================
-
-    private Product sampleProduct(long ownerId, long productId) {
-        Product product = Product.create(ownerId, null, "상품", "설명", new BigDecimal("10000"));
-        try {
-            var idField = Product.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(product, productId);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return product;
     }
 }

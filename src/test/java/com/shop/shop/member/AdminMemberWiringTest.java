@@ -1,12 +1,15 @@
 package com.shop.shop.member;
 
 import com.shop.shop.member.controller.AdminMemberRestController;
-import com.shop.shop.member.controller.AdminMemberViewController;
+import com.shop.shop.web.member.AdminMemberViewController;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.AdminMemberServiceResponse;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
+import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,15 @@ class AdminMemberWiringTest {
 
     @MockBean
     ProductRepository productRepository;
+
+    @MockBean
+    ProductOptionRepository productOptionRepository;
+
+    @MockBean
+    OptionValueRepository optionValueRepository;
+
+    @MockBean
+    ProductVariantRepository productVariantRepository;
 
     @Test
     @DisplayName("운영 배선: AdminMemberRestController 빈이 컨텍스트에 등록된다")
