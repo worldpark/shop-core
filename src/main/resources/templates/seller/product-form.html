@@ -114,11 +114,12 @@
         </form>
 
         <!--
-            옵션/Variant 관리 링크 — 수정 화면에서만 노출 (productId 있을 때).
+            옵션/Variant 관리 링크, 이미지 관리 링크 — 수정 화면에서만 노출 (productId 있을 때).
             등록 화면에서는 productId가 없으므로 노출하지 않는다.
         -->
         <div class="form-footer-link" th:if="${productId != null}">
             <a th:href="@{/seller/products/{id}/variants(id=${productId})}">옵션/Variant 관리</a>
+            <a th:href="@{/seller/products/{id}/images(id=${productId})}">이미지 관리</a>
         </div>
     </div>
 </main>

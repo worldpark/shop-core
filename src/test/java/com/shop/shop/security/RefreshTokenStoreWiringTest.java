@@ -6,6 +6,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,9 @@ class RefreshTokenStoreWiringTest {
 
     @MockitoBean
     ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    ProductImageRepository productImageRepository;
 
     @Test
     @DisplayName("운영 배선: FakeRefreshTokenStore 없이 RefreshTokenStore 빈이 RedisRefreshTokenStore로 등록된다")

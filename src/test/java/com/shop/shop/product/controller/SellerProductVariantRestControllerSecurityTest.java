@@ -15,6 +15,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
@@ -89,6 +90,9 @@ class SellerProductVariantRestControllerSecurityTest {
 
     @MockitoBean
     private ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    private ProductImageRepository productImageRepository;
 
     private String adminToken;
     private String sellerToken;

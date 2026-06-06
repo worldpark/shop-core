@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!--
+    상품 이미지 관리 화면.
+    view name: seller/product-images
+    레이아웃: layout/base :: layout(title, content) — 인증 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 모델 키: product(SellerProductRef) / images(List<ProductImageResponse>) / imageUploadForm
+      - 업로드 폼 action: POST /seller/products/{productId}/images
+      - 대표 지정 action: POST /seller/products/{productId}/images/{imageId}/primary
+      - 정렬 변경 action: POST /seller/products/{productId}/images/{imageId}/order
+      - 삭제 action: POST /seller/products/{productId}/images/{imageId}/delete
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - 업로드 폼: enctype="multipart/form-data", 파일 필드명 file
+      - 정렬 폼 필드: sortOrder
+      - imageUrl: facade/DTO가 합성한 값만 사용 (base URL 하드코딩 금지)
+      - flashSuccess/flashError: fragments/messages.html 재사용 (layout/base가 이미 포함)
+      - Entity 직접 노출 금지 (DTO만 모델에 담김)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="'이미지 관리 - ' + ${product.name}">이미지 관리</title>
+</head>
+<body>
+<main>
+    <div class="images-container">
+        <!-- 상품명 헤딩 -->
+        <h1 class="page-title" th:text="${product.name} + ' — 이미지 관리'">상품명 — 이미지 관리</h1>
+
+        <!-- ====================================================
+             이미지 업로드 폼
+             ==================================================== -->
+        <section class="images-section">
+            <h2 class="section-title">이미지 업로드</h2>
+            <!--
+                multipart/form-data: 파일 업로드 필수.
+                th:action 사용 시 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
+                파일 필드명: file (Backend-View Contract 준수)
+            -->
+            <form method="post"
+                  th:action="@{/seller/products/{productId}/images(productId=${product.productId})}"
+                  th:object="${imageUploadForm}"
+                  enctype="multipart/form-data">
+
+                <div class="form-group">
+                    <label for="imageFile">이미지 파일 선택</label>
+                    <input type="file"
+                           id="imageFile"
+                           name="file"
+                           accept="image/jpeg,image/png,image/gif,image/webp">
+                    <span class="field-hint">허용 형식: jpg, jpeg, png, gif, webp</span>
+                </div>
+
+                <button type="submit" class="btn btn-primary">업로드</button>
+            </form>
+        </section>
+
+        <!-- ====================================================
+             이미지 목록
+             ==================================================== -->
+        <section class="images-section">
+            <h2 class="section-title">이미지 목록</h2>
+
+            <!-- 이미지가 없을 때 -->
+            <p class="empty-msg" th:if="${#lists.isEmpty(images)}">등록된 이미지가 없습니다.</p>
+
+            <!-- 이미지 목록 -->
+            <div class="image-list" th:unless="${#lists.isEmpty(images)}">
+                <div class="image-item" th:each="image : ${images}">
+
+                    <!-- 이미지 미리보기 (imageUrl은 facade/DTO가 합성, base URL 하드코딩 금지) -->
+                    <div class="image-preview">
+                        <img th:src="${image.imageUrl}"
+                             th:alt="'이미지 ' + ${image.imageId}"
+                             class="product-image-thumb">
+                        <span class="badge-primary" th:if="${image.primary}">대표</span>
+                    </div>
+
+                    <!-- 이미지 정보 -->
+                    <div class="image-info">
+                        <span class="image-order" th:text="'순서: ' + ${image.sortOrder}">순서: 0</span>
+                    </div>
+
+                    <!-- 이미지 액션 폼들 -->
+                    <div class="image-actions">
+
+                        <!-- 대표 이미지 지정 폼 -->
+                        <form method="post"
+                              th:action="@{/seller/products/{productId}/images/{imageId}/primary(productId=${product.productId}, imageId=${image.imageId})}"
+                              class="inline-form"
+                              th:unless="${image.primary}">
+                            <button type="submit" class="btn btn-secondary btn-sm">대표 지정</button>
+                        </form>
+
+                        <!-- 정렬 순서 변경 폼 (필드명: sortOrder — Backend-View Contract 준수) -->
+                        <form method="post"
+                              th:action="@{/seller/products/{productId}/images/{imageId}/order(productId=${product.productId}, imageId=${image.imageId})}"
+                              class="inline-form">
+                            <label th:for="'sortOrder-' + ${image.imageId}">정렬 순서</label>
+                            <input type="number"
+                                   th:id="'sortOrder-' + ${image.imageId}"
+                                   name="sortOrder"
+                                   th:value="${image.sortOrder}"
+                                   min="0"
+                                   step="1"
+                                   class="input-short">
+                            <button type="submit" class="btn btn-secondary btn-sm">순서 변경</button>
+                        </form>
+
+                        <!-- 이미지 삭제 폼 -->
+                        <form method="post"
+                              th:action="@{/seller/products/{productId}/images/{imageId}/delete(productId=${product.productId}, imageId=${image.imageId})}"
+                              class="inline-form">
+                            <button type="submit"
+                                    class="btn btn-danger btn-sm"
+                                    onclick="return confirm('이미지를 삭제하시겠습니까?')">삭제</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 이동 링크 -->
+        <div class="back-link">
+            <a th:href="@{/seller/products/{id}/edit(id=${product.productId})}" class="btn btn-outline">
+                상품 수정으로 돌아가기
+            </a>
+            <a th:href="@{/seller/products/{id}/variants(id=${product.productId})}" class="btn btn-outline">
+                옵션/Variant 관리
+            </a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

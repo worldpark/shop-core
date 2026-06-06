@@ -6,6 +6,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,9 @@ class ShopCoreApplicationTests {
 
     @MockitoBean
     ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    ProductImageRepository productImageRepository;
 
     @Test
     void contextLoads() {

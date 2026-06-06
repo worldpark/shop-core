@@ -7,6 +7,7 @@ import com.shop.shop.member.service.AdminMemberServiceResponse;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
@@ -63,6 +64,9 @@ class AdminMemberWiringTest {
 
     @MockitoBean
     ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    ProductImageRepository productImageRepository;
 
     @Test
     @DisplayName("운영 배선: AdminMemberRestController 빈이 컨텍스트에 등록된다")

@@ -19,6 +19,11 @@ spring:
   thymeleaf:
     check-template-location: false
 
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 2MB
+
 # 테스트용 JWT 설정
 # secret: 충분한 길이(32자 이상) 더미값 — 운영 환경 secret과 무관
 # TTL: 테스트 검증 편의를 위해 짧은 값 사용
@@ -29,3 +34,15 @@ shop:
       access-ttl: PT1H
       refresh-ttl: P1D
       issuer: shop-core-test
+
+  storage:
+    root: ${java.io.tmpdir}/shop-test-uploads
+    asset-base-url: http://localhost:8080
+    public-prefix: /assets
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - webp
+    max-images-per-product: 10

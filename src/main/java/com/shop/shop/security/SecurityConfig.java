@@ -41,7 +41,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class})
 public class SecurityConfig {
 
     private static final String LOGIN_PAGE = "/login";
@@ -102,7 +102,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     // 공개 경로
                     .requestMatchers(HttpMethod.GET, LOGIN_PAGE).permitAll()
-                    .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico", "/error").permitAll()
+                    .requestMatchers("/css/**", "/js/**", "/images/**", "/assets/**", "/favicon.ico", "/error").permitAll()
                     // 회원가입 화면 공개 (GET 표시 + POST 폼 제출 — CSRF 보호 유지)
                     .requestMatchers(HttpMethod.GET, "/signup").permitAll()
                     .requestMatchers(HttpMethod.POST, "/signup").permitAll()

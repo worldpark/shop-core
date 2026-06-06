@@ -11,6 +11,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.service.CategoryService;
 import com.shop.shop.product.service.CategoryServiceResponse;
@@ -75,6 +76,9 @@ class ProductWiringTest {
 
     @MockitoBean
     ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    ProductImageRepository productImageRepository;
 
     // ============================================================
     // 신규 진입 빈 등록 단언

@@ -11,6 +11,7 @@ import com.shop.shop.product.dto.SellerProductRef;
 import com.shop.shop.product.dto.VariantManagementView;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
@@ -96,6 +97,9 @@ class SellerProductVariantViewControllerTest {
 
     @MockitoBean
     private ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    private ProductImageRepository productImageRepository;
 
     /**
      * SellerProductVariantFacade를 @MockitoBean으로 대체 — product.spi facade 격리.

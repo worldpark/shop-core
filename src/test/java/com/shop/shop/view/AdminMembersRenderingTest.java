@@ -8,6 +8,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,6 +90,9 @@ class AdminMembersRenderingTest {
 
     @MockitoBean
     private ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    private ProductImageRepository productImageRepository;
 
     /** 테스트용 비밀번호 hash — 본문에 절대 노출되면 안 됨 */
     private static final String SENSITIVE_PASSWORD_HASH = "SUPER_SECRET_HASH_SHOULD_NOT_APPEAR";

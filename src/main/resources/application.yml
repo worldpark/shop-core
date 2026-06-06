@@ -25,6 +25,11 @@ spring:
   thymeleaf:
     cache: false
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB
+
   modulith:
     events:
       externalization:
@@ -79,6 +84,18 @@ shop:
       # 분산락 — 키는 {resource}, 실제 락 획득/해제는 분산락 Task에서 구현(Redisson 재검토 포함)
       prefix: ${SHOP_REDIS_LOCK_PREFIX:shopcore:lock:}
       ttl: ${SHOP_REDIS_LOCK_TTL:PT10S}  # 10초 — 데드락 방지 짧은 TTL
+
+  storage:
+    root: ${SHOP_STORAGE_ROOT:./uploads}
+    asset-base-url: ${SHOP_STORAGE_ASSET_BASE_URL:http://localhost:8080}
+    public-prefix: ${SHOP_STORAGE_PUBLIC_PREFIX:/assets}
+    allowed-extensions:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - webp
+    max-images-per-product: ${SHOP_STORAGE_MAX_IMAGES_PER_PRODUCT:10}
 
 server:
   port: 8080

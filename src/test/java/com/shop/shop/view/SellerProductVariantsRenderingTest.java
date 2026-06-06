@@ -11,6 +11,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.spi.SellerProductVariantFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
@@ -91,6 +92,9 @@ class SellerProductVariantsRenderingTest {
 
     @MockitoBean
     private ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    private ProductImageRepository productImageRepository;
 
     @MockitoBean
     private SellerProductVariantFacade sellerProductVariantFacade;
@@ -325,5 +329,22 @@ class SellerProductVariantsRenderingTest {
 
         assertThat(body).as("variant 생성 폼 action이 올바른 URL이어야 함")
                 .contains("action=\"/seller/products/" + PRODUCT_ID + "/variants\"");
+    }
+
+    // ============================================================
+    // (R13) 이미지 관리 링크
+    // ============================================================
+
+    @Test
+    @DisplayName("(R13) GET /variants — 이미지 관리 링크(/seller/products/{productId}/images) 노출")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void variants_contains_images_link() throws Exception {
+        String body = mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).as("variants 화면에 이미지 관리 링크가 있어야 함")
+                .contains("/seller/products/" + PRODUCT_ID + "/images");
+        assertThat(body).as("variants 화면에 '이미지 관리' 텍스트가 있어야 함").contains("이미지 관리");
     }
 }

@@ -7,6 +7,7 @@ import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
@@ -92,6 +93,9 @@ class SellerProductFormRenderingTest {
 
     @MockitoBean
     private ProductVariantRepository productVariantRepository;
+
+    @MockitoBean
+    private ProductImageRepository productImageRepository;
 
     @MockitoBean
     private SellerProductFacade sellerProductFacade;
@@ -306,5 +310,38 @@ class SellerProductFormRenderingTest {
 
         assertThat(body).as("nav에 /seller/products/new 링크가 있어야 함").contains("/seller/products/new");
         assertThat(body).as("nav에 상품 등록 텍스트가 있어야 함").contains("상품 등록");
+    }
+
+    // ============================================================
+    // (P14) 이미지 관리 링크 — 수정 화면에서 노출
+    // ============================================================
+
+    @Test
+    @DisplayName("(P14) GET /seller/products/{id}/edit — 이미지 관리 링크(/seller/products/{id}/images) 노출")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void edit_form_contains_images_link() throws Exception {
+        ProductFormView view = new ProductFormView(null, "상품", "설명", new BigDecimal("10000"), "DRAFT");
+        when(sellerProductFacade.getForEdit(eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID)))
+                .thenReturn(view);
+
+        String body = mockMvc.perform(get("/seller/products/" + PRODUCT_ID + "/edit"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).as("수정 화면에 이미지 관리 링크가 있어야 함")
+                .contains("/seller/products/" + PRODUCT_ID + "/images");
+        assertThat(body).as("수정 화면에 '이미지 관리' 텍스트가 있어야 함").contains("이미지 관리");
+    }
+
+    @Test
+    @DisplayName("(P15) GET /seller/products/new — 등록 화면에서 이미지 관리 링크 미노출")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void new_form_does_not_contain_images_link() throws Exception {
+        String body = mockMvc.perform(get("/seller/products/new"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).as("등록 화면에서 이미지 관리 링크는 없어야 함")
+                .doesNotContain("/images");
     }
 }

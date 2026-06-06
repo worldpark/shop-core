@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.ModelAndView;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +35,17 @@ public class ViewExceptionHandler {
         ModelAndView mav = new ModelAndView(ERROR_VIEW);
         mav.addObject("status", e.getStatus().value());
         mav.addObject("message", e.getMessage());
+        return mav;
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ModelAndView handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException e, HttpServletResponse response) {
+        log.warn("MaxUploadSizeExceededException (View): {}", e.getMessage());
+        response.setStatus(HttpStatus.BAD_REQUEST.value());
+        ModelAndView mav = new ModelAndView(ERROR_VIEW);
+        mav.addObject("status", HttpStatus.BAD_REQUEST.value());
+        mav.addObject("message", "파일 크기가 허용 한도를 초과했습니다.");
         return mav;
     }
 
