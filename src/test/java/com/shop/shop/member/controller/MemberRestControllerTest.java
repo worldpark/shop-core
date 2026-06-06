@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -44,11 +44,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * - POST /api/v1/members/signup 응답에 password/passwordHash 미포함
  * - POST /api/v1/members/signup 검증 실패 400
  * - POST /api/v1/members/signup 중복 이메일 409
- * - GET /api/v1/members/me 유효 Bearer → 200
+ * - GET /api/v1/members/me CONSUMER/SELLER/ADMIN 유효 Bearer → 200
  * - GET /api/v1/members/me 비인증 → 401 JSON (redirect 아님)
+ * - GET /api/v1/members/me 위조 토큰 → 401 JSON
+ * - GET /api/v1/members/me logout 후 blacklist access token → 401
  *
  * <p>FakeRefreshTokenStore: Redis 미기동 환경 비파괴.
- * MemberRepository: @MockBean stub.
+ * MemberRepository: @MockitoBean stub.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -69,34 +71,39 @@ class MemberRestControllerTest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
+    @Autowired
+    private FakeRefreshTokenStore fakeRefreshTokenStore;
+
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberService memberService;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     private User testUser;
 
     @BeforeEach
     void setUp() {
+        fakeRefreshTokenStore.clear();
+
         testUser = User.of(EMAIL, "$2a$10$hashedpw", NAME, null, Role.CONSUMER);
         setUserId(testUser, 1L);
 
@@ -216,6 +223,68 @@ class MemberRestControllerTest {
         mockMvc.perform(get("/api/v1/members/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/members/me — SELLER 유효 Bearer → 200 (RoleHierarchy: SELLER > CONSUMER)")
+    void me_with_seller_token_returns_200() throws Exception {
+        User sellerUser = User.of("seller@example.com", "$2a$10$hashedpw", "판매자", null, Role.SELLER);
+        setUserId(sellerUser, 2L);
+        when(memberService.getById(2L)).thenReturn(sellerUser);
+
+        String accessToken = jwtTokenProvider.createAccess(
+                2L, sellerUser.getEmail(), List.of(sellerUser.getRole().authority()));
+
+        mockMvc.perform(get("/api/v1/members/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("seller@example.com"))
+                .andExpect(jsonPath("$.role").value("SELLER"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/members/me — ADMIN 유효 Bearer → 200 (RoleHierarchy: ADMIN > SELLER > CONSUMER)")
+    void me_with_admin_token_returns_200() throws Exception {
+        User adminUser = User.of("admin@example.com", "$2a$10$hashedpw", "관리자", null, Role.ADMIN);
+        setUserId(adminUser, 3L);
+        when(memberService.getById(3L)).thenReturn(adminUser);
+
+        String accessToken = jwtTokenProvider.createAccess(
+                3L, adminUser.getEmail(), List.of(adminUser.getRole().authority()));
+
+        mockMvc.perform(get("/api/v1/members/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin@example.com"))
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/members/me — 위조된 토큰(Bearer invalid.jwt.token) → 401 JSON")
+    void me_with_tampered_token_returns_401_json() throws Exception {
+        mockMvc.perform(get("/api/v1/members/me")
+                        .header("Authorization", "Bearer invalid.jwt.token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/members/me — logout 후 blacklist된 access token → 401")
+    void me_with_blacklisted_access_returns_401() throws Exception {
+        String accessToken = jwtTokenProvider.createAccess(
+                1L, testUser.getEmail(), List.of(testUser.getRole().authority()));
+        String refreshToken = jwtTokenProvider.createRefresh(1L);
+        fakeRefreshTokenStore.storeRefresh(1L, refreshToken, java.time.Duration.ofDays(14));
+
+        // logout — access token을 blacklist에 등록
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isNoContent());
+
+        // blacklist된 access token으로 /me 접근 → 401
+        mockMvc.perform(get("/api/v1/members/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

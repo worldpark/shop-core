@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -43,7 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>실제 Thymeleaf 템플릿(templates/seller/product-form.html)이
  * layout/base·프래그먼트와 함께 올바르게 렌더링되는지 검증한다.
  *
- * <p>SellerProductFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * <p>SellerProductFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  * (원래 UserDirectory + CategoryRepository + ProductRepository를 직접 Mock하던 방식에서 전환)
  *
  * <p>검증 항목:
@@ -60,8 +60,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>패턴: LayoutRenderingTest 컨벤션 준수.
  * - @SpringBootTest + @AutoConfigureMockMvc + @ActiveProfiles("test")
- * - @Import(FakeRefreshTokenStore) + @MockBean JPA/DB 의존 격리
- * - SellerProductFacade @MockBean으로 product 도메인 내부 격리
+ * - @Import(FakeRefreshTokenStore) + @MockitoBean JPA/DB 의존 격리
+ * - SellerProductFacade @MockitoBean으로 product 도메인 내부 격리
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -72,28 +72,28 @@ class SellerProductFormRenderingTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
-    @MockBean
+    @MockitoBean
     private SellerProductFacade sellerProductFacade;
 
     private static final long SELLER_ID = 2L;

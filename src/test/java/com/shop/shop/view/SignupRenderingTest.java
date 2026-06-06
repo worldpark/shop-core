@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>테스트 컨벤션: LayoutRenderingTest 패턴 준수.
  * - @SpringBootTest + @AutoConfigureMockMvc + @ActiveProfiles("test")
- * - @Import(FakeRefreshTokenStore) + @MockBean MemberRepository, MemberUserDetailsService
+ * - @Import(FakeRefreshTokenStore) + @MockitoBean MemberRepository, MemberUserDetailsService
  * - 본문 마커 단언 (assertThat(body).contains(...))
  *
  * <p>검증 시나리오:
@@ -51,28 +51,28 @@ class SignupRenderingTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private MemberSignupFacade memberSignupFacade;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     /** footer 프래그먼트 식별 마커 */

@@ -4,6 +4,8 @@ import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductForm;
 import com.shop.shop.product.dto.ProductFormView;
 import com.shop.shop.product.spi.SellerProductFacade;
+import com.shop.shop.web.support.CurrentActor;
+import com.shop.shop.web.support.CurrentActorResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +28,8 @@ import java.util.List;
  * 비SELLER → 403, 비인증 → /login redirect.
  *
  * <p>principal 통일(View): form login session principal = UserDetails(username=email).
- * {@code auth.getName()} → facade 내부에서 {@code UserDirectory.findUserIdByEmail}로 actorId 획득.
- * {@code actorIsAdmin}: authority 'ROLE_ADMIN' 직접 보유로 판정 (순수 Spring Security 로직 — web 잔존).
+ * {@link CurrentActorResolver}가 {@code auth.getName()}과 ROLE_ADMIN 직접 보유 여부를 추출한다.
+ * facade 내부에서 {@code UserDirectory.findUserIdByEmail}로 actorId를 획득한다.
  *
  * <p>레이어: SellerProductViewController → {@link SellerProductFacade}(published port)
  * → ProductService/CategoryService → Repository.
@@ -56,6 +58,7 @@ public class SellerProductViewController {
     private static final String PRODUCT_FORM_VIEW = "seller/product-form";
 
     private final SellerProductFacade sellerProductFacade;
+    private final CurrentActorResolver currentActorResolver;
 
     /**
      * 상품 등록 화면.
@@ -99,8 +102,9 @@ public class SellerProductViewController {
             return PRODUCT_FORM_VIEW;
         }
 
+        CurrentActor actor = currentActorResolver.resolve(auth);
         long id = sellerProductFacade.register(
-                auth.getName(),
+                actor.email(),
                 form.getCategoryId(),
                 form.getName(),
                 form.getDescription(),
@@ -128,7 +132,8 @@ public class SellerProductViewController {
             Authentication auth,
             Model model) {
 
-        ProductFormView view = sellerProductFacade.getForEdit(auth.getName(), isAdmin(auth), id);
+        CurrentActor actor = currentActorResolver.resolve(auth);
+        ProductFormView view = sellerProductFacade.getForEdit(actor.email(), actor.admin(), id);
 
         ProductForm form = toForm(view);
         model.addAttribute("productForm", form);
@@ -170,9 +175,10 @@ public class SellerProductViewController {
             return PRODUCT_FORM_VIEW;
         }
 
+        CurrentActor actor = currentActorResolver.resolve(auth);
         sellerProductFacade.update(
-                auth.getName(),
-                isAdmin(auth),
+                actor.email(),
+                actor.admin(),
                 id,
                 form.getCategoryId(),
                 form.getName(),
@@ -208,15 +214,5 @@ public class SellerProductViewController {
         form.setBasePrice(view.basePrice());
         form.setStatus(view.status());
         return form;
-    }
-
-    /**
-     * ROLE_ADMIN 직접 보유 여부 판정.
-     * RoleHierarchy 함의가 아닌 원본 ROLE_ADMIN 직접 보유로 판정.
-     * 순수 Spring Security 로직이라 web에 잔존.
-     */
-    private boolean isAdmin(Authentication auth) {
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

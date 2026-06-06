@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * MemberSignupViewController MockMvc 테스트.
  *
  * <p>web.member 패키지로 이동 (원래 member.controller 패키지).
- * MemberSignupFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * MemberSignupFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  *
  * <p>검증 시나리오:
  * - POST /signup 정상(csrf) → 302 redirect:/login?signup, MemberSignupFacade.signup 호출 검증
@@ -58,28 +58,28 @@ class MemberSignupViewControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberSignupFacade memberSignupFacade;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     @Test

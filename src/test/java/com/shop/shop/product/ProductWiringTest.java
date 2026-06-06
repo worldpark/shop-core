@@ -22,7 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -34,15 +34,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>FakeRefreshTokenStore를 @Import해 Redis 미기동 환경에서도 컨텍스트가 기동된다.
  * MemberRepository/MemberUserDetailsService/CategoryRepository/ProductRepository는
- * @MockBean으로 JPA/DB 의존을 격리한다.
+ * @MockitoBean으로 JPA/DB 의존을 격리한다.
  *
  * <p>포트-어댑터 운영 배선 단언:
  * {@link MemberUserDirectoryAdapter}가 {@link UserDirectory} 빈으로 등록되고,
  * 컨텍스트에서 {@link UserDirectory} 타입이 어댑터로 단일 운영 배선됨을 단언.
  * ({@link SellerProductViewController}의 UserDirectory 주입이 운영에서 해결됨 확인)
  *
- * <p>NOTE: UserDirectory를 @MockBean하지 않는다 — 운영 배선(어댑터)이 실제 빈으로 등록되는지 확인 목적.
- * MemberService는 MemberRepository @MockBean이 있으므로 운영 빈으로 생성 가능.
+ * <p>NOTE: UserDirectory를 @MockitoBean하지 않는다 — 운영 배선(어댑터)이 실제 빈으로 등록되는지 확인 목적.
+ * MemberService는 MemberRepository @MockitoBean이 있으므로 운영 빈으로 생성 가능.
  * (MemberService→MemberRepository 경로는 빈 존재만 확인, 실제 조회 불요)
  *
  * <p>AdminMemberWiringTest 패턴 계승.
@@ -55,25 +55,25 @@ class ProductWiringTest {
     @Autowired
     private ApplicationContext context;
 
-    @MockBean
+    @MockitoBean
     MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     ProductVariantRepository productVariantRepository;
 
     // ============================================================

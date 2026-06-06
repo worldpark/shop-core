@@ -5,7 +5,6 @@ import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
 import com.shop.shop.member.repository.MemberRepository;
-import com.shop.shop.member.service.AuthServiceResponse;
 import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -20,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,11 +27,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,14 +39,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>검증 시나리오:
  * - login 성공(200 + access/refresh), 실패(401 ErrorResponse JSON)
- * - Bearer 유효 access로 /me 200
- * - 토큰 없음 401 / 위조·만료 토큰 401 (JSON, redirect 아님)
- * - 권한별: ADMIN→허용, CONSUMER→상위 리소스 403
+ * - login @Valid 검증 실패 400
  * - refresh 정상 → 200
  * - logout 후 동일 refresh → 401
  *
  * <p>FakeRefreshTokenStore: Redis 미기동 환경 비파괴 (@Import + @Primary).
- * MemberRepository: @MockBean으로 stub (실 DB 미사용).
+ * MemberRepository: @MockitoBean으로 stub (실 DB 미사용).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -67,36 +62,33 @@ class AuthRestControllerSecurityTest {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private AuthServiceResponse authServiceResponse;
-
-    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private FakeRefreshTokenStore fakeRefreshTokenStore;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberService memberService;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     @Autowired
@@ -147,35 +139,6 @@ class AuthRestControllerSecurityTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/auth/me — 유효한 Bearer access token → 200 + MeResponse")
-    void me_with_valid_bearer_token_returns_200() throws Exception {
-        String accessToken = jwtTokenProvider.createAccess(
-                1L, testUser.getEmail(), List.of(testUser.getRole().authority()));
-
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value(EMAIL));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/auth/me — Authorization 헤더 없음 → 401 JSON (redirect 아님)")
-    void me_without_token_returns_401_json() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
-    @DisplayName("GET /api/v1/auth/me — 위조된 토큰 → 401 JSON")
-    void me_with_tampered_token_returns_401_json() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer invalid.jwt.token"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
     @DisplayName("POST /api/v1/auth/refresh — 유효한 refresh token → 200 + 새 access token")
     void refresh_with_valid_token_returns_200() throws Exception {
         // 로그인하여 refresh token 획득
@@ -208,26 +171,6 @@ class AuthRestControllerSecurityTest {
                         .content("{\"refreshToken\": \"" + refreshToken + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401));
-    }
-
-    @Test
-    @DisplayName("logout 후 동일 access token으로 /me 접근 → 401 (blacklist)")
-    void logout_then_me_with_blacklisted_access_returns_401() throws Exception {
-        String accessToken = jwtTokenProvider.createAccess(
-                1L, testUser.getEmail(), List.of(testUser.getRole().authority()));
-        String refreshToken = jwtTokenProvider.createRefresh(1L);
-        fakeRefreshTokenStore.storeRefresh(1L, refreshToken,
-                java.time.Duration.ofDays(14));
-
-        // logout
-        mockMvc.perform(post("/api/v1/auth/logout")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isNoContent());
-
-        // blacklist된 access token으로 /me 접근
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + accessToken))
-                .andExpect(status().isUnauthorized());
     }
 
     @Test

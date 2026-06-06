@@ -11,7 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -37,25 +37,25 @@ class RefreshTokenStoreWiringTest {
     @Autowired
     private ApplicationContext context;
 
-    @MockBean
+    @MockitoBean
     MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     ProductVariantRepository productVariantRepository;
 
     @Test

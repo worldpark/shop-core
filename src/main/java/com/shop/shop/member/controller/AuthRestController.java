@@ -1,15 +1,12 @@
 package com.shop.shop.member.controller;
 
 import com.shop.shop.member.dto.LoginRequest;
-import com.shop.shop.member.dto.MeResponse;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
 import com.shop.shop.member.service.AuthServiceResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -23,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>레이어: RestController → AuthServiceResponse(ServiceResponse) → MemberService → MemberRepository
  *
  * <p>공개 엔드포인트: POST /login, POST /refresh (SecurityConfig permitAll)
- * <p>인증 필요: POST /logout, GET /me (SecurityConfig authenticated)
+ * <p>인증 필요: POST /logout (SecurityConfig authenticated)
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -62,16 +59,5 @@ public class AuthRestController {
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         authServiceResponse.logout(authorization);
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * 내 정보 조회.
-     * GET /api/v1/auth/me
-     * 인증 필요 — JwtAuthenticationFilter가 SecurityContext를 설정한 후 호출.
-     */
-    @GetMapping("/me")
-    public ResponseEntity<MeResponse> me(Authentication authentication) {
-        MeResponse response = authServiceResponse.me(authentication);
-        return ResponseEntity.ok(response);
     }
 }

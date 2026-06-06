@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>실제 Thymeleaf 템플릿(templates/admin/members.html)이 레이아웃·프래그먼트와 함께
  * 올바르게 렌더링되는지 검증한다.
  *
- * <p>AdminMemberFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * <p>AdminMemberFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  * (원래 MemberService를 직접 Mock하던 방식에서 facade Mock 방식으로 전환)
  *
  * <p>검증 항목:
@@ -54,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * </ul>
  *
  * <p>패턴: @SpringBootTest + @AutoConfigureMockMvc + @ActiveProfiles("test")
- *         + @Import(FakeRefreshTokenStore) + @MockBean MemberRepository, MemberUserDetailsService
+ *         + @Import(FakeRefreshTokenStore) + @MockitoBean MemberRepository, MemberUserDetailsService
  *         (LayoutRenderingTest 컨벤션 준수)
  */
 @SpringBootTest
@@ -66,28 +66,28 @@ class AdminMembersRenderingTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private AdminMemberFacade adminMemberFacade;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     /** 테스트용 비밀번호 hash — 본문에 절대 노출되면 안 됨 */

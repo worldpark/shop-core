@@ -3,6 +3,8 @@ package com.shop.shop.web.product;
 import com.shop.shop.common.exception.BusinessException;
 import com.shop.shop.product.dto.VariantManagementView;
 import com.shop.shop.product.spi.SellerProductVariantFacade;
+import com.shop.shop.web.support.CurrentActor;
+import com.shop.shop.web.support.CurrentActorResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +28,8 @@ import java.util.Collections;
  * 비SELLER → 403, 비인증 → /login redirect.
  *
  * <p>principal 통일(View): form login session principal = UserDetails(username=email).
- * {@code auth.getName()} → facade 내부에서 {@code UserDirectory.findUserIdByEmail}로 actorId 획득.
- * {@code actorIsAdmin}: authority 'ROLE_ADMIN' 직접 보유로 판정 (순수 Spring Security 로직 — web 잔존).
+ * {@link CurrentActorResolver}가 {@code auth.getName()}과 ROLE_ADMIN 직접 보유 여부를 추출한다.
+ * facade 내부에서 {@code UserDirectory.findUserIdByEmail}로 actorId를 획득한다.
  *
  * <p>레이어: SellerProductVariantViewController → {@link SellerProductVariantFacade}(published port)
  * → ProductOptionService/ProductVariantService → Repository.
@@ -55,6 +57,7 @@ public class SellerProductVariantViewController {
     private static final String PRODUCT_VARIANTS_VIEW = "seller/product-variants";
 
     private final SellerProductVariantFacade sellerProductVariantFacade;
+    private final CurrentActorResolver currentActorResolver;
 
     /**
      * variant 관리 화면.
@@ -113,8 +116,9 @@ public class SellerProductVariantViewController {
         }
 
         try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
             sellerProductVariantFacade.createOption(
-                    auth.getName(), isAdmin(auth), productId, form.getName());
+                    actor.email(), actor.admin(), productId, form.getName());
             ra.addFlashAttribute("flashSuccess", "옵션이 생성되었습니다.");
         } catch (BusinessException e) {
             log.warn("옵션 생성 실패: actorEmail={}, productId={}, reason={}", auth.getName(), productId, e.getMessage());
@@ -160,8 +164,9 @@ public class SellerProductVariantViewController {
         }
 
         try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
             sellerProductVariantFacade.createOptionValue(
-                    auth.getName(), isAdmin(auth), productId, optionId, form.getValue());
+                    actor.email(), actor.admin(), productId, optionId, form.getValue());
             ra.addFlashAttribute("flashSuccess", "옵션값이 생성되었습니다.");
         } catch (BusinessException e) {
             log.warn("옵션값 생성 실패: actorEmail={}, productId={}, optionId={}, reason={}",
@@ -205,8 +210,9 @@ public class SellerProductVariantViewController {
         }
 
         try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
             sellerProductVariantFacade.createVariant(
-                    auth.getName(), isAdmin(auth), productId,
+                    actor.email(), actor.admin(), productId,
                     form.getSku(), form.getPrice(), form.getStock(), form.isActive(),
                     form.getOptionValueIds() != null ? form.getOptionValueIds() : Collections.emptyList());
             ra.addFlashAttribute("flashSuccess", "Variant가 생성되었습니다.");
@@ -253,8 +259,9 @@ public class SellerProductVariantViewController {
         }
 
         try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
             sellerProductVariantFacade.updateVariant(
-                    auth.getName(), isAdmin(auth), productId, variantId,
+                    actor.email(), actor.admin(), productId, variantId,
                     form.getSku(), form.getPrice(), form.getStock(), form.isActive(),
                     form.getOptionValueIds() != null ? form.getOptionValueIds() : Collections.emptyList());
             ra.addFlashAttribute("flashSuccess", "Variant가 수정되었습니다.");
@@ -273,20 +280,11 @@ public class SellerProductVariantViewController {
      * 재렌더 시 세 폼이 모두 모델에 존재해야 하므로 호출 측이 나머지 폼을 추가해야 한다.
      */
     private void populateManagementModel(Model model, long productId, Authentication auth) {
+        CurrentActor actor = currentActorResolver.resolve(auth);
         VariantManagementView view = sellerProductVariantFacade.getManagementView(
-                auth.getName(), isAdmin(auth), productId);
+                actor.email(), actor.admin(), productId);
         model.addAttribute("product", view.product());
         model.addAttribute("options", view.options());
         model.addAttribute("variants", view.variants());
-    }
-
-    /**
-     * ROLE_ADMIN 직접 보유 여부 판정.
-     * RoleHierarchy 함의가 아닌 원본 ROLE_ADMIN 직접 보유로 판정.
-     * 순수 Spring Security 로직이라 web에 잔존.
-     */
-    private boolean isAdmin(Authentication auth) {
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 }

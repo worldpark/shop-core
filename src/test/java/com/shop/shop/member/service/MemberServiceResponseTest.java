@@ -61,7 +61,7 @@ class MemberServiceResponseTest {
     }
 
     @Test
-    @DisplayName("me — principal userId로 getById → MeResponse 반환")
+    @DisplayName("me — principal userId로 getById → MeResponse 반환, password 미노출")
     void me_returns_me_response_using_principal_user_id() {
         User user = User.of(EMAIL, "$2a$10$hashedpassword", NAME, null, Role.CONSUMER);
         setUserId(user, 1L);
@@ -77,6 +77,12 @@ class MemberServiceResponseTest {
         assertThat(response.email()).isEqualTo(EMAIL);
         assertThat(response.name()).isEqualTo(NAME);
         assertThat(response.role()).isEqualTo("CONSUMER");
+
+        // MeResponse record 필드는 id/email/name/role뿐 — password/passwordHash 노출 불가 (record 구조로 보장)
+        var fields = java.util.Arrays.stream(MeResponse.class.getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
+        assertThat(fields).doesNotContain("password", "passwordHash", "password_hash");
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.shop.shop.member.service;
 import com.shop.shop.common.exception.InvalidTokenException;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
-import com.shop.shop.member.dto.MeResponse;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
 import com.shop.shop.security.JwtProperties;
@@ -12,7 +11,6 @@ import com.shop.shop.security.RefreshTokenStore;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,7 +20,7 @@ import java.util.List;
  * View/Scheduler/EventListener에서는 사용하지 않는다 (architecture-rule).
  *
  * <p>비즈니스 로직은 하위 Service(MemberService, JwtTokenProvider, RefreshTokenStore)에 위임.
- * Entity는 직접 반환하지 않고 DTO(TokenResponse/MeResponse)로 변환.
+ * Entity는 직접 반환하지 않고 DTO(TokenResponse)로 변환.
  */
 @Slf4j
 @Service
@@ -101,18 +99,5 @@ public class AuthServiceResponse {
         refreshTokenStore.blacklistAccess(jti, jwtTokenProvider.remainingTtl(claims));
 
         log.debug("로그아웃 완료: userId={}, jti={}", userId, jti);
-    }
-
-    /**
-     * 내 정보 조회.
-     * SecurityContext의 Authentication에서 userId 추출 → User 조회 → MeResponse 반환.
-     *
-     * @param authentication SecurityContext의 인증 객체
-     * @return MeResponse (id, email, name, role)
-     */
-    public MeResponse me(Authentication authentication) {
-        long userId = (long) authentication.getPrincipal();
-        User user = memberService.getById(userId);
-        return MeResponse.from(user);
     }
 }

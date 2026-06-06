@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>실제 Thymeleaf 템플릿(templates/seller/product-variants.html)이
  * layout/base·프래그먼트와 함께 올바르게 렌더링되는지 검증한다.
  *
- * <p>SellerProductVariantFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * <p>SellerProductVariantFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  *
  * <p>검증 항목:
  * <ul>
@@ -71,28 +71,28 @@ class SellerProductVariantsRenderingTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
-    @MockBean
+    @MockitoBean
     private SellerProductVariantFacade sellerProductVariantFacade;
 
     private static final long PRODUCT_ID = 10L;

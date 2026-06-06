@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * SellerProductVariantViewController + SecurityConfig View 체인 MockMvc 통합 테스트.
  *
- * <p>SellerProductVariantFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * <p>SellerProductVariantFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  *
  * <p>DB/JPA/Flyway/Kafka 자동설정 제외 프로파일(test)로 기동.
  * FakeRefreshTokenStore: Redis 미기동 비파괴.
@@ -76,32 +76,32 @@ class SellerProductVariantViewControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     /**
-     * SellerProductVariantFacade를 @MockBean으로 대체 — product.spi facade 격리.
+     * SellerProductVariantFacade를 @MockitoBean으로 대체 — product.spi facade 격리.
      * 운영 배선 검증은 별도 WiringTest에서 수행.
      */
-    @MockBean
+    @MockitoBean
     private SellerProductVariantFacade sellerProductVariantFacade;
 
     private static final long PRODUCT_ID = 10L;

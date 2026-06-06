@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -45,9 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * AdminMemberViewController + SecurityConfig View 체인 MockMvc 통합 테스트.
  *
  * <p>web.member 패키지로 이동 (원래 member.controller 패키지).
- * AdminMemberFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * AdminMemberFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  *
- * <p>MemberRepository: @MockBean (JPA context 없이 기동).
+ * <p>MemberRepository: @MockitoBean (JPA context 없이 기동).
  * FakeRefreshTokenStore: Redis 미기동 비파괴.
  */
 @SpringBootTest
@@ -59,28 +59,28 @@ class AdminMemberViewControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private AdminMemberFacade adminMemberFacade;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     @BeforeEach

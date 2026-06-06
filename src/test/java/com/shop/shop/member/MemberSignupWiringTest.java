@@ -15,7 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 회원가입 관련 빈 운영 배선 회귀 방지 테스트 (P1/testing-rule).
  *
  * <p>FakeRefreshTokenStore를 @Import해 Redis 미기동 환경에서도 컨텍스트가 기동된다.
- * MemberRepository, MemberUserDetailsService는 @MockBean으로 JPA/DB 의존을 격리한다.
+ * MemberRepository, MemberUserDetailsService는 @MockitoBean으로 JPA/DB 의존을 격리한다.
  *
  * <p>신규 진입 빈(MemberRestController, MemberServiceResponse, MemberSignupViewController)이
  * 운영 컴포넌트 스캔에서 실제로 등록되는지 단언한다.
@@ -44,25 +44,25 @@ class MemberSignupWiringTest {
     @Autowired
     private ApplicationContext context;
 
-    @MockBean
+    @MockitoBean
     MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     ProductVariantRepository productVariantRepository;
 
     @Test

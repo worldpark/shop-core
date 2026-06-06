@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -46,11 +46,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * SellerProductViewController + SecurityConfig View 체인 MockMvc 통합 테스트.
  *
  * <p>web.product 패키지로 이동 (원래 product.controller 패키지).
- * SellerProductFacade(@MockBean)를 통해 facade 배선 동작을 검증한다.
+ * SellerProductFacade(@MockitoBean)를 통해 facade 배선 동작을 검증한다.
  *
- * <p>MemberRepository: @MockBean (JPA context 없이 기동).
+ * <p>MemberRepository: @MockitoBean (JPA context 없이 기동).
  * FakeRefreshTokenStore: Redis 미기동 비파괴.
- * ProductRepository/CategoryRepository: @MockBean (직접 사용 없음 — facade Mock 경유).
+ * ProductRepository/CategoryRepository: @MockitoBean (직접 사용 없음 — facade Mock 경유).
  *
  * <p>이 테스트는 view name·model 속성·redirect·권한 차단·facade 위임에 집중한다.
  */
@@ -63,33 +63,33 @@ class SellerProductViewControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     private CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     private OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     private ProductVariantRepository productVariantRepository;
 
     /**
-     * SellerProductFacade를 @MockBean으로 대체 — product.spi facade 격리.
+     * SellerProductFacade를 @MockitoBean으로 대체 — product.spi facade 격리.
      * SellerProductFacadeImpl(운영 구현체)은 이 테스트에서 mock으로 교체된다.
      * 운영 배선 검증은 ProductWiringTest에서 별도 수행.
      */
-    @MockBean
+    @MockitoBean
     private SellerProductFacade sellerProductFacade;
 
     private static final long SELLER_ID = 2L;

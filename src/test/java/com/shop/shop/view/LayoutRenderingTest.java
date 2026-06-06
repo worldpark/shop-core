@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -42,25 +42,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(FakeRefreshTokenStore.class)
 class LayoutRenderingTest {
 
-    @MockBean
+    @MockitoBean
     MemberRepository memberRepository;
 
-    @MockBean
+    @MockitoBean
     MemberUserDetailsService memberUserDetailsService;
 
-    @MockBean
+    @MockitoBean
     CategoryRepository categoryRepository;
 
-    @MockBean
+    @MockitoBean
     ProductRepository productRepository;
 
-    @MockBean
+    @MockitoBean
     ProductOptionRepository productOptionRepository;
 
-    @MockBean
+    @MockitoBean
     OptionValueRepository optionValueRepository;
 
-    @MockBean
+    @MockitoBean
     ProductVariantRepository productVariantRepository;
 
     /** footer 프래그먼트 식별 마커 — fragments/footer.html 의 실제 텍스트와 일치 */

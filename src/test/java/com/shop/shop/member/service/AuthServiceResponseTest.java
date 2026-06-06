@@ -4,7 +4,6 @@ import com.shop.shop.common.exception.InvalidTokenException;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
-import com.shop.shop.member.dto.MeResponse;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
 import com.shop.shop.security.JwtProperties;
@@ -16,9 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.time.Duration;
 import java.util.List;
@@ -131,18 +127,4 @@ class AuthServiceResponseTest {
         assertThat(refreshTokenStore.isBlacklisted(jti)).isTrue();
     }
 
-    @Test
-    @DisplayName("me — Authentication에서 userId 추출 후 MeResponse 반환")
-    void me_returns_me_response() {
-        when(memberService.getById(1L)).thenReturn(testUser);
-
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                1L, null, List.of(new SimpleGrantedAuthority("ROLE_CONSUMER")));
-
-        MeResponse response = authServiceResponse.me(authentication);
-
-        assertThat(response.id()).isEqualTo(1L);
-        assertThat(response.email()).isEqualTo(EMAIL);
-        assertThat(response.role()).isEqualTo("CONSUMER");
-    }
 }

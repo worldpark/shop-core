@@ -3,9 +3,12 @@
  *
  * <h2>책임</h2>
  * <ul>
- *   <li>Thymeleaf ViewController(@Controller) 5종 보유: HomeViewController, LoginViewController,
- *       MemberSignupViewController, AdminMemberViewController, SellerProductViewController</li>
+ *   <li>Thymeleaf ViewController(@Controller) 보유: HomeViewController, LoginViewController,
+ *       MemberSignupViewController, AdminMemberViewController, SellerProductViewController,
+ *       SellerProductVariantViewController</li>
  *   <li>View ViewModel · Form · 화면 조립 전담</li>
+ *   <li>Spring Security Authentication을 View facade 호출용 actor 컨텍스트로 변환하는
+ *       support 컴포넌트 보유</li>
  *   <li>도메인의 named interface(spi/dto)만 의존 — 도메인 내부(Entity·Repository·비공개 Service) 직접 참조 금지</li>
  * </ul>
  *
@@ -21,6 +24,12 @@
  *   <li>{@code common} (OPEN 모듈) — {@code DuplicateEmailException}, {@code BusinessException}</li>
  *   <li>Spring MVC / Spring Security / Thymeleaf 프레임워크 타입</li>
  * </ul>
+ *
+ * <h2>web support 경계</h2>
+ * <p>{@code web.support}는 View 진입점 보조만 담당한다. 허용 예:
+ * {@code Authentication -> CurrentActor(email, admin)} 변환, 화면 모델 조립 보조.
+ * 금지 예: 도메인 소유권 검사, 트랜잭션, Repository 접근, Entity 접근, 상품/회원 상태 기반 비즈니스 판단.
+ * 그런 규칙은 도메인 facade/service에 둔다.
  *
  * <h2>금지 의존</h2>
  * <ul>
