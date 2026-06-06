@@ -21,6 +21,11 @@ public interface OptionValueRepository extends JpaRepository<OptionValue, Long> 
     List<OptionValue> findByOption_ProductId(long productId);
 
     /**
+     * 상품 소속 모든 옵션값 조회 — id 오름차순 정렬 보장 (공개 상세 노출용).
+     */
+    List<OptionValue> findByOption_ProductIdOrderByIdAsc(long productId);
+
+    /**
      * 옵션별 옵션값 목록 조회 (id 순 정렬).
      */
     List<OptionValue> findByOptionIdOrderById(long optionId);

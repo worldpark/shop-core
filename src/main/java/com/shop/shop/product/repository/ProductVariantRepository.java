@@ -34,4 +34,18 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
      */
     @EntityGraph(attributePaths = "optionValues")
     List<ProductVariant> findByProductId(long productId);
+
+    /**
+     * 상품의 활성 variant 목록 조회 (공개 상세 전용).
+     *
+     * <p>비활성(isActive=false) variant를 절대 공개 상세에 노출하지 않는다.
+     * @EntityGraph로 optionValues를 즉시 로딩해 LazyInitializationException을 방지한다.
+     * open-in-view=false 환경에서 트랜잭션 종료 후 DTO 변환 시 LazyInit 오류를 막는다.
+     * 실 DB 검증: docker-compose 수동 확인 항목.
+     *
+     * @param productId 상품 ID
+     * @return 활성 variant 목록 (isActive=true인 것만, optionValues 즉시 로딩)
+     */
+    @EntityGraph(attributePaths = "optionValues")
+    List<ProductVariant> findByProductIdAndIsActiveTrue(long productId);
 }

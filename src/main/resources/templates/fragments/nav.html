@@ -11,6 +11,11 @@
                th:classappend="${active == 'home'} ? ' nav-link-active' : ''"
                th:text="'홈'">홈</a>
         </li>
+        <li class="nav-item">
+            <a th:href="@{/products}"
+               class="nav-link"
+               th:classappend="${active == 'products'} ? ' nav-link-active' : ''">상품 목록</a>
+        </li>
         <li class="nav-item" sec:authorize="hasRole('ADMIN')">
             <a th:href="@{/admin/members}"
                class="nav-link"

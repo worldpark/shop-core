@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<!--
+    공개 상품 상세 화면.
+    view name: product/detail
+    레이아웃: layout/base :: layout(title, content) — 공개 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 모델 키: product(PublicProductDetailResponse)
+      - product.images: 정렬된 이미지 목록 (imageUrl, sortOrder, primary)
+      - product.options: 옵션 목록 (name, values[].value)
+      - product.variants: 활성 variant 목록 (price, optionValueIds, available)
+      - product.soldOut: 품절 여부
+      - product.category: 카테고리 정보 (nullable)
+      - ownerId/storageKey/basePrice/sku/stock 수치 미표시
+      - 장바구니/주문/결제 동작 구현 금지 (이번 Task 범위 외)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="${product.name} + ' - 상품 상세'">상품 상세</title>
+</head>
+<body>
+<main>
+    <div class="product-detail-container">
+
+        <!-- 뒤로가기 링크 -->
+        <div class="detail-back-link">
+            <a th:href="@{/products}" class="btn btn-outline btn-sm">목록으로 돌아가기</a>
+        </div>
+
+        <!-- ====================================================
+             상품 메인 영역: 이미지 갤러리 + 기본 정보
+             ==================================================== -->
+        <div class="product-detail-main">
+
+            <!-- 이미지 갤러리 -->
+            <div class="product-gallery">
+
+                <!-- 이미지가 없을 때 -->
+                <div class="gallery-placeholder" th:if="${product.images.isEmpty()}">
+                    <span class="placeholder-text">이미지 없음</span>
+                </div>
+
+                <!-- 이미지 목록 (sortOrder 기준으로 정렬되어 facade에서 전달됨) -->
+                <div class="gallery-images" th:unless="${product.images.isEmpty()}">
+
+                    <!-- 대표 이미지: primary=true인 이미지를 우선 선택하고, 없으면 sortOrder 최소(index 0) 폴백.
+                         primary는 임의 sortOrder에 지정될 수 있으므로 index 0을 무조건 사용하면 안 됨. -->
+                    <div class="gallery-main-image"
+                         th:with="mainImage=${product.images.^[primary] != null ? product.images.^[primary] : product.images[0]}">
+                        <img th:src="${mainImage.imageUrl}"
+                             th:alt="${product.name}"
+                             id="main-product-image"
+                             class="gallery-main-img">
+                    </div>
+
+                    <!-- 이미지 썸네일 목록 -->
+                    <div class="gallery-thumbnails" th:if="${product.images.size() > 1}">
+                        <img th:each="image : ${product.images}"
+                             th:src="${image.imageUrl}"
+                             th:alt="'상품 이미지 ' + ${image.sortOrder}"
+                             th:classappend="${image.primary} ? ' thumb-active' : ''"
+                             class="gallery-thumb"
+                             th:attr="data-src=${image.imageUrl}">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 상품 기본 정보 -->
+            <div class="product-info">
+
+                <!-- 카테고리 -->
+                <p class="product-detail-category"
+                   th:if="${product.category != null}"
+                   th:text="${product.category.name}">카테고리</p>
+
+                <!-- 상품명 -->
+                <h1 class="product-detail-name" th:text="${product.name}">상품명</h1>
+
+                <!-- 품절 표시 -->
+                <div class="product-status">
+                    <span class="badge-sold-out badge-lg" th:if="${product.soldOut}">품절</span>
+                    <span class="badge-on-sale badge-lg" th:unless="${product.soldOut}">구매 가능</span>
+                </div>
+
+                <!-- 가격 -->
+                <div class="product-price-area">
+                    <span class="product-detail-price"
+                          th:text="${#numbers.formatDecimal(product.displayPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+
+                <!-- 상품 설명 -->
+                <div class="product-description" th:if="${product.description != null and !product.description.isBlank()}">
+                    <h2 class="section-title">상품 설명</h2>
+                    <p th:text="${product.description}">설명</p>
+                </div>
+
+                <!-- ====================================================
+                     옵션 목록
+                     ==================================================== -->
+                <div class="product-options" th:unless="${product.options.isEmpty()}">
+                    <h2 class="section-title">옵션</h2>
+                    <div class="option-group" th:each="option : ${product.options}">
+                        <span class="option-label" th:text="${option.name}">옵션명</span>
+                        <div class="option-values">
+                            <span th:if="${option.values.isEmpty()}" class="no-values">옵션값 없음</span>
+                            <span th:each="val : ${option.values}"
+                                  class="option-value-badge"
+                                  th:text="${val.value}">옵션값</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================
+                     Variant 목록 (활성 variant만 — facade가 필터링)
+                     ==================================================== -->
+                <div class="product-variants" th:unless="${product.variants.isEmpty()}">
+                    <h2 class="section-title">구매 옵션</h2>
+                    <div class="variant-list">
+                        <div class="variant-item" th:each="variant : ${product.variants}"
+                             th:classappend="${variant.available} ? '' : ' variant-unavailable'">
+                            <span class="variant-price"
+                                  th:text="${#numbers.formatDecimal(variant.price, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                            <span class="variant-available-badge" th:if="${variant.available}">구매 가능</span>
+                            <span class="variant-unavailable-badge" th:unless="${variant.available}">구매 불가</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="product-variants" th:if="${product.variants.isEmpty()}">
+                    <p class="empty-msg">현재 구매 가능한 옵션이 없습니다.</p>
+                </div>
+
+                <!-- ====================================================
+                     장바구니 버튼 (이번 Task에서 동작 구현 금지 — 비활성/준비중 안내)
+                     ==================================================== -->
+                <div class="product-cart-action">
+                    <button type="button"
+                            class="btn btn-primary btn-disabled-cart"
+                            disabled
+                            title="장바구니 기능은 준비 중입니다.">
+                        장바구니 담기 (준비 중)
+                    </button>
+                    <p class="cart-notice">장바구니 기능은 현재 준비 중입니다.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

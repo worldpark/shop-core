@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<!--
+    공개 상품 목록 화면.
+    view name: product/list
+    레이아웃: layout/base :: layout(title, content) — 공개 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 모델 키: products(PublicProductPage) / searchCondition(ProductSearchCondition) / categories(List<CategoryResponse>)
+      - 검색 폼: GET /products (keyword, categoryId, sort)
+      - 상품 카드 그리드: products.content 순회
+      - 대표 이미지: primaryImageUrl (null이면 placeholder)
+      - 품절 표시: soldOut=true
+      - pagination: products.page / products.totalPages
+      - 장바구니/주문/결제 동작 구현 금지 (이번 Task 범위 외)
+      - ownerId/storageKey/basePrice/sku/stock 수치 미표시
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>상품 목록</title>
+</head>
+<body>
+<main>
+    <div class="product-list-container">
+        <h1 class="page-title">상품 목록</h1>
+
+        <!-- ====================================================
+             검색/필터 폼
+             ==================================================== -->
+        <section class="product-search-section">
+            <!--
+                검색·필터·정렬 폼. GET 방식으로 파라미터 전달.
+                th:action 사용 — CSRF 히든 필드는 GET 폼에 불필요하지만 Thymeleaf th:action 자동 처리.
+                GET 폼의 경우 _csrf가 URL에 노출되지 않도록 method="get"만 사용.
+            -->
+            <form method="get" th:action="@{/products}" class="search-form">
+                <div class="search-form-row">
+
+                    <!-- 검색어 -->
+                    <div class="search-keyword">
+                        <label for="keyword">검색어</label>
+                        <input type="text"
+                               id="keyword"
+                               name="keyword"
+                               th:value="${searchCondition.keyword}"
+                               placeholder="상품명을 입력하세요">
+                    </div>
+
+                    <!-- 카테고리 필터 -->
+                    <div class="search-category">
+                        <label for="categoryId">카테고리</label>
+                        <select id="categoryId" name="categoryId" class="search-select">
+                            <option value="">전체 카테고리</option>
+                            <option th:each="cat : ${categories}"
+                                    th:value="${cat.categoryId}"
+                                    th:text="${cat.name}"
+                                    th:selected="${searchCondition.categoryId != null and searchCondition.categoryId == cat.categoryId}">카테고리</option>
+                        </select>
+                    </div>
+
+                    <!-- 정렬 -->
+                    <div class="search-sort">
+                        <label for="sort">정렬</label>
+                        <select id="sort" name="sort" class="search-select">
+                            <option value="latest"
+                                    th:selected="${searchCondition.sort == 'latest'}">최신순</option>
+                            <option value="priceAsc"
+                                    th:selected="${searchCondition.sort == 'priceAsc'}">낮은 가격순</option>
+                            <option value="priceDesc"
+                                    th:selected="${searchCondition.sort == 'priceDesc'}">높은 가격순</option>
+                        </select>
+                    </div>
+
+                    <!-- 페이지 크기 (히든) -->
+                    <input type="hidden" name="size" th:value="${searchCondition.size}">
+
+                    <div class="search-submit">
+                        <button type="submit" class="btn btn-primary">검색</button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <!-- ====================================================
+             상품 카드 그리드
+             ==================================================== -->
+        <section class="product-grid-section">
+
+            <!-- 결과 없을 때 -->
+            <p class="empty-msg" th:if="${products.content.isEmpty()}">
+                조건에 맞는 상품이 없습니다.
+            </p>
+
+            <!-- 상품 카드 그리드 -->
+            <div class="product-grid" th:unless="${products.content.isEmpty()}">
+                <div class="product-card" th:each="item : ${products.content}">
+
+                    <!-- 상품 상세 링크 -->
+                    <a th:href="@{/products/{id}(id=${item.productId})}" class="product-card-link">
+
+                        <!-- 대표 이미지 -->
+                        <div class="product-card-image">
+                            <img th:if="${item.primaryImageUrl != null}"
+                                 th:src="${item.primaryImageUrl}"
+                                 th:alt="${item.name}"
+                                 class="product-thumb">
+                            <!-- 대표 이미지 없을 때 placeholder -->
+                            <div th:unless="${item.primaryImageUrl != null}"
+                                 class="product-thumb-placeholder">
+                                <span class="placeholder-text">이미지 없음</span>
+                            </div>
+                        </div>
+
+                        <!-- 상품 정보 -->
+                        <div class="product-card-body">
+                            <p class="product-name" th:text="${item.name}">상품명</p>
+                            <p class="product-category"
+                               th:if="${item.categoryName != null}"
+                               th:text="${item.categoryName}">카테고리</p>
+                            <p class="product-price"
+                               th:text="${#numbers.formatDecimal(item.displayPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</p>
+
+                            <!-- 품절 표시 -->
+                            <span class="badge-sold-out" th:if="${item.soldOut}">품절</span>
+                            <span class="badge-on-sale" th:unless="${item.soldOut}">구매 가능</span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ====================================================
+             페이지네이션
+             ==================================================== -->
+        <section class="pagination-section" th:unless="${products.content.isEmpty()}">
+            <div class="pagination">
+                <div class="page-info">
+                    <span th:text="'총 ' + ${products.totalElements} + '개 상품'">총 0개 상품</span>
+                    <span th:text="'(' + (${products.page} + 1) + ' / ' + ${products.totalPages} + ' 페이지)'"> (1 / 1 페이지)</span>
+                </div>
+                <div class="page-nav">
+                    <!-- 이전 페이지 -->
+                    <a th:if="${products.page > 0}"
+                       th:href="@{/products(keyword=${searchCondition.keyword}, categoryId=${searchCondition.categoryId}, sort=${searchCondition.sort}, page=${products.page - 1}, size=${searchCondition.size})}"
+                       class="btn btn-outline btn-sm">이전</a>
+                    <span th:unless="${products.page > 0}"
+                          class="btn btn-outline btn-sm disabled">이전</span>
+
+                    <!-- 다음 페이지 -->
+                    <a th:if="${products.page + 1 < products.totalPages}"
+                       th:href="@{/products(keyword=${searchCondition.keyword}, categoryId=${searchCondition.categoryId}, sort=${searchCondition.sort}, page=${products.page + 1}, size=${searchCondition.size})}"
+                       class="btn btn-outline btn-sm">다음</a>
+                    <span th:unless="${products.page + 1 < products.totalPages}"
+                          class="btn btn-outline btn-sm disabled">다음</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>

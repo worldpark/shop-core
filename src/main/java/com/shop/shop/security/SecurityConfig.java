@@ -71,6 +71,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/api/v1/members/signup").permitAll()
                     // 카테고리 목록 조회는 공개 (인증 불필요) — anyRequest 앞에 배치
                     .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
+                    // 공개 상품 목록/상세 API (인증 불필요) — anyRequest 앞에 배치
+                    .requestMatchers(HttpMethod.GET, "/api/v1/products").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/v1/products/*").permitAll()
                     // 관리자 전용 REST API (anyRequest 앞에 배치)
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                     // 판매자 이상 REST API (ADMIN 함의) — anyRequest 앞에 배치
@@ -106,6 +109,9 @@ public class SecurityConfig {
                     // 회원가입 화면 공개 (GET 표시 + POST 폼 제출 — CSRF 보호 유지)
                     .requestMatchers(HttpMethod.GET, "/signup").permitAll()
                     .requestMatchers(HttpMethod.POST, "/signup").permitAll()
+                    // 공개 상품 목록/상세 View (인증 불필요) — anyRequest 앞에 배치
+                    .requestMatchers(HttpMethod.GET, "/products").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/products/*").permitAll()
                     // 관리자 전용 View 경로 (anyRequest 앞에 배치)
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     // 판매자 이상 View 경로 (ADMIN 함의) — anyRequest 앞에 배치
