@@ -131,6 +131,40 @@ class CartServiceTest {
     }
 
     // =============================================================
+    // getCart
+    // =============================================================
+
+    @Test
+    @DisplayName("영속된 장바구니가 없으면 빈 CartView를 반환한다 (findByCartId(null) 언박싱 NPE 회귀)")
+    void getCart_noPersistedCart_returnsEmptyView() {
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.empty());
+
+        CartService.CartView view = cartService.getCart(USER_ID);
+
+        assertThat(view.cartId()).isZero();
+        assertThat(view.items()).isEmpty();
+        assertThat(view.totalQuantity()).isZero();
+        assertThat(view.totalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(view.hasUnavailableItem()).isFalse();
+        // 미영속 cart(id=null)를 findByCartId(long)에 넘겨 언박싱 NPE가 나면 안 된다
+        verify(cartItemRepository, never()).findByCartId(anyLong());
+    }
+
+    @Test
+    @DisplayName("장바구니는 있으나 항목이 없으면 빈 CartView(cartId 유지)를 반환한다")
+    void getCart_existingCartNoItems_returnsEmptyView() {
+        when(cartRepository.findByUserId(USER_ID)).thenReturn(Optional.of(mockCart));
+        when(cartItemRepository.findByCartId(CART_ID)).thenReturn(List.of());
+
+        CartService.CartView view = cartService.getCart(USER_ID);
+
+        assertThat(view.cartId()).isEqualTo(CART_ID);
+        assertThat(view.items()).isEmpty();
+        // 항목이 없으면 카탈로그 배치 조회를 호출하지 않는다
+        verify(productPurchaseCatalog, never()).getPurchasableVariants(any());
+    }
+
+    // =============================================================
     // addItem
     // =============================================================
 

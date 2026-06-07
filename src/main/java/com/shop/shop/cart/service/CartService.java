@@ -80,9 +80,13 @@ public class CartService {
      */
     @Transactional(readOnly = true)
     public CartView getCart(long userId) {
-        Cart cart = getOrCreateCartReadOnly(userId);
-        List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
+        Cart cart = cartRepository.findByUserId(userId).orElse(null);
+        if (cart == null) {
+            // 아직 영속된 장바구니 없음 (첫 방문) — 빈 장바구니. 실제 생성은 첫 담기(getOrCreateCart) 시.
+            return CartView.empty(0L);
+        }
 
+        List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
         if (items.isEmpty()) {
             return CartView.empty(cart.getId());
         }
@@ -219,17 +223,6 @@ public class CartService {
         }
 
         return item;
-    }
-
-    /**
-     * 읽기 전용 조회용 getOrCreateCart (트랜잭션 readOnly 컨텍스트에서 사용).
-     *
-     * <p>readOnly 메서드에서 getOrCreateCart(쓰기)를 직접 호출하지 않고 단순 조회 후 없으면 빈 CartView 반환.
-     * 실제 생성은 첫 담기 시 getOrCreateCart(쓰기)가 처리한다.
-     */
-    private Cart getOrCreateCartReadOnly(long userId) {
-        return cartRepository.findByUserId(userId)
-                .orElseGet(() -> Cart.create(userId));
     }
 
     // =============================================================
