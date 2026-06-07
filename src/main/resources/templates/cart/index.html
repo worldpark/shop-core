@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<!--
+    장바구니 화면.
+    view name: cart/index
+    레이아웃: layout/base :: layout(title, content) — 인증 풀 레이아웃 (nav 포함)
+
+    보존 계약:
+      - 모델 키: cart(CartResponse)
+      - cart.items: 장바구니 항목 목록 (CartItemResponse)
+      - 항목 표시: 상품명, 대표 이미지(imageUrl, 없으면 placeholder), 옵션라벨, 단가, 수량, 합계(lineAmount)
+      - available=false → 구매불가 배지, stockEnough=false → 재고부족 배지
+      - 수량 변경 폼: POST /cart/items/{cartItemId}, 필드 quantity, CSRF 자동
+      - 삭제 폼: POST /cart/items/{cartItemId}/delete, CSRF 자동
+      - totalQuantity, totalAmount, hasUnavailableItem 표시
+      - 주문하기 버튼: 비활성(disabled) — 후속 Task에서 구현
+      - stock 수치·ownerId·Entity·로컬 절대경로 미표시
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>장바구니</title>
+</head>
+<body>
+<main>
+    <div class="cart-container">
+        <h1 class="page-title">장바구니</h1>
+
+        <!-- 구매불가 항목 알림 -->
+        <div class="alert alert-info" th:if="${cart.hasUnavailableItem}">
+            일부 항목이 현재 구매 불가능하거나 재고가 부족합니다. 확인 후 주문해 주세요.
+        </div>
+
+        <!-- 장바구니가 비어 있는 경우 -->
+        <div class="cart-empty" th:if="${cart.items.isEmpty()}">
+            <p class="empty-msg">장바구니가 비어 있습니다.</p>
+            <a th:href="@{/products}" class="btn btn-primary">상품 보러 가기</a>
+        </div>
+
+        <!-- 장바구니 항목 목록 -->
+        <div class="cart-items" th:unless="${cart.items.isEmpty()}">
+
+            <!-- 항목 테이블 -->
+            <div class="table-wrapper">
+                <table class="cart-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">상품</th>
+                            <th scope="col">옵션</th>
+                            <th scope="col">단가</th>
+                            <th scope="col">수량</th>
+                            <th scope="col">합계</th>
+                            <th scope="col">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="item : ${cart.items}"
+                            th:classappend="${!item.available or !item.stockEnough} ? ' cart-item-row cart-item-unavailable' : ' cart-item-row'">
+
+                            <!-- 상품 정보 -->
+                            <td class="cart-item-product">
+                                <div class="cart-item-product-inner">
+                                    <!-- 대표 이미지 -->
+                                    <img th:if="${item.imageUrl != null}"
+                                         th:src="${item.imageUrl}"
+                                         th:alt="${item.productName}"
+                                         class="cart-item-image">
+                                    <div th:unless="${item.imageUrl != null}"
+                                         class="cart-item-image-placeholder">
+                                        <span>이미지 없음</span>
+                                    </div>
+                                    <!-- 상품명 + 배지 -->
+                                    <div class="cart-item-name-area">
+                                        <span class="cart-item-name" th:text="${item.productName}">상품명</span>
+                                        <span class="badge-unavailable" th:unless="${item.available}">구매불가</span>
+                                        <span class="badge-stock-shortage" th:if="${item.available and !item.stockEnough}">재고부족</span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- 옵션 라벨 -->
+                            <td class="cart-item-option">
+                                <span th:text="${item.optionLabel != null ? item.optionLabel : '-'}">옵션</span>
+                            </td>
+
+                            <!-- 단가 -->
+                            <td class="cart-item-price">
+                                <span th:if="${item.unitPrice != null}"
+                                      th:text="${#numbers.formatDecimal(item.unitPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                <span th:unless="${item.unitPrice != null}">-</span>
+                            </td>
+
+                            <!-- 수량 변경 폼 -->
+                            <td class="cart-item-quantity">
+                                <form th:action="@{/cart/items/{id}(id=${item.cartItemId})}"
+                                      method="post"
+                                      class="cart-quantity-form">
+                                    <label th:for="'quantity-' + ${item.cartItemId}"
+                                           class="sr-only">수량</label>
+                                    <input type="number"
+                                           th:id="'quantity-' + ${item.cartItemId}"
+                                           name="quantity"
+                                           th:value="${item.quantity}"
+                                           min="1"
+                                           class="cart-quantity-input"
+                                           th:attr="aria-label='수량 (' + ${item.productName} + ')'">
+                                    <button type="submit" class="btn btn-outline btn-sm">변경</button>
+                                </form>
+                            </td>
+
+                            <!-- 합계 -->
+                            <td class="cart-item-line-amount">
+                                <span th:if="${item.lineAmount != null}"
+                                      th:text="${#numbers.formatDecimal(item.lineAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                <span th:unless="${item.lineAmount != null}">-</span>
+                            </td>
+
+                            <!-- 삭제 폼 -->
+                            <td class="cart-item-delete">
+                                <form th:action="@{/cart/items/{id}/delete(id=${item.cartItemId})}"
+                                      method="post"
+                                      class="cart-delete-form">
+                                    <button type="submit"
+                                            class="btn btn-outline btn-sm btn-danger"
+                                            th:attr="aria-label='삭제 (' + ${item.productName} + ')'">
+                                        삭제
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 합계 요약 -->
+            <div class="cart-summary">
+                <div class="cart-summary-row">
+                    <span class="cart-summary-label">총 상품 수:</span>
+                    <span class="cart-summary-value" th:text="${cart.totalQuantity} + '개'">0개</span>
+                </div>
+                <div class="cart-summary-row">
+                    <span class="cart-summary-label">주문 가능 금액:</span>
+                    <span class="cart-summary-value cart-total-amount"
+                          th:text="${#numbers.formatDecimal(cart.totalAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+            </div>
+
+            <!-- 주문하기 버튼 (비활성 — 후속 Task) -->
+            <div class="cart-action">
+                <button type="button"
+                        class="btn btn-primary btn-lg"
+                        disabled
+                        title="주문 기능은 준비 중입니다.">
+                    주문하기 (준비 중)
+                </button>
+                <p class="cart-order-notice">주문 기능은 현재 준비 중입니다.</p>
+            </div>
+        </div>
+
+        <!-- 쇼핑 계속하기 -->
+        <div class="cart-back-link">
+            <a th:href="@{/products}" class="btn btn-outline btn-sm">쇼핑 계속하기</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

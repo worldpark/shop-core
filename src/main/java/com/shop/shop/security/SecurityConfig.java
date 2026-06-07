@@ -78,6 +78,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                     // 판매자 이상 REST API (ADMIN 함의) — anyRequest 앞에 배치
                     .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
+                    // 장바구니 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
+                    .requestMatchers("/api/v1/cart/**").hasRole("CONSUMER")
                     // 그 외 REST API는 인증 필요
                     .anyRequest().authenticated()
             )
@@ -116,6 +118,8 @@ public class SecurityConfig {
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     // 판매자 이상 View 경로 (ADMIN 함의) — anyRequest 앞에 배치
                     .requestMatchers("/seller/**").hasRole("SELLER")
+                    // 장바구니 View 경로 — 최소 ROLE_CONSUMER (미인증은 formLogin이 302→/login)
+                    .requestMatchers("/cart", "/cart/**").hasRole("CONSUMER")
                     // 그 외 모든 경로는 인증 필요
                     .anyRequest().authenticated()
             )

@@ -14,6 +14,8 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.product.spi.SellerProductImageFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,6 +110,12 @@ class SellerProductImageViewControllerTest {
 
     @MockitoBean
     private ProductImageRepository productImageRepository;
+
+    @MockitoBean
+    private CartRepository cartRepository;
+
+    @MockitoBean
+    private CartItemRepository cartItemRepository;
 
     /**
      * SellerProductImageFacade를 @MockitoBean으로 대체 — product.spi facade 격리.

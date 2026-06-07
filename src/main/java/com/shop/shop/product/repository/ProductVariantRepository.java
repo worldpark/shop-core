@@ -4,7 +4,9 @@ import com.shop.shop.product.domain.ProductVariant;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ProductVariant JPA Repository.
@@ -48,4 +50,27 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
      */
     @EntityGraph(attributePaths = "optionValues")
     List<ProductVariant> findByProductIdAndIsActiveTrue(long productId);
+
+    /**
+     * 단건 variant + product 즉시 로딩 조회 (장바구니 담기·수량변경 검증용).
+     *
+     * <p>product LAZY 회피 — productName/status 접근 시 LazyInitializationException 방지.
+     * optionValues도 즉시 로딩하여 optionLabel 조립에 사용한다.
+     *
+     * @param id variant ID
+     * @return variant (product·optionValues 즉시 로딩)
+     */
+    @EntityGraph(attributePaths = {"product", "optionValues"})
+    Optional<ProductVariant> findWithProductById(long id);
+
+    /**
+     * IN 배치 variant + product + optionValues 즉시 로딩 조회 (장바구니 조회 합성용, N+1 회피).
+     *
+     * <p>존재하는 id만 반환한다. 목록에 없는 id(삭제됨)는 cart가 available=false 폴백으로 처리한다.
+     *
+     * @param ids 조회할 variant ID 컬렉션
+     * @return variant 목록 (product·optionValues 즉시 로딩)
+     */
+    @EntityGraph(attributePaths = {"product", "optionValues"})
+    List<ProductVariant> findByIdIn(Collection<Long> ids);
 }

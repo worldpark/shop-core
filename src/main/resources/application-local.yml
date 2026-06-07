@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+
+shop:
+  security:
+    jwt:
+      # Local development only. Production must provide SHOP_SECURITY_JWT_SECRET.
+      secret: ${SHOP_SECURITY_JWT_SECRET:local-development-jwt-secret-32-bytes-minimum}
+
+  storage:
+    root: ${SHOP_STORAGE_ROOT:./build/local-uploads}
+    asset-base-url: ${SHOP_STORAGE_ASSET_BASE_URL:http://localhost:8080}
+

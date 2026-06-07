@@ -8,6 +8,8 @@ import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.cart.repository.CartItemRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,12 @@ class RefreshTokenStoreWiringTest {
 
     @MockitoBean
     ProductImageRepository productImageRepository;
+
+    @MockitoBean
+    CartRepository cartRepository;
+
+    @MockitoBean
+    CartItemRepository cartItemRepository;
 
     @Test
     @DisplayName("운영 배선: FakeRefreshTokenStore 없이 RefreshTokenStore 빈이 RedisRefreshTokenStore로 등록된다")

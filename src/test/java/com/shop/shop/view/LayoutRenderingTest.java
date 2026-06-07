@@ -8,6 +8,8 @@ import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,6 +68,12 @@ class LayoutRenderingTest {
 
     @MockitoBean
     ProductImageRepository productImageRepository;
+
+    @MockitoBean
+    CartRepository cartRepository;
+
+    @MockitoBean
+    CartItemRepository cartItemRepository;
 
     /** footer 프래그먼트 식별 마커 — fragments/footer.html 의 실제 텍스트와 일치 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

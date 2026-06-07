@@ -15,6 +15,8 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.product.spi.PublicProductFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,6 +90,12 @@ class PublicProductDetailRenderingTest {
 
     @MockitoBean
     private ProductImageRepository productImageRepository;
+
+    @MockitoBean
+    private CartRepository cartRepository;
+
+    @MockitoBean
+    private CartItemRepository cartItemRepository;
 
     @MockitoBean
     private PublicProductFacade publicProductFacade;
@@ -279,18 +287,17 @@ class PublicProductDetailRenderingTest {
     }
 
     // ============================================================
-    // (D8) 장바구니 버튼 비활성
+    // (D8) 장바구니 담기 영역 (비인증 → 로그인 안내)
     // ============================================================
 
     @Test
-    @DisplayName("(D8) GET /products/{id} — 장바구니 버튼 비활성(disabled) 렌더링")
-    void getProductDetail_rendersDisabledCartButton() throws Exception {
+    @DisplayName("(D8) GET /products/{id} — 비인증 → 로그인 안내 렌더링")
+    void getProductDetail_rendersLoginNoticeForUnauthenticated() throws Exception {
         String body = mockMvc.perform(get("/products/" + PRODUCT_ID))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertThat(body).as("disabled 속성이 있어야 함").contains("disabled");
-        assertThat(body).as("준비 중 안내 텍스트가 있어야 함").contains("준비 중");
+        assertThat(body).as("로그인 후 담기 가능 텍스트가 있어야 함").contains("로그인 후 담기 가능");
     }
 
     // ============================================================

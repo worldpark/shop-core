@@ -12,7 +12,10 @@
       - product.soldOut: 품절 여부
       - product.category: 카테고리 정보 (nullable)
       - ownerId/storageKey/basePrice/sku/stock 수치 미표시
-      - 장바구니/주문/결제 동작 구현 금지 (이번 Task 범위 외)
+      - 장바구니 담기 폼: POST /cart/items (variantId, quantity) — Task 014
+      - 비인증: 로그인 안내 표시 (sec:authorize)
+      - available=false variant: 선택 불가/비활성 표시
+      - soldOut/variants empty: 폼 숨김
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
@@ -134,16 +137,72 @@
                 </div>
 
                 <!-- ====================================================
-                     장바구니 버튼 (이번 Task에서 동작 구현 금지 — 비활성/준비중 안내)
+                     장바구니 담기 폼 (Task 014)
+                     soldOut 또는 variants 없음이면 폼 숨김
+                     비인증 사용자: 로그인 안내 (sec:authorize)
                      ==================================================== -->
                 <div class="product-cart-action">
-                    <button type="button"
-                            class="btn btn-primary btn-disabled-cart"
-                            disabled
-                            title="장바구니 기능은 준비 중입니다.">
-                        장바구니 담기 (준비 중)
-                    </button>
-                    <p class="cart-notice">장바구니 기능은 현재 준비 중입니다.</p>
+
+                    <!-- 비인증 사용자: 로그인 안내 -->
+                    <div sec:authorize="!isAuthenticated()" class="cart-login-notice">
+                        <a th:href="@{/login}" class="btn btn-outline">로그인 후 담기 가능</a>
+                        <p class="cart-notice">로그인한 회원만 장바구니를 이용할 수 있습니다.</p>
+                    </div>
+
+                    <!-- 인증 사용자: 담기 폼 (soldOut이거나 variants 없으면 숨김) -->
+                    <div sec:authorize="isAuthenticated()">
+
+                        <!-- 품절 또는 구매가능 variant 없음 -->
+                        <div th:if="${product.soldOut or product.variants.isEmpty()}"
+                             class="cart-soldout-notice">
+                            <p class="cart-notice">현재 구매 가능한 옵션이 없습니다.</p>
+                        </div>
+
+                        <!-- 담기 폼 -->
+                        <form th:unless="${product.soldOut or product.variants.isEmpty()}"
+                              th:action="@{/cart/items}"
+                              method="post"
+                              class="add-to-cart-form">
+
+                            <!-- variant 선택 (라디오) -->
+                            <div class="form-group">
+                                <label class="form-label">구매 옵션 선택 <span class="required">*</span></label>
+                                <div class="variant-radio-list">
+                                    <div th:each="variant, varStat : ${product.variants}"
+                                         class="variant-radio-item"
+                                         th:classappend="${!variant.available} ? ' variant-radio-disabled' : ''">
+                                        <input type="radio"
+                                               name="variantId"
+                                               th:id="'variant-' + ${variant.variantId}"
+                                               th:value="${variant.variantId}"
+                                               th:disabled="${!variant.available}"
+                                               th:checked="${varStat.first and variant.available}">
+                                        <label th:for="'variant-' + ${variant.variantId}"
+                                               th:classappend="${!variant.available} ? ' label-disabled' : ''">
+                                            <span class="variant-radio-price"
+                                                  th:text="${#numbers.formatDecimal(variant.price, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                            <span class="variant-radio-status badge-unavailable"
+                                                  th:if="${!variant.available}">(구매불가)</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 수량 입력 -->
+                            <div class="form-group">
+                                <label for="add-to-cart-quantity" class="form-label">수량</label>
+                                <input type="number"
+                                       id="add-to-cart-quantity"
+                                       name="quantity"
+                                       value="1"
+                                       min="1"
+                                       class="add-to-cart-quantity-input">
+                            </div>
+
+                            <!-- 담기 버튼 -->
+                            <button type="submit" class="btn btn-primary">장바구니 담기</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
