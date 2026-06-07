@@ -77,6 +77,11 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
+    // Testcontainers — PostgreSQL 고유 동작(예: NULL 파라미터 타입 추론) 검증용 실 DB 통합 테스트.
+    // 버전은 Spring Boot BOM(testcontainers-bom)이 관리한다.
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
     testCompileOnly   'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly   'org.junit.platform:junit-platform-launcher'
@@ -84,4 +89,47 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// =============================================================
+// E2E — Playwright for Java (브라우저 기반 종단 테스트)
+// =============================================================
+// 일반 `test`(인프라 비의존 원칙)와 분리한 전용 소스셋·태스크.
+// `check`/`test`에 포함하지 않는다(무거움 + 실행 중인 앱·DB 필요).
+// 실행: 1) 앱 기동(localhost:8080)  2) ./gradlew installPlaywrightBrowsers (최초 1회)
+//       3) ./gradlew e2eTest
+sourceSets {
+    e2eTest {
+        java.srcDir 'src/e2eTest/java'
+        resources.srcDir 'src/e2eTest/resources'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    e2eTestImplementation.extendsFrom testImplementation
+    e2eTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    // Playwright Java — 엔진/로케이터/웹-퍼스트 assertion은 JS판과 동일. 러너는 JUnit5 사용.
+    e2eTestImplementation 'com.microsoft.playwright:playwright:1.52.0'
+}
+
+tasks.register('e2eTest', Test) {
+    group = 'verification'
+    description = 'Playwright 브라우저 E2E 테스트. 실행 중인 앱(SHOP_CORE_BASE_URL, 기본 localhost:8080)이 필요하다.'
+    testClassesDirs = sourceSets.e2eTest.output.classesDirs
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter(tasks.named('test'))
+}
+
+tasks.register('installPlaywrightBrowsers', JavaExec) {
+    group = 'verification'
+    description = 'Playwright Java용 Chromium 브라우저를 설치한다 (최초 1회).'
+    classpath = sourceSets.e2eTest.runtimeClasspath
+    mainClass = 'com.microsoft.playwright.CLI'
+    args = ['install', 'chromium']
 }

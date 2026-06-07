@@ -55,7 +55,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             LEFT JOIN p.category c
             LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             GROUP BY p.id, p.name, p.basePrice, c.id, c.name, p.status, p.createdAt
             ORDER BY p.createdAt DESC, p.id DESC
@@ -65,7 +65,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM Product p
             LEFT JOIN p.category c
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             """)
     Page<ProductSummaryProjection> findPublicProductsLatest(
@@ -101,7 +101,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             LEFT JOIN p.category c
             LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             GROUP BY p.id, p.name, p.basePrice, c.id, c.name, p.status, p.createdAt
             ORDER BY COALESCE(MIN(v.price), p.basePrice) ASC, p.id ASC
@@ -111,7 +111,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM Product p
             LEFT JOIN p.category c
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             """)
     Page<ProductSummaryProjection> findPublicProductsPriceAsc(
@@ -147,7 +147,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             LEFT JOIN p.category c
             LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             GROUP BY p.id, p.name, p.basePrice, c.id, c.name, p.status, p.createdAt
             ORDER BY COALESCE(MIN(v.price), p.basePrice) DESC, p.id ASC
@@ -157,7 +157,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM Product p
             LEFT JOIN p.category c
             WHERE p.status IN :statuses
-            AND (:keyword IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            AND (CAST(:keyword AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
             AND (:categoryId IS NULL OR c.id = :categoryId)
             """)
     Page<ProductSummaryProjection> findPublicProductsPriceDesc(
