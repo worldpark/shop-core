@@ -18,6 +18,8 @@ import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.product.service.PublicProductServiceResponse;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
@@ -102,6 +104,12 @@ class PublicProductRestControllerSecurityTest {
 
     @MockitoBean
     private CartItemRepository cartItemRepository;
+
+    @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
 
     private String adminToken;
     private String sellerToken;

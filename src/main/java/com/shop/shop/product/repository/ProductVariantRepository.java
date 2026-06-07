@@ -73,4 +73,16 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
      */
     @EntityGraph(attributePaths = {"product", "optionValues"})
     List<ProductVariant> findByIdIn(Collection<Long> ids);
+
+    /**
+     * IN 배치 variant + product + optionValues + option 즉시 로딩 조회 (주문 스냅샷 생성용, N+1 회피).
+     *
+     * <p>존재하는 id만 반환한다. optionValues.option(옵션명)까지 즉시 로딩해
+     * 주문 시점 스냅샷(optionName/optionValue) 조립 시 LazyInitializationException을 방지한다.
+     *
+     * @param ids 조회할 variant ID 컬렉션
+     * @return variant 목록 (product·optionValues·option 즉시 로딩)
+     */
+    @EntityGraph(attributePaths = {"product", "optionValues", "optionValues.option"})
+    List<ProductVariant> findWithOptionsByIdIn(Collection<Long> ids);
 }

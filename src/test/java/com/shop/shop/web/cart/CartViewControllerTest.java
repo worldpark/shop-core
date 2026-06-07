@@ -5,6 +5,9 @@ import com.shop.shop.cart.dto.CartResponse;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.spi.CartFacade;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.common.exception.CartItemNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
@@ -103,12 +106,25 @@ class CartViewControllerTest {
     @MockitoBean
     private CartItemRepository cartItemRepository;
 
+    @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
+
     /**
      * CartFacade @MockitoBean — cart.spi facade 격리.
      * cart 도메인 내부 Service·Repository와 무관하게 컨트롤러만 테스트한다.
      */
     @MockitoBean
     private CartFacade cartFacade;
+
+    /**
+     * OrderFacade @MockitoBean — order.spi facade 격리.
+     * OrderViewController가 OrderFacade를 의존하므로 테스트 컨텍스트에서 mock 등록 필요.
+     */
+    @MockitoBean
+    private OrderFacade orderFacade;
 
     private static final String USER_EMAIL = "user@example.com";
 

@@ -2,6 +2,8 @@ package com.shop.shop.view;
 
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.dto.PublicCategoryResponse;
@@ -93,6 +95,12 @@ class ProductDetailAddToCartRenderingTest {
 
     @MockitoBean
     private CartItemRepository cartItemRepository;
+
+    @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
 
     @MockitoBean
     private PublicProductFacade publicProductFacade;

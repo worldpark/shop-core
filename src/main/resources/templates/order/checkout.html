@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<!--
+    주문서(체크아웃) 화면.
+    view name: order/checkout
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 모델 키: checkout(OrderCheckoutResponse)
+      - checkout.items: 주문 가능 항목 목록 (OrderItemResponse)
+      - 항목 표시: productName, optionLabel, unitPrice, quantity, lineAmount
+      - stock 수치·ownerId·Entity·로컬 절대경로 미표시
+      - checkout.itemsAmount / discountAmount / shippingFee / finalAmount 금액 표시
+      - 배송지 폼: POST /orders, 필드 recipient/phone/postcode/address1/address2, CSRF 자동
+      - checkout.hasItems=false 이면 빈 안내·주문 버튼 비활성
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>주문서</title>
+</head>
+<body>
+<main>
+    <div class="checkout-container">
+        <h1 class="page-title">주문서</h1>
+
+        <!-- 플래시 메시지는 layout/base 의 fragments/messages 에서 처리 -->
+
+        <!-- 장바구니 비어있을 때 -->
+        <div class="cart-empty" th:unless="${checkout.hasItems}">
+            <p class="empty-msg">주문 가능한 상품이 없습니다.</p>
+            <a th:href="@{/cart}" class="btn btn-outline btn-sm">장바구니로 돌아가기</a>
+        </div>
+
+        <!-- 주문 가능 항목이 있을 때 -->
+        <div th:if="${checkout.hasItems}">
+
+            <!-- 주문 항목 목록 -->
+            <section class="checkout-items-section">
+                <h2 class="section-title">주문 상품</h2>
+                <div class="table-wrapper">
+                    <table class="checkout-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">상품명</th>
+                                <th scope="col">옵션</th>
+                                <th scope="col">단가</th>
+                                <th scope="col">수량</th>
+                                <th scope="col">합계</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${checkout.items}" class="checkout-item-row">
+                                <td class="checkout-item-name" th:text="${item.productName}">상품명</td>
+                                <td class="checkout-item-option">
+                                    <span th:text="${item.optionLabel != null ? item.optionLabel : '-'}">옵션</span>
+                                </td>
+                                <td class="checkout-item-price">
+                                    <span th:text="${#numbers.formatDecimal(item.unitPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                </td>
+                                <td class="checkout-item-quantity" th:text="${item.quantity}">1</td>
+                                <td class="checkout-item-line-amount">
+                                    <span th:text="${#numbers.formatDecimal(item.lineAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 금액 요약 -->
+            <section class="checkout-summary-section">
+                <h2 class="section-title">결제 금액</h2>
+                <div class="checkout-summary">
+                    <div class="checkout-summary-row">
+                        <span class="checkout-summary-label">상품 금액:</span>
+                        <span class="checkout-summary-value"
+                              th:text="${#numbers.formatDecimal(checkout.itemsAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                    </div>
+                    <div class="checkout-summary-row">
+                        <span class="checkout-summary-label">할인 금액:</span>
+                        <span class="checkout-summary-value"
+                              th:text="${#numbers.formatDecimal(checkout.discountAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                    </div>
+                    <div class="checkout-summary-row">
+                        <span class="checkout-summary-label">배송비:</span>
+                        <span class="checkout-summary-value"
+                              th:text="${#numbers.formatDecimal(checkout.shippingFee, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                    </div>
+                    <div class="checkout-summary-row checkout-total-row">
+                        <span class="checkout-summary-label checkout-total-label">최종 결제 금액:</span>
+                        <span class="checkout-summary-value checkout-total-amount"
+                              th:text="${#numbers.formatDecimal(checkout.finalAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 배송지 입력 폼 (POST /orders, CSRF 자동 주입) -->
+            <section class="checkout-shipping-section">
+                <h2 class="section-title">배송지 정보</h2>
+                <form th:action="@{/orders}" method="post" class="checkout-form">
+
+                    <div class="form-group">
+                        <label for="recipient">수령인 <span class="required">*</span></label>
+                        <input type="text"
+                               id="recipient"
+                               name="recipient"
+                               class="form-control"
+                               placeholder="수령인 이름"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">전화번호 <span class="required">*</span></label>
+                        <input type="tel"
+                               id="phone"
+                               name="phone"
+                               class="form-control"
+                               placeholder="전화번호 (예: 010-1234-5678)"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="postcode">우편번호 <span class="required">*</span></label>
+                        <input type="text"
+                               id="postcode"
+                               name="postcode"
+                               class="form-control"
+                               placeholder="우편번호"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="address1">주소 <span class="required">*</span></label>
+                        <input type="text"
+                               id="address1"
+                               name="address1"
+                               class="form-control"
+                               placeholder="기본 주소"
+                               required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="address2">상세 주소</label>
+                        <input type="text"
+                               id="address2"
+                               name="address2"
+                               class="form-control"
+                               placeholder="상세 주소 (선택)">
+                    </div>
+
+                    <div class="checkout-action">
+                        <button type="submit" class="btn btn-primary btn-lg">주문하기</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <!-- 쇼핑 계속하기 -->
+        <div class="checkout-back-link">
+            <a th:href="@{/cart}" class="btn btn-outline btn-sm">장바구니로 돌아가기</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

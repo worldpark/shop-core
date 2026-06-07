@@ -8,6 +8,8 @@ import com.shop.shop.cart.dto.CartResponse;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.service.CartServiceResponse;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.common.exception.CartItemNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
@@ -104,6 +106,12 @@ class CartRestControllerSecurityTest {
 
     @MockitoBean
     private CartServiceResponse cartServiceResponse;
+
+    @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
 
     private String adminToken;
     private String sellerToken;

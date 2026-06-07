@@ -57,4 +57,16 @@ public interface CartItemRepository extends JpaRepository<CartItem, Long> {
             @Param("variantId") long variantId,
             @Param("delta") int delta,
             @Param("stock") int stock);
+
+    /**
+     * 장바구니 항목 전체 삭제 (장바구니 비우기).
+     *
+     * <p>주문 생성 완료 후 장바구니를 비울 때 사용한다.
+     * 신규 인덱스·migration 금지 — 기존 cart_id 컬럼 기반 쿼리.
+     *
+     * @param cartId 장바구니 ID
+     */
+    @Modifying
+    @Query("DELETE FROM CartItem ci WHERE ci.cart.id = :cartId")
+    void deleteByCartId(@Param("cartId") long cartId);
 }

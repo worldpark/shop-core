@@ -12,7 +12,7 @@
       - 수량 변경 폼: POST /cart/items/{cartItemId}, 필드 quantity, CSRF 자동
       - 삭제 폼: POST /cart/items/{cartItemId}/delete, CSRF 자동
       - totalQuantity, totalAmount, hasUnavailableItem 표시
-      - 주문하기 버튼: 비활성(disabled) — 후속 Task에서 구현
+      - 주문하기 버튼: hasUnavailableItem=false 이면 /checkout 링크, true 이면 비활성(disabled)
       - stock 수치·ownerId·Entity·로컬 절대경로 미표시
 -->
 <html xmlns:th="http://www.thymeleaf.org"
@@ -146,15 +146,22 @@
                 </div>
             </div>
 
-            <!-- 주문하기 버튼 (비활성 — 후속 Task) -->
+            <!-- 주문하기 버튼 -->
             <div class="cart-action">
-                <button type="button"
-                        class="btn btn-primary btn-lg"
-                        disabled
-                        title="주문 기능은 준비 중입니다.">
-                    주문하기 (준비 중)
-                </button>
-                <p class="cart-order-notice">주문 기능은 현재 준비 중입니다.</p>
+                <!-- 구매불가 항목이 있을 때 비활성 안내 -->
+                <div th:if="${cart.hasUnavailableItem}">
+                    <button type="button"
+                            class="btn btn-primary btn-lg"
+                            disabled
+                            title="구매 불가 또는 재고 부족 항목이 있습니다.">
+                        주문하기
+                    </button>
+                    <p class="cart-order-notice">구매 불가 또는 재고 부족 항목을 제거한 후 주문해 주세요.</p>
+                </div>
+                <!-- 정상 주문하기 링크 -->
+                <a th:unless="${cart.hasUnavailableItem}"
+                   th:href="@{/checkout}"
+                   class="btn btn-primary btn-lg">주문하기</a>
             </div>
         </div>
 

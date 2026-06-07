@@ -12,6 +12,8 @@ import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.product.spi.PublicProductFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,6 +96,12 @@ class PublicProductListRenderingTest {
 
     @MockitoBean
     private CartItemRepository cartItemRepository;
+
+    @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
 
     @MockitoBean
     private PublicProductFacade publicProductFacade;

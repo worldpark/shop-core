@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<!--
+    내 주문 목록 화면.
+    view name: order/list
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 모델 키: orders(Page<OrderSummaryResponse>)
+      - 행 표시: orderNumber, status, representativeItemName, itemCount, finalAmount, createdAt
+      - 상세 링크: /orders/{orderId}
+      - 페이지네이션: orders.number, orders.totalPages
+      - ownerId·Entity·로컬 절대경로 미표시
+      - 최신순 (OrderFacade.getMyOrders 기본 최신순)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>내 주문 목록</title>
+</head>
+<body>
+<main>
+    <div class="order-list-container">
+        <h1 class="page-title">내 주문 목록</h1>
+
+        <!-- 주문 없을 때 -->
+        <div class="order-empty" th:if="${orders.content.isEmpty()}">
+            <p class="empty-msg">주문 내역이 없습니다.</p>
+            <a th:href="@{/products}" class="btn btn-primary">상품 보러 가기</a>
+        </div>
+
+        <!-- 주문 목록 테이블 -->
+        <div class="table-wrapper" th:unless="${orders.content.isEmpty()}">
+            <table class="order-table">
+                <thead>
+                    <tr>
+                        <th scope="col">주문번호</th>
+                        <th scope="col">상태</th>
+                        <th scope="col">대표 상품</th>
+                        <th scope="col">항목 수</th>
+                        <th scope="col">결제 금액</th>
+                        <th scope="col">주문일시</th>
+                        <th scope="col">상세</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="o : ${orders.content}" class="order-row">
+                        <td class="order-number" th:text="${o.orderNumber}">ORD-...</td>
+                        <td class="order-status">
+                            <span class="badge-order-status" th:text="${o.status}">pending</span>
+                        </td>
+                        <td class="order-representative-item" th:text="${o.representativeItemName}">상품명</td>
+                        <td class="order-item-count" th:text="${o.itemCount} + '건'">1건</td>
+                        <td class="order-final-amount">
+                            <span th:text="${#numbers.formatDecimal(o.finalAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                        </td>
+                        <td class="order-created-at">
+                            <span th:text="${#temporals.format(o.createdAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm')}">2026-01-01</span>
+                        </td>
+                        <td class="order-detail-link">
+                            <a th:href="@{/orders/{id}(id=${o.orderId})}"
+                               class="btn btn-outline btn-sm">상세 보기</a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <section class="pagination-section" th:unless="${orders.content.isEmpty()}">
+            <div class="pagination">
+                <div class="page-info">
+                    <span th:text="'총 ' + ${orders.totalElements} + '건'">총 0건</span>
+                    <span th:text="'(' + (${orders.number} + 1) + ' / ' + ${orders.totalPages} + ' 페이지)'"> (1 / 1 페이지)</span>
+                </div>
+                <div class="page-nav">
+                    <!-- 이전 페이지 -->
+                    <a th:if="${orders.number > 0}"
+                       th:href="@{/orders(page=${orders.number - 1}, size=${orders.size})}"
+                       class="btn btn-outline btn-sm">이전</a>
+                    <span th:unless="${orders.number > 0}"
+                          class="btn btn-outline btn-sm disabled">이전</span>
+
+                    <!-- 다음 페이지 -->
+                    <a th:if="${orders.number + 1 < orders.totalPages}"
+                       th:href="@{/orders(page=${orders.number + 1}, size=${orders.size})}"
+                       class="btn btn-outline btn-sm">다음</a>
+                    <span th:unless="${orders.number + 1 < orders.totalPages}"
+                          class="btn btn-outline btn-sm disabled">다음</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>

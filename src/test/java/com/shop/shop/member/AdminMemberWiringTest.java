@@ -12,6 +12,8 @@ import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
@@ -75,6 +77,12 @@ class AdminMemberWiringTest {
 
     @MockitoBean
     CartItemRepository cartItemRepository;
+
+    @MockitoBean
+    InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    OrderRepository orderRepository;
 
     @Test
     @DisplayName("운영 배선: AdminMemberRestController 빈이 컨텍스트에 등록된다")

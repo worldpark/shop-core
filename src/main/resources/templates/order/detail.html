@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--
+    주문 상세 화면.
+    view name: order/detail
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 모델 키: order(OrderResponse)
+      - 헤더: orderNumber, status, createdAt, 금액 스냅샷(itemsAmount/discountAmount/shippingFee/finalAmount)
+      - 항목 목록: items(OrderItemResponse) — productName, optionLabel, optionValues, unitPrice, quantity, lineAmount
+      - 배송지 스냅샷: shippingAddress(recipient/phone/postcode/address1/address2)
+      - 스냅샷 그대로 표시(현재 상품 정보 아님)
+      - ownerId·stock 수치·Entity·로컬 절대경로 미표시
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>주문 상세</title>
+</head>
+<body>
+<main>
+    <div class="order-detail-container">
+        <h1 class="page-title">주문 상세</h1>
+
+        <!-- 주문 헤더 -->
+        <section class="order-detail-header">
+            <div class="order-detail-meta">
+                <div class="order-detail-row">
+                    <span class="order-detail-label">주문번호:</span>
+                    <span class="order-detail-value" th:text="${order.orderNumber}">ORD-...</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">주문 상태:</span>
+                    <span class="order-detail-value badge-order-status" th:text="${order.status}">pending</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">주문 일시:</span>
+                    <span class="order-detail-value"
+                          th:text="${#temporals.format(order.createdAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 주문 항목 목록 -->
+        <section class="order-detail-items">
+            <h2 class="section-title">주문 상품 (주문 시점 스냅샷)</h2>
+            <div class="table-wrapper">
+                <table class="checkout-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">상품명</th>
+                            <th scope="col">옵션</th>
+                            <th scope="col">옵션값 상세</th>
+                            <th scope="col">단가</th>
+                            <th scope="col">수량</th>
+                            <th scope="col">합계</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="item : ${order.items}" class="order-item-row">
+                            <td class="order-item-name" th:text="${item.productName}">상품명</td>
+                            <td class="order-item-option">
+                                <span th:text="${item.optionLabel != null ? item.optionLabel : '-'}">옵션</span>
+                            </td>
+                            <td class="order-item-option-values">
+                                <span th:if="${item.optionValues == null or item.optionValues.isEmpty()}">-</span>
+                                <ul class="option-value-list" th:unless="${item.optionValues == null or item.optionValues.isEmpty()}">
+                                    <li th:each="ov : ${item.optionValues}"
+                                        class="option-value-item">
+                                        <span th:text="${ov.optionName} + ': ' + ${ov.optionValue}">옵션명: 옵션값</span>
+                                    </li>
+                                </ul>
+                            </td>
+                            <td class="order-item-price">
+                                <span th:text="${#numbers.formatDecimal(item.unitPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                            </td>
+                            <td class="order-item-quantity" th:text="${item.quantity}">1</td>
+                            <td class="order-item-line-amount">
+                                <span th:text="${#numbers.formatDecimal(item.lineAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 금액 스냅샷 -->
+        <section class="order-detail-amount">
+            <h2 class="section-title">결제 금액 (주문 시점 스냅샷)</h2>
+            <div class="checkout-summary">
+                <div class="checkout-summary-row">
+                    <span class="checkout-summary-label">상품 금액:</span>
+                    <span class="checkout-summary-value"
+                          th:text="${#numbers.formatDecimal(order.itemsAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+                <div class="checkout-summary-row">
+                    <span class="checkout-summary-label">할인 금액:</span>
+                    <span class="checkout-summary-value"
+                          th:text="${#numbers.formatDecimal(order.discountAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+                <div class="checkout-summary-row">
+                    <span class="checkout-summary-label">배송비:</span>
+                    <span class="checkout-summary-value"
+                          th:text="${#numbers.formatDecimal(order.shippingFee, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+                <div class="checkout-summary-row checkout-total-row">
+                    <span class="checkout-summary-label checkout-total-label">최종 결제 금액:</span>
+                    <span class="checkout-summary-value checkout-total-amount"
+                          th:text="${#numbers.formatDecimal(order.finalAmount, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 배송지 스냅샷 -->
+        <section class="order-detail-shipping" th:if="${order.shippingAddress != null}">
+            <h2 class="section-title">배송지 (주문 시점 스냅샷)</h2>
+            <div class="shipping-info">
+                <div class="order-detail-row">
+                    <span class="order-detail-label">수령인:</span>
+                    <span class="order-detail-value" th:text="${order.shippingAddress.recipient}">수령인</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">전화번호:</span>
+                    <span class="order-detail-value" th:text="${order.shippingAddress.phone}">010-0000-0000</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">우편번호:</span>
+                    <span class="order-detail-value" th:text="${order.shippingAddress.postcode}">00000</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">주소:</span>
+                    <span class="order-detail-value" th:text="${order.shippingAddress.address1}">주소</span>
+                </div>
+                <div class="order-detail-row" th:if="${order.shippingAddress.address2 != null and !order.shippingAddress.address2.isEmpty()}">
+                    <span class="order-detail-label">상세 주소:</span>
+                    <span class="order-detail-value" th:text="${order.shippingAddress.address2}">상세 주소</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 뒤로가기 -->
+        <div class="order-detail-back">
+            <a th:href="@{/orders}" class="btn btn-outline btn-sm">주문 목록으로</a>
+        </div>
+    </div>
+</main>
+</body>
+</html>

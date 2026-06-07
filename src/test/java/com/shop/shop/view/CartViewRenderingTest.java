@@ -5,6 +5,9 @@ import com.shop.shop.cart.dto.CartResponse;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.spi.CartFacade;
+import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -102,7 +105,16 @@ class CartViewRenderingTest {
     private CartItemRepository cartItemRepository;
 
     @MockitoBean
+    private InventoryStockRepository inventoryStockRepository;
+
+    @MockitoBean
+    private OrderRepository orderRepository;
+
+    @MockitoBean
     private CartFacade cartFacade;
+
+    @MockitoBean
+    private OrderFacade orderFacade;
 
     @BeforeEach
     void setUp() {
@@ -328,15 +340,38 @@ class CartViewRenderingTest {
     // ============================================================
 
     @Test
-    @DisplayName("(C7) GET /cart — 주문하기 버튼 disabled 렌더링")
+    @DisplayName("(C7) GET /cart — 구매 가능 장바구니 → 주문하기 /checkout 링크 렌더링")
     @WithMockUser(roles = "CONSUMER", username = "user@example.com")
-    void getCart_orderButtonIsDisabled() throws Exception {
+    void getCart_availableItems_showsCheckoutLink() throws Exception {
+        String body = mockMvc.perform(get("/cart"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).as("/checkout 링크가 있어야 함").contains("/checkout");
+        assertThat(body).as("주문하기 텍스트가 있어야 함").contains("주문하기");
+    }
+
+    @Test
+    @DisplayName("(C7-b) GET /cart — 구매불가 항목 있을 때 주문하기 버튼 disabled 렌더링")
+    @WithMockUser(roles = "CONSUMER", username = "user@example.com")
+    void getCart_unavailableItem_orderButtonDisabled() throws Exception {
+        CartItemResponse unavailableItem = new CartItemResponse(
+                2L, 200L, 20L,
+                "구매불가 상품", "파랑",
+                null,
+                new BigDecimal("10000"), 1,
+                new BigDecimal("10000"), false, false
+        );
+        CartResponse cart = new CartResponse(
+                1L, List.of(unavailableItem), 1, BigDecimal.ZERO, true);
+        when(cartFacade.getCart(anyString())).thenReturn(cart);
+
         String body = mockMvc.perform(get("/cart"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(body).as("disabled 속성이 있어야 함").contains("disabled");
-        assertThat(body).as("주문 기능 준비중 텍스트가 있어야 함").contains("준비 중");
+        assertThat(body).as("구매 불가 안내 문구가 있어야 함").contains("구매 불가");
     }
 
     // ============================================================
@@ -387,6 +422,22 @@ class CartViewRenderingTest {
 
         assertThat(body).as("nav에 /cart 링크가 있어야 함").contains("/cart");
         assertThat(body).as("nav에 장바구니 텍스트가 있어야 함").contains("장바구니");
+    }
+
+    // ============================================================
+    // (C11) nav에 /orders 링크 (CONSUMER)
+    // ============================================================
+
+    @Test
+    @DisplayName("(C11) GET /cart — nav에 /orders 링크 노출 (CONSUMER)")
+    @WithMockUser(roles = "CONSUMER", username = "user@example.com")
+    void getCart_navContainsOrdersLink() throws Exception {
+        String body = mockMvc.perform(get("/cart"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).as("nav에 /orders 링크가 있어야 함").contains("/orders");
+        assertThat(body).as("nav에 주문 내역 텍스트가 있어야 함").contains("주문 내역");
     }
 
     // ============================================================

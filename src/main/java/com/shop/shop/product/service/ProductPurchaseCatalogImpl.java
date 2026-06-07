@@ -2,7 +2,6 @@ package com.shop.shop.product.service;
 
 import com.shop.shop.common.exception.VariantNotPurchasableException;
 import com.shop.shop.common.storage.AssetUrlResolver;
-import com.shop.shop.product.domain.OptionValue;
 import com.shop.shop.product.domain.ProductImage;
 import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.domain.ProductVariant;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -120,15 +118,12 @@ class ProductPurchaseCatalogImpl implements ProductPurchaseCatalog {
     }
 
     /**
-     * optionLabel 조립: variant의 optionValues를 " / " 구분자로 연결.
+     * optionLabel 조립 — {@link ProductVariantLabelBuilder#buildOptionLabel(ProductVariant)} 위임.
      *
-     * <p>optionValues가 없으면 빈 문자열 반환.
+     * <p>product 내부 공통 헬퍼를 통해 {@link ProductOrderCatalogImpl}과 로직을 공유한다.
      */
     private String buildOptionLabel(ProductVariant variant) {
-        return variant.getOptionValues().stream()
-                .sorted(Comparator.comparing(OptionValue::getId))
-                .map(OptionValue::getValue)
-                .collect(Collectors.joining(" / "));
+        return ProductVariantLabelBuilder.buildOptionLabel(variant);
     }
 
     /**
