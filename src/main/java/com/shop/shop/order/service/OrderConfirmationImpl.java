@@ -1,0 +1,201 @@
+package com.shop.shop.order.service;
+
+import com.shop.shop.common.exception.AmountConversionException;
+import com.shop.shop.common.exception.OrderConfirmationConflictException;
+import com.shop.shop.common.exception.OrderNotFoundException;
+import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.member.spi.MemberDirectory.MemberContact;
+import com.shop.shop.order.domain.Order;
+import com.shop.shop.order.domain.OrderItem;
+import com.shop.shop.order.event.OrderCompletedEvent;
+import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.spi.OrderConfirmation;
+import com.shop.shop.product.spi.ProductOrderCatalog;
+import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/**
+ * {@link OrderConfirmation} 구현체 (package-private).
+ *
+ * <p>order 내부 {@code service} 패키지에 배치한다.
+ * payment는 인터페이스({@link OrderConfirmation})만 참조하며, 이 구현체를 직접 알지 못한다(P1).
+ *
+ * <p>처리:
+ * <ol>
+ *   <li>orders row {@code PESSIMISTIC_WRITE} 비관락 (InventoryStockRepository 선례 동형)</li>
+ *   <li>소유권 재검증 (불일치 → 404)</li>
+ *   <li>status 분기 (이미 paid → 멱등 반환 / pending 외 → 409)</li>
+ *   <li>금액 재검증 (불일치 → 409)</li>
+ *   <li>Order.markPaid() 상태 전이</li>
+ *   <li>OrderCompletedEvent 구성·발행 (같은 트랜잭션 Outbox 저장)</li>
+ * </ol>
+ */
+@Slf4j
+@Service
+@Transactional
+@RequiredArgsConstructor
+class OrderConfirmationImpl implements OrderConfirmation {
+
+    private final OrderRepository orderRepository;
+    private final MemberDirectory memberDirectory;
+    private final ProductOrderCatalog productOrderCatalog;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public OrderConfirmationResult confirmPaid(long orderId, long requesterUserId, BigDecimal paidAmount) {
+        // 1. orders row 비관락
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        // 2. 소유권 재검증 (락 후 권위)
+        if (!order.getUserId().equals(requesterUserId)) {
+            throw new OrderNotFoundException();
+        }
+
+        // 3. status 분기
+        String currentStatus = order.getStatus();
+        if ("paid".equals(currentStatus)) {
+            // 이미 paid → 멱등 반환 (재발행 없음)
+            log.info("주문 이미 확정 — 멱등 반환: orderId={}, orderNumber={}", orderId, order.getOrderNumber());
+            return new OrderConfirmationResult(
+                    order.getId(),
+                    order.getOrderNumber(),
+                    true,
+                    false,
+                    order.getUpdatedAt()
+            );
+        }
+
+        if (!"pending".equals(currentStatus)) {
+            log.warn("주문 상태 충돌: orderId={}, status={}", orderId, currentStatus);
+            throw new OrderConfirmationConflictException(
+                    "주문 상태(" + currentStatus + ")에서 결제 확정을 할 수 없습니다.");
+        }
+
+        // 4. 금액 재검증
+        if (order.getFinalAmount().compareTo(paidAmount) != 0) {
+            log.warn("결제 금액 불일치(확정 단계): orderId={}, orderAmount={}, paidAmount={}",
+                    orderId, order.getFinalAmount(), paidAmount);
+            throw new OrderConfirmationConflictException("결제 금액이 주문 금액과 일치하지 않습니다.");
+        }
+
+        // 5. pending → paid 전이
+        order.markPaid();
+
+        // 6. OrderCompletedEvent 구성·발행
+        OrderCompletedEvent event = buildOrderCompletedEvent(order);
+
+        log.info("OrderCompletedEvent 발행 시도: eventId={}, topic={}, orderId={}",
+                event.eventId(), OrderCompletedEvent.TOPIC, orderId);
+        eventPublisher.publishEvent(event);
+        log.info("OrderCompletedEvent 발행 성공: eventId={}, topic={}",
+                event.eventId(), OrderCompletedEvent.TOPIC);
+
+        return new OrderConfirmationResult(
+                order.getId(),
+                order.getOrderNumber(),
+                true,
+                true,
+                Instant.now()
+        );
+    }
+
+    /**
+     * OrderCompletedEvent 페이로드 구성.
+     *
+     * <p>member 연락처는 member.spi, item productId는 product.spi 해석.
+     * productName/quantity/unitPrice는 order_items 스냅샷 출처(P4 — 주문 후 product 변경 무영향).
+     * 금액 변환: {@link #toLong(BigDecimal)} (longValueExact, 소수부 비0 → AmountConversionException).
+     *
+     * @param order 확정된 주문 (items lazy 로딩 허용 — 같은 트랜잭션)
+     * @return 구성된 이벤트
+     */
+    private OrderCompletedEvent buildOrderCompletedEvent(Order order) {
+        // member 연락처 조회 (member.spi)
+        MemberContact contact = memberDirectory.findContactByUserId(order.getUserId());
+
+        // item productId 해석 (product.spi) + 스냅샷 필드 구성
+        List<OrderItem> items = order.getItems();
+        List<Long> variantIds = items.stream()
+                .map(OrderItem::getVariantId)
+                .filter(id -> id != null)
+                .distinct()
+                .toList();
+
+        Map<Long, Long> variantToProductId;
+        if (variantIds.isEmpty()) {
+            variantToProductId = Map.of();
+        } else {
+            List<OrderableVariantSnapshot> snapshots = productOrderCatalog.getOrderableSnapshots(variantIds);
+            variantToProductId = snapshots.stream()
+                    .collect(Collectors.toMap(OrderableVariantSnapshot::variantId, OrderableVariantSnapshot::productId));
+        }
+
+        List<OrderCompletedEvent.Item> eventItems = items.stream()
+                .map(item -> {
+                    Long productId = variantToProductId.get(item.getVariantId());
+                    if (productId == null) {
+                        // confirmPaid 단계에서 해석 불가 — getPayableOrder의 사전검증이 막았어야 함
+                        // 시스템 불변식 위반으로 처리
+                        throw new com.shop.shop.common.exception.PaymentEventResolutionException(
+                                "주문 확정 중 productId 해석에 실패했습니다.");
+                    }
+                    return new OrderCompletedEvent.Item(
+                            productId,
+                            item.getProductName(),    // order_items 스냅샷 (P4)
+                            item.getQuantity(),       // order_items 스냅샷 (P4)
+                            toLong(item.getUnitPrice()) // order_items 스냅샷 + longValueExact (P3, P4)
+                    );
+                })
+                .toList();
+
+        return new OrderCompletedEvent(
+                UUID.randomUUID(),
+                Instant.now(),
+                order.getId(),
+                order.getOrderNumber(),
+                order.getUserId(),
+                contact.email(),
+                contact.name(),
+                eventItems,
+                toLong(order.getFinalAmount()),  // P3
+                "KRW",
+                Instant.now()
+        );
+    }
+
+    /**
+     * BigDecimal → long 변환 (P3).
+     *
+     * <p>KRW는 소수 단위가 없으므로 소수부가 0이어야 한다.
+     * {@code longValueExact()} 위반(소수부 비0 / long 범위 초과) →
+     * {@link AmountConversionException}(500, 시스템 불변식 위반).
+     *
+     * @param amount 변환할 BigDecimal
+     * @return long 값
+     * @throws AmountConversionException 소수부 비0 또는 long 범위 초과
+     */
+    private long toLong(BigDecimal amount) {
+        try {
+            return amount.longValueExact();
+        } catch (ArithmeticException e) {
+            throw new AmountConversionException(
+                    "금액 변환 실패(소수부 비0 또는 long 범위 초과): " + amount);
+        }
+    }
+}

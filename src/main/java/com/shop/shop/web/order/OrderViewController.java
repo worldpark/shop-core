@@ -6,6 +6,9 @@ import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
 import com.shop.shop.order.spi.OrderFacade;
+import com.shop.shop.payment.dto.PaymentRequest;
+import com.shop.shop.payment.dto.PaymentStatusView;
+import com.shop.shop.payment.spi.PaymentFacade;
 import com.shop.shop.web.support.CurrentActor;
 import com.shop.shop.web.support.CurrentActorResolver;
 import jakarta.validation.Valid;
@@ -31,17 +34,23 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * → {@code hasRole("CONSUMER")}. 미인증 → 302 /login (컨트롤러 도달 전 Security 처리).
  *
  * <p>레이어: OrderViewController → {@link OrderFacade}(order.spi published port) +
- * {@link CurrentActorResolver}. order 도메인 내부 Service·Repository·Entity 직접 참조 금지.
+ * {@link PaymentFacade}(payment.spi published port) + {@link CurrentActorResolver}.
+ * order/payment 도메인 내부 Service·Repository·Entity 직접 참조 금지.
  *
  * <p>모델 키 계약 (Backend-View Contract 준수):
  * <ul>
  *   <li>{@code checkout} — {@link OrderCheckoutResponse} (주문서 조회)</li>
  *   <li>{@code orders} — {@link Page}&lt;{@link OrderSummaryResponse}&gt; (주문 목록)</li>
  *   <li>{@code order} — {@link OrderResponse} (주문 상세)</li>
+ *   <li>{@code payment} — {@link PaymentStatusView} (주문 상세 결제 영역)</li>
  * </ul>
  *
  * <p>PRG 패턴: POST /orders 성공 시 redirect:/orders/{orderId}.
- * 검증 실패·도메인 예외 시 flashError + redirect:/checkout.
+ * POST /orders/{orderId}/payment 성공 시 flashSuccess + redirect:/orders/{orderId}.
+ * 검증 실패·도메인 예외 시 flashError + redirect (각 경로 참조).
+ *
+ * <p>결제 폼 변환: {@link OrderPaymentForm} → {@link PaymentRequest} 변환은 핸들러 책임(#1).
+ * web 타입을 facade에 직접 전달하지 않는다(architecture-rule, revision #1).
  *
  * <p>예외 전파: facade가 던지는 {@link com.shop.shop.common.exception.OrderNotFoundException}(404)는
  * ViewExceptionHandler → error/error 뷰. 컨트롤러에서 별도 분기 불필요.
@@ -56,6 +65,7 @@ public class OrderViewController {
     private static final String REDIRECT_CHECKOUT = "redirect:/checkout";
 
     private final OrderFacade orderFacade;
+    private final PaymentFacade paymentFacade;
     private final CurrentActorResolver currentActorResolver;
 
     /**
@@ -150,9 +160,13 @@ public class OrderViewController {
      * <p>타인/미존재 → OrderFacade가 OrderNotFoundException(404) → ViewExceptionHandler error/error.
      * 컨트롤러에서 별도 분기 불필요.
      *
-     * @param orderId 주문 ID (path variable)
-     * @param auth    SecurityContext 인증 객체
-     * @param model   Spring MVC 모델
+     * <p>결제 상태(모델 키 {@code payment})를 함께 조회해 결제 영역 렌더링에 사용한다.
+     * getPaymentStatus는 상태 조회 전용 경로(이벤트 완결성 검증 없음, #3)를 사용하므로
+     * 주문 상세 렌더링이 productId/연락처 해석 실패(409)에 영향받지 않는다.
+     *
+     * @param orderId            주문 ID (path variable)
+     * @param auth               SecurityContext 인증 객체
+     * @param model              Spring MVC 모델
      * @return view name "order/detail"
      */
     @GetMapping("/orders/{orderId}")
@@ -163,7 +177,51 @@ public class OrderViewController {
 
         CurrentActor actor = currentActorResolver.resolve(auth);
         OrderResponse order = orderFacade.getMyOrder(actor.email(), orderId);
+        PaymentStatusView payment = paymentFacade.getPaymentStatus(actor.email(), orderId);
         model.addAttribute("order", order);
+        model.addAttribute("payment", payment);
         return ORDER_DETAIL_VIEW;
+    }
+
+    /**
+     * 결제 처리 (폼 제출).
+     * POST /orders/{orderId}/payment
+     *
+     * <p>form→PaymentRequest 변환은 이 핸들러가 담당한다(web 계층 책임, #1 revision).
+     * {@link OrderPaymentForm}을 facade에 직접 넘기지 않고,
+     * {@link PaymentRequest}(payment 소유 DTO)로 변환 후 {@link PaymentFacade#pay}를 호출한다.
+     *
+     * <p>성공: flashSuccess("결제가 완료되었습니다.") + redirect:/orders/{orderId} (PRG).
+     * 실패(BusinessException 400/409): flashError(메시지) + redirect:/orders/{orderId}.
+     *
+     * <p>인가: SecurityConfig View 체인 /orders/[orderId]/payment hasRole("CONSUMER").
+     * 미인증 시 컨트롤러 도달 전 302 /login.
+     *
+     * @param orderId            주문 ID (path variable)
+     * @param form               결제 폼 (method/amount — web 소유)
+     * @param auth               SecurityContext 인증 객체
+     * @param redirectAttributes flash 메시지 전달용
+     * @return redirect:/orders/{orderId}
+     */
+    @PostMapping("/orders/{orderId}/payment")
+    public String pay(
+            @PathVariable long orderId,
+            @ModelAttribute OrderPaymentForm form,
+            Authentication auth,
+            RedirectAttributes redirectAttributes) {
+
+        String redirectTarget = "redirect:/orders/" + orderId;
+
+        try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
+            // web 타입(OrderPaymentForm) → payment 소유 DTO(PaymentRequest) 변환 (revision #1)
+            PaymentRequest paymentRequest = new PaymentRequest(form.getMethod(), form.getAmount());
+            paymentFacade.pay(actor.email(), orderId, paymentRequest);
+            redirectAttributes.addFlashAttribute("flashSuccess", "결제가 완료되었습니다.");
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("flashError", e.getMessage());
+        }
+
+        return redirectTarget;
     }
 }

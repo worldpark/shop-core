@@ -14,6 +14,7 @@ import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
 import com.shop.shop.order.dto.ShippingAddressResponse;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.order.service.OrderServiceResponse;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
@@ -98,6 +99,9 @@ class OrderRestControllerSecurityTest {
     private CartItemRepository cartItemRepository;
     @MockitoBean
     private OrderRepository orderRepository;
+
+    @MockitoBean
+    private PaymentRepository paymentRepository;
     @MockitoBean
     private InventoryStockRepository inventoryStockRepository;
 

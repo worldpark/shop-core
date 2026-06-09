@@ -1,10 +1,14 @@
 package com.shop.shop.order.repository;
 
 import com.shop.shop.order.domain.Order;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
@@ -48,4 +52,33 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @EntityGraph(attributePaths = {"items", "items.optionValues"})
     Optional<Order> findWithItemsByIdAndUserId(long id, long userId);
+
+    /**
+     * 결제 경로 전용: 소유권 검증 포함 주문 + items 즉시 로딩 (optionValues 제외).
+     *
+     * <p>@EntityGraph로 items·optionValues 동시 fetch 시 MultipleBagFetchException 발생.
+     * 결제 이벤트 완결성 검증은 variantId만 필요하므로 items만 fetch한다.
+     *
+     * @param id     주문 ID
+     * @param userId 소유자 userId
+     * @return 주문 (items 즉시 로딩, optionValues 지연, 없으면 empty)
+     */
+    @Query("select distinct o from Order o left join fetch o.items where o.id = :id and o.userId = :userId")
+    Optional<Order> findWithItemsOnlyByIdAndUserId(@Param("id") long id, @Param("userId") long userId);
+
+    /**
+     * 비관적 쓰기 락으로 주문 row 조회.
+     *
+     * <p>{@code PESSIMISTIC_WRITE} → PostgreSQL {@code SELECT ... FOR UPDATE}.
+     * 주문 확정(pending→paid) 권위 직렬화에 사용한다.
+     * 트랜잭션 안에서만 의미 있다 (OrderConfirmation @Transactional 경계 안에서 호출).
+     *
+     * <p>InventoryStockRepository.findByIdForUpdate 선례와 동형.
+     *
+     * @param id 주문 ID
+     * @return 주문 (잠긴 row, 없으면 empty)
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.id = :id")
+    Optional<Order> findByIdForUpdate(@Param("id") long id);
 }

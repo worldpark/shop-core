@@ -7,6 +7,7 @@ import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.spi.CartFacade;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.common.exception.CartItemNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
@@ -111,6 +112,9 @@ class CartViewControllerTest {
 
     @MockitoBean
     private OrderRepository orderRepository;
+
+    @MockitoBean
+    private PaymentRepository paymentRepository;
 
     /**
      * CartFacade @MockitoBean — cart.spi facade 격리.

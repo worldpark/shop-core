@@ -4,6 +4,7 @@ import com.shop.shop.common.exception.MemberNotFoundException;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,43 @@ class MemberDirectoryImplTest {
         assertThatThrownBy(() -> memberDirectory.findUserIdByEmail(EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(EMAIL);
+    }
+
+    @Test
+    @DisplayName("findContactByUserId: userId → email/name 스칼라 반환 (Entity 미노출)")
+    void findContactByUserId_success_returnsMemberContact() {
+        User user = User.of(EMAIL, "hash", "홍길동", null, Role.CONSUMER);
+        setUserId(user, USER_ID);
+        when(memberService.getById(USER_ID)).thenReturn(user);
+
+        MemberContact contact = memberDirectory.findContactByUserId(USER_ID);
+
+        assertThat(contact.email()).isEqualTo(EMAIL);
+        assertThat(contact.name()).isEqualTo("홍길동");
+        assertThat(contact).isInstanceOf(MemberContact.class);
+    }
+
+    @Test
+    @DisplayName("findContactByUserId: 반환 타입은 MemberContact — Entity 미노출")
+    void findContactByUserId_returnType_notEntity() {
+        User user = User.of(EMAIL, "hash", "홍길동", null, Role.CONSUMER);
+        setUserId(user, USER_ID);
+        when(memberService.getById(USER_ID)).thenReturn(user);
+
+        Object result = memberDirectory.findContactByUserId(USER_ID);
+
+        assertThat(result).isInstanceOf(MemberContact.class);
+        assertThat(result).isNotInstanceOf(User.class);
+    }
+
+    @Test
+    @DisplayName("findContactByUserId: 미존재 userId → IllegalStateException (시스템 불변식 위반)")
+    void findContactByUserId_notExisting_throwsIllegalStateException() {
+        when(memberService.getById(USER_ID))
+                .thenThrow(new MemberNotFoundException(String.valueOf(USER_ID)));
+
+        assertThatThrownBy(() -> memberDirectory.findContactByUserId(USER_ID))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     private void setUserId(User user, long userId) {

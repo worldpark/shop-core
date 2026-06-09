@@ -5,10 +5,12 @@
     레이아웃: layout/base :: layout(title, content)
 
     보존 계약:
-      - 모델 키: order(OrderResponse)
+      - 모델 키: order(OrderResponse), payment(PaymentStatusView)
       - 헤더: orderNumber, status, createdAt, 금액 스냅샷(itemsAmount/discountAmount/shippingFee/finalAmount)
       - 항목 목록: items(OrderItemResponse) — productName, optionLabel, optionValues, unitPrice, quantity, lineAmount
       - 배송지 스냅샷: shippingAddress(recipient/phone/postcode/address1/address2)
+      - 결제 영역: payment.paid=false → 결제 대기, payment.paid=true → 결제 완료 + 금액
+      - 결제 폼: payment.payable(=주문 pending && !paid)일 때만 노출, POST /orders/{orderId}/payment
       - 스냅샷 그대로 표시(현재 상품 정보 아님)
       - ownerId·stock 수치·Entity·로컬 절대경로 미표시
 -->
@@ -137,6 +139,45 @@
                     <span class="order-detail-label">상세 주소:</span>
                     <span class="order-detail-value" th:text="${order.shippingAddress.address2}">상세 주소</span>
                 </div>
+            </div>
+        </section>
+
+        <!-- 결제 영역 -->
+        <section class="order-detail-payment" th:if="${payment != null}">
+            <h2 class="section-title">결제 정보</h2>
+            <div class="payment-info">
+
+                <!-- 결제 상태 표시 -->
+                <div class="order-detail-row">
+                    <span class="order-detail-label">결제 상태:</span>
+                    <span class="order-detail-value payment-status-paid"
+                          th:if="${payment.paid}"
+                          th:text="'결제 완료 (' + ${#numbers.formatDecimal(payment.amount, 1, 'COMMA', 0, 'POINT')} + '원)'">결제 완료</span>
+                    <span class="order-detail-value payment-status-pending"
+                          th:unless="${payment.paid}">결제 대기</span>
+                </div>
+
+                <!-- 결제 완료 시 금액·일시 추가 표시 -->
+                <div class="order-detail-row" th:if="${payment.paid and payment.paidAt != null}">
+                    <span class="order-detail-label">결제 일시:</span>
+                    <span class="order-detail-value"
+                          th:text="${#temporals.format(payment.paidAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}">결제 일시</span>
+                </div>
+
+                <!-- 결제 폼: payment.payable(= 주문 pending && !paid)일 때만 노출 -->
+                <div class="payment-form-section" th:if="${payment.payable}">
+                    <form th:action="@{/orders/{orderId}/payment(orderId=${order.orderId})}"
+                          method="post"
+                          class="payment-form">
+                        <!-- 결제 수단 히든(기본 mock) -->
+                        <input type="hidden" name="method" value="mock">
+                        <!-- amount 미전달 → 서버가 주문 finalAmount 사용 (서버 권위) -->
+                        <div class="payment-action">
+                            <button type="submit" class="btn btn-primary btn-lg">결제하기</button>
+                        </div>
+                    </form>
+                </div>
+
             </div>
         </section>
 

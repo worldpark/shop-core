@@ -1,0 +1,130 @@
+package com.shop.shop.payment.domain;
+
+import com.shop.shop.common.domain.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+
+/**
+ * 결제 Entity.
+ *
+ * <p>테이블: payments (V1__init_schema.sql line 314~334).
+ * 신규 migration 불필요 — V1이 이미 전 필드를 포함한다.
+ *
+ * <p>orderId 스칼라: order Entity 직접 참조 금지(architecture-rule 모듈 경계).
+ * status: 016에서 "ready"/"paid"만 사용. "failed"는 017에서 추가(markFailed).
+ * method: "card"/"bank_transfer"/"virtual_account"/"mock" — 016 기본 "mock".
+ * amount: BigDecimal(precision=12, scale=2) — 저장 정밀도 보존.
+ * paidAt/pgTransactionId: nullable, 승인 시 기록.
+ * created_at/updated_at: DB 트리거 소유 → BaseEntity 상속(읽기전용 매핑).
+ *
+ * <p>Setter 사용 금지. 정적 팩토리 {@link #create} + 의도 메서드 {@link #markPaid}.
+ */
+@Entity
+@Table(name = "payments")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Payment extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * 소유자 주문 ID 스칼라.
+     * payment → order Entity 직접 참조 금지 — Long 스칼라로 보유.
+     * FK 무결성은 DB(REFERENCES orders(id) ON DELETE RESTRICT)가 보장.
+     * UNIQUE(order_id): uq_payments_order_id — 주문당 결제 1건, 동시 결제 직렬화(#2).
+     */
+    @Column(name = "order_id", nullable = false, unique = true)
+    private Long orderId;
+
+    /**
+     * 결제 수단.
+     * DB CHECK: IN('card','bank_transfer','virtual_account','mock').
+     * 016 기본: "mock".
+     */
+    @Column(nullable = false, length = 20)
+    private String method;
+
+    /**
+     * 결제 상태 (DB lowercase 문자열 — enum 아님).
+     * 016에서 "ready"/"paid"만 사용.
+     * "failed"는 017에서 markFailed() 추가.
+     */
+    @Column(nullable = false, length = 20)
+    private String status;
+
+    /**
+     * 결제 금액 (BigDecimal, precision=12, scale=2).
+     * 서버 권위 finalAmount로 채운다 — 클라이언트 금액 미신뢰.
+     * 이벤트 페이로드 직렬화 시점에만 long 변환(저장 정밀도와 계약 타입 분리, P3).
+     */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal amount;
+
+    /**
+     * PG 거래 번호 (nullable, 승인 시 기록).
+     */
+    @Column(name = "pg_transaction_id")
+    private String pgTransactionId;
+
+    /**
+     * 결제 완료 시각 (nullable, 승인 시 기록).
+     */
+    @Column(name = "paid_at")
+    private Instant paidAt;
+
+    /**
+     * 결제 row 생성 정적 팩토리 (status="ready").
+     *
+     * <p>INSERT 후 uq_payments_order_id 위반 감지로 동시 결제 직렬화(#2).
+     * saveAndFlush를 사용해 INSERT를 즉시 flush해 unique 충돌이 트랜잭션 경계에서 드러나게 한다.
+     *
+     * @param orderId  주문 ID
+     * @param method   결제 수단 (예: "mock")
+     * @param amount   결제 금액 (서버 권위 finalAmount)
+     * @return 새 Payment 인스턴스 (status="ready")
+     */
+    public static Payment create(long orderId, String method, BigDecimal amount) {
+        Payment payment = new Payment();
+        payment.orderId = orderId;
+        payment.method = method;
+        payment.status = "ready";
+        payment.amount = amount;
+        return payment;
+    }
+
+    /**
+     * 결제 승인 상태 전이 메서드 (ready → paid).
+     *
+     * <p>status가 "ready"인 결제만 "paid"로 전이할 수 있다.
+     * 이미 "paid"면 멱등 처리(재호출 무시).
+     *
+     * @param pgTransactionId PG 거래 번호
+     * @param paidAt          결제 완료 시각
+     * @throws IllegalStateException status가 "ready"/"paid"가 아닐 때
+     */
+    public void markPaid(String pgTransactionId, Instant paidAt) {
+        if ("paid".equals(this.status)) {
+            // 멱등 처리 — 이미 paid면 무시
+            return;
+        }
+        if (!"ready".equals(this.status)) {
+            throw new IllegalStateException(
+                    "결제 상태가 ready가 아니어서 paid로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "paid";
+        this.pgTransactionId = pgTransactionId;
+        this.paidAt = paidAt;
+    }
+}

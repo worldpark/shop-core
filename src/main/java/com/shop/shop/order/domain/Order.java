@@ -129,4 +129,22 @@ public class Order extends BaseEntity {
         items.add(item);
         item.assignOrder(this);
     }
+
+    /**
+     * 주문 확정 상태 전이 메서드 (pending → paid).
+     *
+     * <p>status가 "pending"인 주문만 "paid"로 전이할 수 있다.
+     * "pending"이 아닌 상태에서 호출하면 IllegalStateException(도메인 불변식 위반)을 던진다.
+     *
+     * <p>016에서 사용. markFailed()는 017에서 추가.
+     *
+     * @throws IllegalStateException status가 "pending"이 아닐 때
+     */
+    public void markPaid() {
+        if (!"pending".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 pending이 아니어서 paid로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "paid";
+    }
 }

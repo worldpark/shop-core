@@ -7,6 +7,9 @@ import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.spi.CartFacade;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.payment.dto.PaymentStatusView;
+import com.shop.shop.payment.repository.PaymentRepository;
+import com.shop.shop.payment.spi.PaymentFacade;
 import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
@@ -111,10 +114,16 @@ class CartViewRenderingTest {
     private OrderRepository orderRepository;
 
     @MockitoBean
+    private PaymentRepository paymentRepository;
+
+    @MockitoBean
     private CartFacade cartFacade;
 
     @MockitoBean
     private OrderFacade orderFacade;
+
+    @MockitoBean
+    private PaymentFacade paymentFacade;
 
     @BeforeEach
     void setUp() {
