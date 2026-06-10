@@ -147,4 +147,56 @@ public class Order extends BaseEntity {
         }
         this.status = "paid";
     }
+
+    /**
+     * 주문 취소 상태 전이 메서드 (pending → cancelled, 미결제 취소 경로).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"pending" → "cancelled" 전이</li>
+     *   <li>"cancelled" 재호출 → 멱등(상태 무변경 no-op)</li>
+     *   <li>그 외("paid"/이행단계/"refunded") → {@link IllegalStateException}(상위에서 차단됨, 방어적)</li>
+     * </ul>
+     *
+     * <p>결제완료 취소 → 주문 refunded 전이는 {@link #markRefunded()} 사용(#3).
+     *
+     * @throws IllegalStateException status가 "pending"/"cancelled"가 아닐 때
+     */
+    public void markCancelled() {
+        if ("cancelled".equals(this.status)) {
+            // 멱등 처리 — 이미 cancelled면 no-op
+            return;
+        }
+        if (!"pending".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 pending이 아니어서 cancelled로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "cancelled";
+    }
+
+    /**
+     * 주문 환불 완료 상태 전이 메서드 (paid → refunded, 결제완료 취소 경로).
+     *
+     * <p>결제완료 주문 취소는 환불을 동반하므로 주문 상태도 "refunded"로 종결한다(#3 — payment.refunded와 정렬).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"paid" → "refunded" 전이</li>
+     *   <li>"refunded" 재호출 → 멱등(상태 무변경 no-op)</li>
+     *   <li>그 외 → {@link IllegalStateException}(상위에서 차단됨, 방어적)</li>
+     * </ul>
+     *
+     * @throws IllegalStateException status가 "paid"/"refunded"가 아닐 때
+     */
+    public void markRefunded() {
+        if ("refunded".equals(this.status)) {
+            // 멱등 처리 — 이미 refunded면 no-op
+            return;
+        }
+        if (!"paid".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 paid가 아니어서 refunded로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "refunded";
+    }
 }

@@ -1,6 +1,7 @@
 package com.shop.shop.payment.service;
 
 import com.shop.shop.common.exception.AmountConversionException;
+import com.shop.shop.common.exception.OrderCancellationConflictException;
 import com.shop.shop.common.exception.OrderConfirmationConflictException;
 import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.common.exception.PaymentAmountMismatchException;
@@ -8,6 +9,9 @@ import com.shop.shop.common.exception.PaymentEventResolutionException;
 import com.shop.shop.common.exception.PaymentInProgressException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
+import com.shop.shop.order.spi.OrderCancellation;
+import com.shop.shop.order.spi.OrderCancellation.OrderCancellationResult;
+import com.shop.shop.order.spi.OrderCancellation.RefundInfo;
 import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.order.spi.OrderConfirmation.OrderConfirmationResult;
 import com.shop.shop.order.spi.OrderPaymentReader;
@@ -19,6 +23,8 @@ import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.payment.spi.PaymentGatewayPort;
 import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentAuthorizationRequest;
 import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentAuthorizationResult;
+import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentRefundRequest;
+import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentRefundResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -56,6 +62,7 @@ public class PaymentService {
 
     private final OrderPaymentReader orderPaymentReader;
     private final OrderConfirmation orderConfirmation;
+    private final OrderCancellation orderCancellation;
     private final PaymentGatewayPort paymentGatewayPort;
     private final PaymentRepository paymentRepository;
     private final MemberDirectory memberDirectory;
@@ -153,6 +160,129 @@ public class PaymentService {
 
         // ⑧ 커밋 (payments paid + orders paid + event_publication 1행 원자 커밋)
         return PaymentResult.approved(payment, snapshot.orderNumber());
+    }
+
+    /**
+     * 주문 취소 오케스트레이션 — 취소 전용 locked reader + 상태 판정 + (paid)환불 + OrderCancellation 위임.
+     *
+     * <p>단일 {@code @Transactional}: 환불·재고 복원·종결 전이·이벤트 발행이 한 커밋 단위.
+     * 실패 시 전체 롤백(부분 반영 없음).
+     *
+     * <p>처리 흐름:
+     * <ol>
+     *   <li>취소 전용 locked reader({@link OrderPaymentReader#getOrderForCancel})로 orders row PESSIMISTIC_WRITE 잠금
+     *       + 소유권 404 + 스냅샷 획득(#4). 환불 결정보다 먼저 호출(#4).</li>
+     *   <li>상태 판정(권위·PG refund 전, #3):
+     *     <ul>
+     *       <li>이행단계(preparing/shipping/delivered) → {@link OrderCancellationConflictException}(409, 부작용 전 throw)</li>
+     *       <li>이미 cancelled/refunded → 멱등 반환({@link CancelResult#already})</li>
+     *       <li>paid → 환불 경로</li>
+     *       <li>pending → 미결제 취소 경로</li>
+     *     </ul>
+     *   </li>
+     *   <li>(paid) PG refund + Payment.markRefunded. (pending) Payment.markCancelled 또는 no-op.</li>
+     *   <li>{@link OrderCancellation#cancel} 위임 → 종결 전이·재고 복원·OrderCancelledEvent.
+     *       REJECTED/ALREADY 반환 시 {@link IllegalStateException}(500, 락 불변식 위반, 정상 흐름 미발생).</li>
+     *   <li>성공 시 CancelResult 반환 (원자 커밋 — #2).</li>
+     * </ol>
+     *
+     * @param userId  소유자 userId
+     * @param orderId 주문 ID
+     * @return 취소 결과
+     * @throws OrderCancellationConflictException 이행단계 취소 불가 (409, 부작용 발생 전 throw)
+     * @throws OrderNotFoundException             타인/미존재 주문 (404)
+     */
+    @Transactional
+    public CancelResult cancel(long userId, long orderId) {
+        // ① 취소 전용 locked reader — orders row PESSIMISTIC_WRITE 잠금 + 소유권 404 (#4)
+        // 환불 결정 전에 호출해 confirmPaid와 직렬화
+        OrderSnapshotView snapshot = orderPaymentReader.getOrderForCancel(orderId, userId);
+
+        String status = snapshot.status();
+
+        // ② 상태 판정 (권위·PG refund 전, #3 — 부작용 발생 전 판정)
+        if ("preparing".equals(status) || "shipping".equals(status) || "delivered".equals(status)) {
+            log.warn("이행단계 취소 시도(PG refund 전 차단): orderId={}, status={}", orderId, status);
+            throw new OrderCancellationConflictException(
+                    "이행단계(" + status + ") 주문은 취소할 수 없습니다. 배송 완료 후 반품을 이용하세요.");
+        }
+
+        if ("cancelled".equals(status) || "refunded".equals(status)) {
+            log.info("이미 취소/환불된 주문 — 멱등 반환: orderId={}, status={}", orderId, status);
+            boolean wasRefunded = "refunded".equals(status);
+            long alreadyRefundedAmount = wasRefunded ? toLongExact(snapshot.finalAmount()) : 0L;
+            return CancelResult.already(orderId, snapshot.orderNumber(), status, alreadyRefundedAmount, snapshot.currency());
+        }
+
+        // ③ 결제 row 처리
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        boolean refunded = false;
+        long refundedAmount = 0L;
+
+        if ("paid".equals(status)) {
+            // 결제완료 경로 — PG 환불 후 markRefunded
+            if (payment == null) {
+                // paid 상태인데 payment row 없으면 시스템 불변식 위반
+                throw new IllegalStateException(
+                        "주문 상태가 paid인데 payment row가 없습니다. orderId=" + orderId);
+            }
+
+            String idempotencyKey = String.valueOf(payment.getId());
+            PaymentRefundResult refundResult = paymentGatewayPort.refund(
+                    new PaymentRefundRequest(
+                            payment.getPgTransactionId(),
+                            payment.getAmount(),
+                            snapshot.currency(),
+                            idempotencyKey
+                    )
+            );
+
+            if (!refundResult.refunded()) {
+                // 본 Task mock은 항상 성공 — 실 PG에서만 발생 가능
+                log.error("PG 환불 실패: orderId={}, failureCode={}", orderId, refundResult.failureCode());
+                throw new IllegalStateException("PG 환불에 실패했습니다: " + refundResult.failureReason());
+            }
+
+            payment.markRefunded(refundResult.pgRefundId());
+            refunded = true;
+            refundedAmount = toLongExact(payment.getAmount());
+
+            log.info("PG 환불 성공: orderId={}, paymentId={}, pgRefundId={}",
+                    orderId, payment.getId(), refundResult.pgRefundId());
+
+        } else if ("pending".equals(status)) {
+            // 미결제 경로 — 결제 row 있으면 markCancelled, 없으면 no-op
+            if (payment != null) {
+                payment.markCancelled();
+            }
+        }
+
+        // ④ OrderCancellation 위임 — 종결 전이 + 재고 복원 + OrderCancelledEvent 발행
+        RefundInfo refundInfo = new RefundInfo(refunded, refundedAmount, snapshot.currency());
+        OrderCancellationResult cancellationResult = orderCancellation.cancel(orderId, userId, refundInfo);
+
+        // 방어 검증(#3): 2단계에서 이행단계·종결을 선판정했으므로 정상 흐름엔 REJECTED/ALREADY_CANCELLED 미발생
+        // 발생 시 락 불변식 위반 → 500 (전체 롤백)
+        if (cancellationResult.outcome() == OrderCancellation.Outcome.REJECTED) {
+            throw new IllegalStateException(
+                    "OrderCancellation이 REJECTED를 반환했습니다 — 락 불변식 위반(#3). orderId=" + orderId
+                    + ", reason=" + cancellationResult.rejectedReason());
+        }
+        if (cancellationResult.outcome() == OrderCancellation.Outcome.ALREADY_CANCELLED) {
+            throw new IllegalStateException(
+                    "OrderCancellation이 ALREADY_CANCELLED를 반환했습니다 — 락 불변식 위반(#3). orderId=" + orderId);
+        }
+
+        log.info("주문 취소 완료: orderId={}, orderNumber={}, orderStatus={}, refunded={}",
+                orderId, snapshot.orderNumber(), cancellationResult.orderStatus(), refunded);
+
+        // ⑤ 성공 — 원자 커밋 (#2)
+        if (refunded) {
+            return CancelResult.refunded(orderId, snapshot.orderNumber(), cancellationResult.orderStatus(),
+                    refundedAmount, snapshot.currency());
+        } else {
+            return CancelResult.cancelled(orderId, snapshot.orderNumber(), cancellationResult.orderStatus());
+        }
     }
 
     /**
@@ -428,6 +558,74 @@ public class PaymentService {
         /** method null/빈 문자열이면 기본값 "mock" 반환. */
         public String methodOrDefault() {
             return (method != null && !method.isBlank()) ? method : "mock";
+        }
+    }
+
+    /**
+     * 취소 처리 결과 (내부 타입).
+     *
+     * <p>정적 팩토리:
+     * <ul>
+     *   <li>{@link #cancelled} — 미결제 취소 성공 (orders=cancelled)</li>
+     *   <li>{@link #refunded} — 결제완료 취소+환불 성공 (orders=refunded)</li>
+     *   <li>{@link #already} — 멱등 재취소 (이미 cancelled/refunded)</li>
+     * </ul>
+     */
+    public record CancelResult(
+            long orderId,
+            String orderNumber,
+            String orderStatus,
+            boolean isRefunded,
+            long refundedAmount,
+            String currency,
+            boolean alreadyCancelled
+    ) {
+
+        /**
+         * 미결제 취소 성공 결과.
+         *
+         * @param orderId     주문 PK
+         * @param orderNumber 주문 번호
+         * @param orderStatus 취소 후 주문 상태 ("cancelled")
+         * @return 취소 결과
+         */
+        public static CancelResult cancelled(long orderId, String orderNumber, String orderStatus) {
+            return new CancelResult(orderId, orderNumber, orderStatus, false, 0L, "KRW", false);
+        }
+
+        /**
+         * 결제완료 취소+환불 성공 결과.
+         *
+         * @param orderId        주문 PK
+         * @param orderNumber    주문 번호
+         * @param orderStatus    취소 후 주문 상태 ("refunded")
+         * @param refundedAmount 환불 금액 (long, KRW=원)
+         * @param currency       통화 코드
+         * @return 환불 결과
+         */
+        public static CancelResult refunded(long orderId, String orderNumber, String orderStatus,
+                                            long refundedAmount, String currency) {
+            return new CancelResult(orderId, orderNumber, orderStatus, true, refundedAmount, currency, false);
+        }
+
+        /**
+         * 멱등 재취소 결과 (이미 cancelled/refunded).
+         *
+         * <p>B안(state 스냅샷 멱등): 동일 요청 → 동일 표현.
+         * already-refunded 시 {@code refundedAmount/currency}를 스냅샷에서 채워 최초 {@link #refunded} 응답과 동일하게 맞춘다.
+         * already-cancelled 시 {@code refundedAmount=0, currency=snapshot.currency()}로 최초 {@link #cancelled} 응답과 동일하게 맞춘다.
+         *
+         * @param orderId        주문 PK
+         * @param orderNumber    주문 번호
+         * @param orderStatus    현재 주문 상태 ("cancelled" 또는 "refunded")
+         * @param refundedAmount 환불 금액 (refunded 시 finalAmount, cancelled 시 0)
+         * @param currency       통화 코드 (스냅샷 값 사용)
+         * @return 멱등 결과
+         */
+        public static CancelResult already(long orderId, String orderNumber, String orderStatus,
+                                           long refundedAmount, String currency) {
+            boolean wasRefunded = "refunded".equals(orderStatus);
+            return new CancelResult(orderId, orderNumber, orderStatus, wasRefunded, refundedAmount, currency, true);
         }
     }
 }

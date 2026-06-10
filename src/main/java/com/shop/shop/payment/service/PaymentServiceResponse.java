@@ -1,6 +1,7 @@
 package com.shop.shop.payment.service;
 
 import com.shop.shop.common.exception.PaymentDeclinedException;
+import com.shop.shop.payment.dto.OrderCancelResponse;
 import com.shop.shop.payment.dto.PaymentRequest;
 import com.shop.shop.payment.dto.PaymentResponse;
 import lombok.RequiredArgsConstructor;
@@ -66,5 +67,28 @@ public class PaymentServiceResponse {
         long userId = (long) auth.getPrincipal();
         PaymentService.PaymentStatusResult result = paymentService.getPaymentStatus(userId, orderId);
         return dtoMapper.toPaymentResponseFromStatus(result);
+    }
+
+    /**
+     * 주문 취소 처리 (REST).
+     *
+     * <p>거부 예외(409/404)는 {@link PaymentService#cancel}이 트랜잭션 안에서 던지므로 그대로 전파(C1 비적용 — #2).
+     * {@link com.shop.shop.common.exception.RestExceptionHandler}가 BusinessException→ErrorResponse로 자동 매핑.
+     *
+     * @param auth    JWT 인증 (principal = userId(long))
+     * @param orderId 주문 ID
+     * @return 취소 결과 DTO (200)
+     */
+    public OrderCancelResponse cancel(Authentication auth, long orderId) {
+        long userId = (long) auth.getPrincipal();
+        PaymentService.CancelResult result = paymentService.cancel(userId, orderId);
+        return new OrderCancelResponse(
+                result.orderId(),
+                result.orderNumber(),
+                result.orderStatus(),
+                result.isRefunded(),
+                result.refundedAmount(),
+                result.currency()
+        );
     }
 }

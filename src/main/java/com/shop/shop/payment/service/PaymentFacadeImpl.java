@@ -2,6 +2,7 @@ package com.shop.shop.payment.service;
 
 import com.shop.shop.common.exception.PaymentDeclinedException;
 import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.payment.dto.OrderCancelResponse;
 import com.shop.shop.payment.dto.PaymentRequest;
 import com.shop.shop.payment.dto.PaymentResponse;
 import com.shop.shop.payment.dto.PaymentStatusView;
@@ -72,5 +73,25 @@ class PaymentFacadeImpl implements PaymentFacade {
         long userId = memberDirectory.findUserIdByEmail(email);
         PaymentService.PaymentStatusResult result = paymentService.getPaymentStatus(userId, orderId);
         return dtoMapper.toPaymentStatusView(result);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>거부 예외(409/404)는 PaymentService가 트랜잭션 안에서 던지므로 그대로 전파(C1 비적용 — #2).
+     * View 핸들러의 {@code catch (BusinessException e)} 절이 flashError로 처리한다.
+     */
+    @Override
+    public OrderCancelResponse cancel(String email, long orderId) {
+        long userId = memberDirectory.findUserIdByEmail(email);
+        PaymentService.CancelResult result = paymentService.cancel(userId, orderId);
+        return new OrderCancelResponse(
+                result.orderId(),
+                result.orderNumber(),
+                result.orderStatus(),
+                result.isRefunded(),
+                result.refundedAmount(),
+                result.currency()
+        );
     }
 }

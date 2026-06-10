@@ -156,4 +156,46 @@ class PaymentModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 018 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 7: OrderCancelledEvent는 order 모듈(order.event 패키지)에 위치한다 (018).
+     *
+     * <p>주문 취소 사건은 order 모듈이 소유한다 — OrderCompletedEvent와 동일한 소유권 원칙.
+     * payment 모듈에 있으면 소유권 위반이다.
+     */
+    @Test
+    @DisplayName("규칙 7: OrderCancelledEvent가 payment 패키지가 아닌 order.event 패키지에 위치함 (018)")
+    void orderCancelledEvent_resides_in_order_event_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderCancelledEvent")
+                .should().resideInAPackage("com.shop.shop.payment..")
+                .because("OrderCancelledEvent는 이벤트 발행 주체인 order 모듈(order.event)이 소유해야 한다(018).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 8: payment 클래스는 order 내부를 직접 참조하지 않는다 (018 추가 — 순환 없음 재확인).
+     *
+     * <p>OrderCancellationImpl이 order 내부 service에 추가됐어도 payment가 직접 알면 안 된다.
+     * PaymentService는 OrderCancellation(SPI, order.spi 패키지)만 사용한다.
+     */
+    @Test
+    @DisplayName("규칙 8: payment↔order 순환 없음 — payment가 order.service 직접 참조하지 않음 (018)")
+    void payment_does_not_depend_on_order_service_018() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.shop.shop.payment..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.shop.shop.order.service..")
+                .because("payment 모듈은 order 내부 service를 직접 참조하지 않고 " +
+                         "order.spi(OrderCancellation/OrderPaymentReader)만 사용해야 한다(018 순환 없음).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

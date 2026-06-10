@@ -3,6 +3,8 @@ package com.shop.shop.payment.service;
 import com.shop.shop.payment.spi.PaymentGatewayPort;
 import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentAuthorizationRequest;
 import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentAuthorizationResult;
+import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentRefundRequest;
+import com.shop.shop.payment.spi.PaymentGatewayPort.PaymentRefundResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -167,6 +169,66 @@ class MockPaymentGatewayTest {
     }
 
     // ============================================================
+    // refund 테스트 (018 신규)
+    // ============================================================
+
+    @Test
+    @DisplayName("refund: 항상 성공 — refunded=true")
+    void refund_alwaysSucceeds() {
+        PaymentRefundResult result = gateway.refund(buildRefundRequest("idem-key-001"));
+
+        assertThat(result.refunded()).isTrue();
+    }
+
+    @Test
+    @DisplayName("refund: pgRefundId 비어있지 않음")
+    void refund_pgRefundIdNotBlank() {
+        PaymentRefundResult result = gateway.refund(buildRefundRequest("idem-key-001"));
+
+        assertThat(result.pgRefundId()).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("refund: pgRefundId = 'MOCK-REFUND-' + idempotencyKey (결정적)")
+    void refund_pgRefundId_equalsIdempotencyKeyBased() {
+        String idempotencyKey = "pay-id-12345";
+        PaymentRefundResult result = gateway.refund(buildRefundRequest(idempotencyKey));
+
+        assertThat(result.pgRefundId()).isEqualTo("MOCK-REFUND-" + idempotencyKey);
+    }
+
+    @Test
+    @DisplayName("refund: 동일 idempotencyKey로 2회 호출 → 동일 pgRefundId (진짜 결정성 — UUID 미사용)")
+    void refund_calledTwiceWithSameKey_samePgRefundId() {
+        String idempotencyKey = "same-key-999";
+        PaymentRefundRequest request = buildRefundRequest(idempotencyKey);
+
+        String pgRefundId1 = gateway.refund(request).pgRefundId();
+        String pgRefundId2 = gateway.refund(request).pgRefundId();
+
+        assertThat(pgRefundId1).isEqualTo(pgRefundId2);
+        assertThat(pgRefundId1).isEqualTo("MOCK-REFUND-" + idempotencyKey);
+    }
+
+    @Test
+    @DisplayName("refund: 다른 idempotencyKey → 다른 pgRefundId")
+    void refund_differentKeys_differentPgRefundIds() {
+        String pgRefundId1 = gateway.refund(buildRefundRequest("key-A")).pgRefundId();
+        String pgRefundId2 = gateway.refund(buildRefundRequest("key-B")).pgRefundId();
+
+        assertThat(pgRefundId1).isNotEqualTo(pgRefundId2);
+    }
+
+    @Test
+    @DisplayName("refund: failureCode/failureReason null (성공 시)")
+    void refund_noFailureFields_onSuccess() {
+        PaymentRefundResult result = gateway.refund(buildRefundRequest("idem-key-001"));
+
+        assertThat(result.failureCode()).isNull();
+        assertThat(result.failureReason()).isNull();
+    }
+
+    // ============================================================
     // 헬퍼
     // ============================================================
 
@@ -177,6 +239,15 @@ class MockPaymentGatewayTest {
                 "KRW",
                 method,
                 "idempotency-key-001"
+        );
+    }
+
+    private PaymentRefundRequest buildRefundRequest(String idempotencyKey) {
+        return new PaymentRefundRequest(
+                "MOCK-PG-TX-001",
+                BigDecimal.valueOf(10000),
+                "KRW",
+                idempotencyKey
         );
     }
 }

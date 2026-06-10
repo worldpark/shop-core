@@ -8,14 +8,14 @@ import java.math.BigDecimal;
  * <p>payment 모듈이 order 내부(domain/repository/service)를 직접 참조하지 않고
  * 이 포트를 통해서만 주문 정보에 접근한다(architecture-rule P1).
  *
- * <p>메서드 2개 분리(#3):
+ * <p>메서드 3개 분리:
  * <ul>
  *   <li>{@link #getPayableOrder} — 결제(pay) 전용. 이벤트 완결성 사전검증 포함. 409 가능.</li>
  *   <li>{@link #getOrderSnapshot} — 상태 조회 전용. 완결성 검증 없음. 404만 가능.</li>
+ *   <li>{@link #getOrderForCancel} — 취소 전용. orders row PESSIMISTIC_WRITE 잠금. 환불 결정 전 호출(#4).</li>
  * </ul>
  *
- * <p>두 메서드 모두 락을 잡지 않는다(준비/멱등 판정용 읽기).
- * 소유권 검증: 타 사용자 주문·미존재 모두 {@link com.shop.shop.common.exception.OrderNotFoundException}(404 존재 은닉).
+ * <p>소유권 검증: 타 사용자 주문·미존재 모두 {@link com.shop.shop.common.exception.OrderNotFoundException}(404 존재 은닉).
  * order/member/product Entity 노출 금지 — scalar record만 반환.
  *
  * <p>017에서 시그니처 불변.
@@ -54,6 +54,25 @@ public interface OrderPaymentReader {
      * @throws com.shop.shop.common.exception.OrderNotFoundException 타인/미존재 주문 (404 존재 은닉)
      */
     OrderSnapshotView getOrderSnapshot(long orderId, long requesterUserId);
+
+    /**
+     * 취소 전용 locked 주문 스냅샷 조회 (#4).
+     *
+     * <p><b>orders row PESSIMISTIC_WRITE 잠금</b>: 환불 결정(상태 판정) 전에 호출해
+     * 동시 결제({@code OrderConfirmation.confirmPaid}도 같은 row PESSIMISTIC_WRITE)와 직렬화한다.
+     * 무락 {@link #getOrderSnapshot} 재사용 금지 — 환불/확정 race 방지(#4).
+     *
+     * <p>이 락은 PaymentService.cancel의 같은 트랜잭션 전체에 걸쳐 유효하다(④ OrderCancellation 위임까지).
+     * OrderCancellationImpl도 같은 트랜잭션에서 findByIdForUpdate를 재호출해 락 재진입/권위 재검증을 수행한다.
+     *
+     * <p>items는 조회하지 않는다 — 재고 복원에 필요한 items 로딩은 OrderCancellationImpl이 수행.
+     *
+     * @param orderId          주문 ID
+     * @param requesterUserId  요청자 userId
+     * @return 취소 판정용 주문 스냅샷 (orders row 락 획득 상태)
+     * @throws com.shop.shop.common.exception.OrderNotFoundException 타인/미존재 주문 (404 존재 은닉)
+     */
+    OrderSnapshotView getOrderForCancel(long orderId, long requesterUserId);
 
     /**
      * 결제 준비용 주문 스냅샷 (Entity 미노출, scalar only).

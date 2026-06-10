@@ -83,6 +83,9 @@ public class SecurityConfig {
                     // 결제 경로 — Task 016 명시 권한 (api-authorization-rule: ROLE_CONSUMER 최소, 소유권 서비스 레이어 검증)
                     // /api/v1/orders/**가 이미 CONSUMER 덮음 — 의도 명시 + 회귀 방지용 전용 matcher
                     .requestMatchers("/api/v1/orders/*/payment").hasRole("CONSUMER")
+                    // 취소 경로 — Task 018 명시 권한 (api-authorization-rule: ROLE_CONSUMER 최소, 소유권 서비스 레이어 검증)
+                    // /api/v1/orders/**가 이미 CONSUMER 덮음 — 의도 명시 + 회귀 방지용 전용 matcher
+                    .requestMatchers("/api/v1/orders/*/cancel").hasRole("CONSUMER")
                     // 주문 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
                     .requestMatchers("/api/v1/orders/**").hasRole("CONSUMER")
                     // 그 외 REST API는 인증 필요
@@ -128,6 +131,9 @@ public class SecurityConfig {
                     // 결제 경로 — Task 016 명시 권한 (api-authorization-rule: ROLE_CONSUMER 최소, 소유권 서비스 레이어 검증)
                     // /orders/**가 이미 CONSUMER 덮음 — 의도 명시 + 회귀 방지용 전용 matcher
                     .requestMatchers("/orders/*/payment").hasRole("CONSUMER")
+                    // 취소 경로 — Task 018 명시 권한 (api-authorization-rule: ROLE_CONSUMER 최소, 소유권 서비스 레이어 검증)
+                    // /orders/**가 이미 CONSUMER 덮음 — 의도 명시 + 회귀 방지용 전용 matcher
+                    .requestMatchers("/orders/*/cancel").hasRole("CONSUMER")
                     // 주문/체크아웃 View 경로 — 최소 ROLE_CONSUMER (미인증은 formLogin이 302→/login)
                     .requestMatchers("/checkout", "/orders", "/orders/**").hasRole("CONSUMER")
                     // 그 외 모든 경로는 인증 필요

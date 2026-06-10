@@ -11,6 +11,9 @@
       - 배송지 스냅샷: shippingAddress(recipient/phone/postcode/address1/address2)
       - 결제 영역: payment.paid=false → 결제 대기, payment.paid=true → 결제 완료 + 금액
       - 결제 폼: payment.payable(=주문 pending && !paid)일 때만 노출, POST /orders/{orderId}/payment
+      - 취소 폼: order.status가 'pending' 또는 'paid'일 때만 노출, POST /orders/{orderId}/cancel
+      - 취소 후 상태: order.status='cancelled'(취소됨), order.status='refunded'(환불됨) 배지 표시
+      - 종결 상태(cancelled/refunded)·이행단계(preparing/shipping/delivered)에서는 결제 폼·취소 폼 모두 미노출
       - 스냅샷 그대로 표시(현재 상품 정보 아님)
       - ownerId·stock 수치·Entity·로컬 절대경로 미표시
 -->
@@ -35,7 +38,15 @@
                 </div>
                 <div class="order-detail-row">
                     <span class="order-detail-label">주문 상태:</span>
-                    <span class="order-detail-value badge-order-status" th:text="${order.status}">pending</span>
+                    <span class="order-detail-value badge-order-status"
+                          th:with="statusLabel=(${order.status} == 'pending' ? '결제 대기' :
+                                               (${order.status} == 'paid' ? '결제 완료' :
+                                               (${order.status} == 'preparing' ? '상품 준비 중' :
+                                               (${order.status} == 'shipping' ? '배송 중' :
+                                               (${order.status} == 'delivered' ? '배송 완료' :
+                                               (${order.status} == 'cancelled' ? '취소됨' :
+                                               (${order.status} == 'refunded' ? '환불됨' : ${order.status})))))))"
+                          th:text="${statusLabel}">pending</span>
                 </div>
                 <div class="order-detail-row">
                     <span class="order-detail-label">주문 일시:</span>
@@ -178,6 +189,33 @@
                     </form>
                 </div>
 
+            </div>
+        </section>
+
+        <!-- 취소 영역: pending 또는 paid 상태에서만 노출 -->
+        <section class="order-detail-cancel"
+                 th:if="${order.status == 'pending' or order.status == 'paid'}">
+            <h2 class="section-title">주문 취소</h2>
+            <div class="cancel-section">
+                <p class="cancel-notice">주문을 취소하시겠습니까? 취소 후에는 되돌릴 수 없습니다.</p>
+                <form th:action="@{/orders/{orderId}/cancel(orderId=${order.orderId})}"
+                      method="post"
+                      class="cancel-form">
+                    <div class="cancel-action">
+                        <button type="submit" class="btn btn-danger btn-sm">주문 취소</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- 취소/환불 완료 안내: cancelled 또는 refunded 상태에서 표시 -->
+        <section class="order-detail-cancelled-notice"
+                 th:if="${order.status == 'cancelled' or order.status == 'refunded'}">
+            <div class="cancel-complete-info">
+                <span class="cancel-complete-label"
+                      th:if="${order.status == 'cancelled'}">주문이 취소되었습니다.</span>
+                <span class="cancel-complete-label"
+                      th:if="${order.status == 'refunded'}">주문이 취소되고 환불 처리되었습니다.</span>
             </div>
         </section>
 

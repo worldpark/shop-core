@@ -137,4 +137,131 @@ class PaymentTest {
         assertThatThrownBy(() -> payment.markFailed("X", "Y"))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    // ============================================================
+    // markCancelled 테스트 (018 신규)
+    // ============================================================
+
+    @Test
+    @DisplayName("markCancelled: ready → cancelled 전이")
+    void markCancelled_ready_transitionsToCancelled() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        assertThat(payment.getStatus()).isEqualTo("ready");
+
+        payment.markCancelled();
+
+        assertThat(payment.getStatus()).isEqualTo("cancelled");
+    }
+
+    @Test
+    @DisplayName("markCancelled: failed → cancelled 전이")
+    void markCancelled_failed_transitionsToCancelled() {
+        Payment payment = Payment.create(ORDER_ID, "virtual_account", AMOUNT);
+        payment.markFailed("CARD_DECLINED", "거절");
+        assertThat(payment.getStatus()).isEqualTo("failed");
+
+        payment.markCancelled();
+
+        assertThat(payment.getStatus()).isEqualTo("cancelled");
+    }
+
+    @Test
+    @DisplayName("markCancelled: cancelled 재호출 → 멱등(no-op)")
+    void markCancelled_alreadyCancelled_idempotent() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markCancelled();
+
+        // 멱등 재호출 — 예외 없음, 상태 유지
+        payment.markCancelled();
+
+        assertThat(payment.getStatus()).isEqualTo("cancelled");
+    }
+
+    @Test
+    @DisplayName("markCancelled: paid → cancelled 금지 → IllegalStateException(환불을 거쳐야 함)")
+    void markCancelled_paid_throwsIllegalStateException() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markPaid("MOCK-TX-001", Instant.now());
+        assertThat(payment.getStatus()).isEqualTo("paid");
+
+        assertThatThrownBy(() -> payment.markCancelled())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paid");
+    }
+
+    @Test
+    @DisplayName("markCancelled: refunded → cancelled 금지 → IllegalStateException")
+    void markCancelled_refunded_throwsIllegalStateException() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markPaid("MOCK-TX-001", Instant.now());
+        payment.markRefunded("MOCK-REFUND-key");
+        assertThat(payment.getStatus()).isEqualTo("refunded");
+
+        assertThatThrownBy(() -> payment.markCancelled())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("refunded");
+    }
+
+    // ============================================================
+    // markRefunded 테스트 (018 신규)
+    // ============================================================
+
+    @Test
+    @DisplayName("markRefunded: paid → refunded 전이")
+    void markRefunded_paid_transitionsToRefunded() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markPaid("MOCK-TX-001", Instant.now());
+
+        payment.markRefunded("MOCK-REFUND-key-001");
+
+        assertThat(payment.getStatus()).isEqualTo("refunded");
+    }
+
+    @Test
+    @DisplayName("markRefunded: refunded 재호출 → 멱등(no-op)")
+    void markRefunded_alreadyRefunded_idempotent() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markPaid("MOCK-TX-001", Instant.now());
+        payment.markRefunded("MOCK-REFUND-key-001");
+
+        // 멱등 재호출 — 예외 없음
+        payment.markRefunded("MOCK-REFUND-key-002");
+
+        assertThat(payment.getStatus()).isEqualTo("refunded");
+    }
+
+    @Test
+    @DisplayName("markRefunded: ready → refunded 금지 → IllegalStateException")
+    void markRefunded_ready_throwsIllegalStateException() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        assertThat(payment.getStatus()).isEqualTo("ready");
+
+        assertThatThrownBy(() -> payment.markRefunded("MOCK-REFUND-key"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paid");
+    }
+
+    @Test
+    @DisplayName("markRefunded: failed → refunded 금지 → IllegalStateException")
+    void markRefunded_failed_throwsIllegalStateException() {
+        Payment payment = Payment.create(ORDER_ID, "virtual_account", AMOUNT);
+        payment.markFailed("CARD_DECLINED", "거절");
+
+        assertThatThrownBy(() -> payment.markRefunded("MOCK-REFUND-key"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("paid");
+    }
+
+    @Test
+    @DisplayName("markRefunded: pgRefundId 미영속(옵션 A) — 상태 전이만 수행")
+    void markRefunded_pgRefundId_notPersistedToEntity() {
+        Payment payment = Payment.create(ORDER_ID, "mock", AMOUNT);
+        payment.markPaid("MOCK-TX-001", Instant.now());
+
+        payment.markRefunded("MOCK-REFUND-key-001");
+
+        // pgTransactionId는 markPaid 시 기록된 값 그대로 유지
+        assertThat(payment.getStatus()).isEqualTo("refunded");
+        assertThat(payment.getPgTransactionId()).isEqualTo("MOCK-TX-001");
+    }
 }

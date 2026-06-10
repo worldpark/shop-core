@@ -185,4 +185,65 @@ public class Payment extends BaseEntity {
         // ready → failed 전이
         this.status = "failed";
     }
+
+    /**
+     * 결제 취소 상태 전이 메서드 (ready/failed → cancelled, 미결제 취소 경로).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"ready" → "cancelled" 전이</li>
+     *   <li>"failed" → "cancelled" 전이</li>
+     *   <li>"cancelled" 재호출 → 멱등(상태 무변경 no-op)</li>
+     *   <li>"paid" → {@link IllegalStateException}(결제완료 취소는 환불을 거쳐야 함 — markRefunded 사용)</li>
+     *   <li>"refunded" → {@link IllegalStateException}(이미 종결 상태)</li>
+     * </ul>
+     *
+     * @throws IllegalStateException status가 "paid" 또는 "refunded"일 때
+     */
+    public void markCancelled() {
+        if ("cancelled".equals(this.status)) {
+            // 멱등 처리 — 이미 cancelled면 no-op
+            return;
+        }
+        if ("paid".equals(this.status)) {
+            throw new IllegalStateException(
+                    "결제완료 상태에서 직접 cancelled로 전이할 수 없습니다. 환불(markRefunded)을 먼저 수행하세요. 현재 상태: " + this.status);
+        }
+        if ("refunded".equals(this.status)) {
+            throw new IllegalStateException(
+                    "이미 환불 완료된 결제를 cancelled로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        // ready/failed → cancelled 전이
+        this.status = "cancelled";
+    }
+
+    /**
+     * 결제 환불 완료 상태 전이 메서드 (paid → refunded, 결제완료 취소 경로).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"paid" → "refunded" 전이</li>
+     *   <li>"refunded" 재호출 → 멱등(상태 무변경 no-op)</li>
+     *   <li>"ready"/"failed"/"cancelled" → {@link IllegalStateException}</li>
+     * </ul>
+     *
+     * <p><b>pgRefundId 현재 미영속(옵션 A)</b>: {@code payments}에 {@code pg_refund_id} 컬럼이 없어
+     * 신규 migration 없이 처리한다. 환불 ID/사유 영속이 필요하면 후속 Task(옵션 B).
+     * 인자는 시그니처 고정 목적이며 현재 본문에서 미사용(markFailed 선례와 동형).
+     *
+     * @param pgRefundId PG 환불 번호 (현재 미영속 — 옵션 A)
+     * @throws IllegalStateException status가 "paid"/"refunded"가 아닐 때
+     */
+    public void markRefunded(String pgRefundId) {
+        if ("refunded".equals(this.status)) {
+            // 멱등 처리 — 이미 refunded면 no-op
+            return;
+        }
+        if (!"paid".equals(this.status)) {
+            throw new IllegalStateException(
+                    "결제 상태가 paid가 아니어서 refunded로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        // paid → refunded 전이 (pgRefundId 미영속 — 옵션 A)
+        this.status = "refunded";
+    }
 }

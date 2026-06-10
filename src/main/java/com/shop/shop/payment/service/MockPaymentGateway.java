@@ -77,4 +77,19 @@ class MockPaymentGateway implements PaymentGatewayPort {
         String pgTransactionId = PG_TX_PREFIX + UUID.randomUUID();
         return PaymentAuthorizationResult.approved(pgTransactionId);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>결정적·항상 성공(018 — 무작위 금지)</b>:
+     * {@code pgRefundId = "MOCK-REFUND-" + request.idempotencyKey()} — 같은 idempotencyKey → 같은 pgRefundId.
+     * UUID를 사용하지 않으므로 동일 입력에 대해 항상 동일한 pgRefundId를 반환한다(재환불 멱등·테스트 재현성).
+     *
+     * <p>외부 I/O 없음 — in-process 동기 실행.
+     */
+    @Override
+    public PaymentRefundResult refund(PaymentRefundRequest request) {
+        String pgRefundId = "MOCK-REFUND-" + request.idempotencyKey();
+        return PaymentRefundResult.refunded(pgRefundId);
+    }
 }

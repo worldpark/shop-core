@@ -5,6 +5,7 @@ import com.shop.shop.inventory.domain.VariantStock;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.inventory.spi.InventoryStockPort;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>이 메서드는 호출자(order)의 @Transactional 경계 안에서 실행된다.
  * 호출자는 다중 variant 주문 시 variantId 오름차순으로 이 메서드를 순차 호출해야 한다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -54,5 +56,22 @@ class InventoryStockPortImpl implements InventoryStockPort {
         }
 
         variantStock.decrease(quantity);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>1. SELECT ... FOR UPDATE (비관적 락 획득)
+     * 2. 미존재(변형 삭제됨) → 복원 skip + 로깅(InsufficientStockException 미발생)
+     * 3. isActive 미검사(비활성 변형도 재고 복원)
+     * 4. vs.increase(quantity) — dirty checking으로 stock UPDATE
+     */
+    @Override
+    public void increase(long variantId, int quantity) {
+        inventoryStockRepository.findByIdForUpdate(variantId)
+                .ifPresentOrElse(
+                        variantStock -> variantStock.increase(quantity),
+                        () -> log.warn("재고 복원 skip: variantId={} 에 해당하는 VariantStock row 없음 (변형 삭제됨)", variantId)
+                );
     }
 }

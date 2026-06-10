@@ -7,6 +7,7 @@ import com.shop.shop.common.exception.PaymentEventResolutionException;
 import com.shop.shop.common.exception.PaymentInProgressException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
+import com.shop.shop.order.spi.OrderCancellation;
 import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.order.spi.OrderConfirmation.OrderConfirmationResult;
 import com.shop.shop.order.spi.OrderPaymentReader;
@@ -61,6 +62,7 @@ class PaymentServiceTest {
 
     @Mock private OrderPaymentReader orderPaymentReader;
     @Mock private OrderConfirmation orderConfirmation;
+    @Mock private OrderCancellation orderCancellation;
     @Mock private PaymentGatewayPort paymentGatewayPort;
     @Mock private PaymentRepository paymentRepository;
     @Mock private MemberDirectory memberDirectory;
@@ -76,8 +78,8 @@ class PaymentServiceTest {
     @BeforeEach
     void setUp() {
         paymentService = new PaymentService(
-                orderPaymentReader, orderConfirmation, paymentGatewayPort, paymentRepository,
-                memberDirectory, eventPublisher);
+                orderPaymentReader, orderConfirmation, orderCancellation, paymentGatewayPort,
+                paymentRepository, memberDirectory, eventPublisher);
         // 기본 연락처 mock — 승인 경로 테스트에서 연락처 해석 성공 가정
         when(memberDirectory.findContactByUserId(USER_ID))
                 .thenReturn(new MemberContact("user@example.com", "테스트유저"));

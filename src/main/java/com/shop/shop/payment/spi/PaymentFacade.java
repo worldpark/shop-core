@@ -1,5 +1,6 @@
 package com.shop.shop.payment.spi;
 
+import com.shop.shop.payment.dto.OrderCancelResponse;
 import com.shop.shop.payment.dto.PaymentRequest;
 import com.shop.shop.payment.dto.PaymentResponse;
 import com.shop.shop.payment.dto.PaymentStatusView;
@@ -43,4 +44,19 @@ public interface PaymentFacade {
      * @return 결제 상태 뷰 (주문 상세 결제 영역용)
      */
     PaymentStatusView getPaymentStatus(String email, long orderId);
+
+    /**
+     * 주문 취소 처리 — form-login email 기반 View facade.
+     *
+     * <p>처리 흐름: email→userId(member.spi) → {@link com.shop.shop.payment.service.PaymentService#cancel} 위임.
+     * 거부 예외는 PaymentService가 트랜잭션 안에서 던지므로 그대로 전파(C1 비적용 — #2).
+     * View 핸들러({@code OrderViewController.cancel})가 {@code catch (BusinessException e) → flashError}로 처리.
+     *
+     * @param email   form-login principal email
+     * @param orderId 주문 ID
+     * @return 취소 결과 DTO (성공 시 반환)
+     * @throws com.shop.shop.common.exception.OrderCancellationConflictException 이행단계 취소 불가 (409)
+     * @throws com.shop.shop.common.exception.OrderNotFoundException              타인/미존재 주문 (404)
+     */
+    OrderCancelResponse cancel(String email, long orderId);
 }

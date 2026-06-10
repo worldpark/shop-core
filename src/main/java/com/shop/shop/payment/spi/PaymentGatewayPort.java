@@ -27,6 +27,77 @@ public interface PaymentGatewayPort {
     PaymentAuthorizationResult authorize(PaymentAuthorizationRequest request);
 
     /**
+     * 결제 환불 요청.
+     *
+     * <p><b>실 PG 환불 비가역성 주의(#5)</b>: 본 Task 모의 구현은 트랜잭션 안에서 호출해도
+     * 부작용이 없어 무해하나, 실 PG 환불은 "환불 성공 후 커밋 전 롤백 = 실제 환불 비가역"이라
+     * authorize(016)와 동일한 분산 트랜잭션 문제를 가진다.
+     * 실 PG 도입 시 멱등키 + 정산(reconciliation)이 필요하다.
+     *
+     * @param request 환불 요청 (pgTransactionId·금액·통화·idempotencyKey 포함)
+     * @return 환불 결과 (refunded 또는 failed)
+     */
+    PaymentRefundResult refund(PaymentRefundRequest request);
+
+    /**
+     * 환불 요청 DTO.
+     *
+     * @param pgTransactionId 원 결제 PG 거래 번호 (payments.pg_transaction_id)
+     * @param amount          환불 금액 (BigDecimal, 원 결제 금액 전체)
+     * @param currency        통화 코드 (예: "KRW")
+     * @param idempotencyKey  멱등성 키 (paymentId 또는 orderNumber) — 동일 키 → 동일 pgRefundId 보장
+     */
+    record PaymentRefundRequest(
+            String pgTransactionId,
+            BigDecimal amount,
+            String currency,
+            String idempotencyKey
+    ) {}
+
+    /**
+     * 환불 결과 DTO.
+     *
+     * <p>정적 팩토리:
+     * <ul>
+     *   <li>{@link #refunded(String)} — 환불 성공</li>
+     *   <li>{@link #failed(String, String)} — 환불 실패 (시그니처상 표현, 본 Task mock은 항상 성공)</li>
+     * </ul>
+     *
+     * @param refunded        환불 성공 여부
+     * @param pgRefundId      PG 환불 번호 (성공 시 non-null)
+     * @param failureCode     실패 코드 (실패 시 non-null)
+     * @param failureReason   실패 사유 (실패 시 non-null)
+     */
+    record PaymentRefundResult(
+            boolean refunded,
+            String pgRefundId,
+            String failureCode,
+            String failureReason
+    ) {
+
+        /**
+         * 환불 성공 결과 팩토리.
+         *
+         * @param pgRefundId PG 환불 번호
+         * @return 환불 성공 결과
+         */
+        public static PaymentRefundResult refunded(String pgRefundId) {
+            return new PaymentRefundResult(true, pgRefundId, null, null);
+        }
+
+        /**
+         * 환불 실패 결과 팩토리.
+         *
+         * @param failureCode   실패 코드
+         * @param failureReason 실패 사유
+         * @return 환불 실패 결과
+         */
+        public static PaymentRefundResult failed(String failureCode, String failureReason) {
+            return new PaymentRefundResult(false, null, failureCode, failureReason);
+        }
+    }
+
+    /**
      * 결제 승인 요청 DTO.
      *
      * @param orderNumber    주문 번호

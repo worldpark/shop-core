@@ -2,6 +2,7 @@ package com.shop.shop.payment.service;
 
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
+import com.shop.shop.order.spi.OrderCancellation;
 import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.order.spi.OrderPaymentReader;
 import com.shop.shop.order.spi.OrderPaymentReader.OrderPaymentView;
@@ -50,6 +51,7 @@ class PaymentServiceDeclineTest {
 
     @Mock private OrderPaymentReader orderPaymentReader;
     @Mock private OrderConfirmation orderConfirmation;
+    @Mock private OrderCancellation orderCancellation;
     @Mock private PaymentGatewayPort paymentGatewayPort;
     @Mock private PaymentRepository paymentRepository;
     @Mock private MemberDirectory memberDirectory;
@@ -68,8 +70,8 @@ class PaymentServiceDeclineTest {
     @BeforeEach
     void setUp() {
         paymentService = new PaymentService(
-                orderPaymentReader, orderConfirmation, paymentGatewayPort, paymentRepository,
-                memberDirectory, eventPublisher);
+                orderPaymentReader, orderConfirmation, orderCancellation, paymentGatewayPort,
+                paymentRepository, memberDirectory, eventPublisher);
     }
 
     private OrderPaymentView pendingSnapshot() {

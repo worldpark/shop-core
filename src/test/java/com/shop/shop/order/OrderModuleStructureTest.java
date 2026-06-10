@@ -142,4 +142,51 @@ class OrderModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 018 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 6: OrderCancelledEvent는 order.event 패키지에 위치한다 (018).
+     *
+     * <p>주문 취소 사건의 이벤트 소유권은 order 모듈이다.
+     * OrderCompletedEvent와 동일한 원칙: payment 모듈에 있으면 소유권 위반.
+     */
+    @Test
+    @DisplayName("규칙 6: OrderCancelledEvent가 order.event 패키지에 위치함 (018)")
+    void orderCancelledEvent_resides_in_order_event_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderCancelledEvent")
+                .should().resideOutsideOfPackage("com.shop.shop.order.event..")
+                .because("OrderCancelledEvent는 이벤트 발행 주체인 order 모듈(order.event)이 소유해야 한다(018).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 7: order 클래스는 payment 내부(domain/repository/service)를 직접 참조하지 않는다 (018 순환 없음).
+     *
+     * <p>018에서 OrderCancellationImpl이 order.service에 추가됐다.
+     * payment 오케스트레이션 방향(payment → order.spi)을 유지해야 하므로
+     * order가 payment 내부를 역방향 참조하면 순환이 된다.
+     */
+    @Test
+    @DisplayName("규칙 7: order 클래스가 payment 내부(domain·repository·service)를 직접 참조하지 않음 (018)")
+    void order_does_not_depend_on_payment_internals() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.shop.shop.order..")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.shop.shop.payment.domain..",
+                        "com.shop.shop.payment.repository..",
+                        "com.shop.shop.payment.service.."
+                )
+                .because("order 모듈은 payment 내부(domain/repository/service)를 직접 참조하지 않는다. " +
+                         "payment가 order.spi를 호출하는 단방향 의존성을 유지해야 한다(018 순환 없음).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

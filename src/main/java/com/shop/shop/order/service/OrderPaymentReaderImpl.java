@@ -93,6 +93,33 @@ class OrderPaymentReaderImpl implements OrderPaymentReader {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>orders row PESSIMISTIC_WRITE 잠금 후 소유권 검증(#4).
+     * PaymentService.cancel의 쓰기 트랜잭션 안에서 호출되므로 락이 트랜잭션 전체에 걸쳐 유효하다.
+     * items 조회 없음 — 재고 복원에 필요한 items 로딩은 OrderCancellationImpl이 별도 수행.
+     */
+    @Override
+    @Transactional
+    public OrderSnapshotView getOrderForCancel(long orderId, long requesterUserId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        if (!order.getUserId().equals(requesterUserId)) {
+            throw new OrderNotFoundException();
+        }
+
+        return new OrderSnapshotView(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getUserId(),
+                order.getStatus(),
+                order.getFinalAmount(),
+                CURRENCY_KRW
+        );
+    }
+
+    /**
      * 이벤트 완결성 사전검증.
      *
      * <p>variantId → productId 해석 불가 또는 member 연락처 미존재 시

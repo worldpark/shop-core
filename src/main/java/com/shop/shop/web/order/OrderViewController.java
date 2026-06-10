@@ -224,4 +224,38 @@ public class OrderViewController {
 
         return redirectTarget;
     }
+
+    /**
+     * 주문 취소 처리 (폼 제출).
+     * POST /orders/{orderId}/cancel
+     *
+     * <p>016/017 pay 핸들러 패턴 재사용. web→payment.spi 단방향 유지.
+     *
+     * <p>성공: flashSuccess("주문이 취소되었습니다.") + redirect:/orders/{orderId} (PRG).
+     * 취소 불가(BusinessException 409/404): flashError(메시지) + redirect:/orders/{orderId}.
+     *
+     * <p>인가: SecurityConfig View 체인 /orders/[orderId]/cancel hasRole("CONSUMER").
+     * 미인증 시 컨트롤러 도달 전 302 /login.
+     *
+     * @param orderId            주문 ID (path variable)
+     * @param auth               SecurityContext 인증 객체
+     * @param redirectAttributes flash 메시지 전달용
+     * @return redirect:/orders/{orderId}
+     */
+    @PostMapping("/orders/{orderId}/cancel")
+    public String cancel(
+            @PathVariable long orderId,
+            Authentication auth,
+            RedirectAttributes redirectAttributes) {
+
+        try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
+            paymentFacade.cancel(actor.email(), orderId);
+            redirectAttributes.addFlashAttribute("flashSuccess", "주문이 취소되었습니다.");
+        } catch (BusinessException e) {
+            redirectAttributes.addFlashAttribute("flashError", e.getMessage());
+        }
+
+        return "redirect:/orders/" + orderId;
+    }
 }

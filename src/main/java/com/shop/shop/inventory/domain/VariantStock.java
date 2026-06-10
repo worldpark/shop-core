@@ -48,4 +48,17 @@ public class VariantStock {
     public void decrease(int quantity) {
         this.stock -= quantity;
     }
+
+    /**
+     * 재고 복원 의도 메서드 (취소/환불 시).
+     *
+     * <p>decrease와 동형. JPA dirty checking으로 stock UPDATE가 발행된다.
+     * isActive 검사 없음 — 비활성 변형도 재고를 복원한다.
+     * 다중 variant는 호출자가 variantId 오름차순으로 순차 호출해야 한다(데드락 완화, decrease와 동일 규약).
+     *
+     * @param quantity 복원할 수량 (≥ 1)
+     */
+    public void increase(int quantity) {
+        this.stock += quantity;
+    }
 }
