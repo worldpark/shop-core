@@ -1,7 +1,6 @@
 package com.shop.shop.order.service;
 
 import com.shop.shop.common.exception.AmountConversionException;
-import com.shop.shop.common.exception.OrderConfirmationConflictException;
 import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
@@ -23,7 +22,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -75,23 +73,39 @@ class OrderConfirmationImpl implements OrderConfirmation {
             return new OrderConfirmationResult(
                     order.getId(),
                     order.getOrderNumber(),
-                    true,
+                    OrderConfirmation.Outcome.ALREADY_CONFIRMED,
                     false,
-                    order.getUpdatedAt()
+                    order.getUpdatedAt(),
+                    null
             );
         }
 
         if (!"pending".equals(currentStatus)) {
+            // 비-pending 상태 → REJECTED 값 반환 (throw 대신 값으로 표현 — forward-compat)
             log.warn("주문 상태 충돌: orderId={}, status={}", orderId, currentStatus);
-            throw new OrderConfirmationConflictException(
-                    "주문 상태(" + currentStatus + ")에서 결제 확정을 할 수 없습니다.");
+            return new OrderConfirmationResult(
+                    order.getId(),
+                    order.getOrderNumber(),
+                    OrderConfirmation.Outcome.REJECTED,
+                    false,
+                    order.getUpdatedAt(),
+                    "주문 상태(" + currentStatus + ")에서 결제 확정을 할 수 없습니다."
+            );
         }
 
         // 4. 금액 재검증
         if (order.getFinalAmount().compareTo(paidAmount) != 0) {
+            // 금액 불일치 → REJECTED 값 반환 (throw 대신 값으로 표현 — forward-compat)
             log.warn("결제 금액 불일치(확정 단계): orderId={}, orderAmount={}, paidAmount={}",
                     orderId, order.getFinalAmount(), paidAmount);
-            throw new OrderConfirmationConflictException("결제 금액이 주문 금액과 일치하지 않습니다.");
+            return new OrderConfirmationResult(
+                    order.getId(),
+                    order.getOrderNumber(),
+                    OrderConfirmation.Outcome.REJECTED,
+                    false,
+                    order.getUpdatedAt(),
+                    "결제 금액이 주문 금액과 일치하지 않습니다."
+            );
         }
 
         // 5. pending → paid 전이
@@ -109,9 +123,10 @@ class OrderConfirmationImpl implements OrderConfirmation {
         return new OrderConfirmationResult(
                 order.getId(),
                 order.getOrderNumber(),
+                OrderConfirmation.Outcome.CONFIRMED,
                 true,
-                true,
-                Instant.now()
+                Instant.now(),
+                null
         );
     }
 

@@ -57,7 +57,7 @@ class PaymentFacadeImplTest {
     void pay_delegatesToMemberDirectoryAndPaymentService() {
         Payment payment = Payment.create(ORDER_ID, "mock", BigDecimal.valueOf(10000));
         payment.markPaid("MOCK-TX-001", Instant.now());
-        PaymentService.PaymentResult result = new PaymentService.PaymentResult(payment, "ORD-001");
+        PaymentService.PaymentResult result = PaymentService.PaymentResult.approved(payment, "ORD-001");
         when(paymentService.pay(anyLong(), anyLong(), any())).thenReturn(result);
         when(dtoMapper.toPaymentResponse(result)).thenReturn(
                 new PaymentResponse(1L, ORDER_ID, "ORD-001", "paid", "mock",
@@ -92,7 +92,7 @@ class PaymentFacadeImplTest {
     void pay_returnType_notEntity() {
         Payment payment = Payment.create(ORDER_ID, "mock", BigDecimal.valueOf(10000));
         payment.markPaid("MOCK-TX-001", Instant.now());
-        PaymentService.PaymentResult result = new PaymentService.PaymentResult(payment, "ORD-001");
+        PaymentService.PaymentResult result = PaymentService.PaymentResult.approved(payment, "ORD-001");
         when(paymentService.pay(anyLong(), anyLong(), any())).thenReturn(result);
         PaymentResponse expectedResponse = new PaymentResponse(1L, ORDER_ID, "ORD-001", "paid", "mock",
                 BigDecimal.valueOf(10000), "MOCK-TX-001", Instant.now());

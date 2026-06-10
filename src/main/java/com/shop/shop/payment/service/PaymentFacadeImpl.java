@@ -1,5 +1,6 @@
 package com.shop.shop.payment.service;
 
+import com.shop.shop.common.exception.PaymentDeclinedException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.payment.dto.PaymentRequest;
 import com.shop.shop.payment.dto.PaymentResponse;
@@ -24,6 +25,11 @@ import org.springframework.stereotype.Service;
  *
  * <p>web 타입({@code OrderPaymentForm})을 받지 않는다(#1).
  * 변환은 web 핸들러 책임.
+ *
+ * <p>거절 처리(C1·Ma3): {@code PaymentService.pay}가 커밋한 거절 결과를 받아
+ * 트랜잭션 밖(facade는 트랜잭션 밖)에서 {@link PaymentDeclinedException}(402, failureReason)을 throw한다.
+ * View 핸들러가 {@code catch (BusinessException e) → flashError(e.getMessage()) + redirect}로 처리한다.
+ * (이미 커밋된 failed/이벤트를 롤백시키지 않는다)
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +41,11 @@ class PaymentFacadeImpl implements PaymentFacade {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>거절 시: {@link PaymentDeclinedException}(402, failureReason)을 throw한다(C1·Ma3).
+     * View 핸들러의 {@code catch (BusinessException e)} 절이 flashError로 처리한다.
+     *
+     * @throws PaymentDeclinedException 거절 시 402 (트랜잭션 밖에서 throw, C1)
      */
     @Override
     public PaymentResponse pay(String email, long orderId, PaymentRequest request) {
@@ -44,6 +55,12 @@ class PaymentFacadeImpl implements PaymentFacade {
                 request.amount()
         );
         PaymentService.PaymentResult result = paymentService.pay(userId, orderId, cmd);
+
+        // 거절 결과를 커밋 이후 트랜잭션 밖에서 402로 변환 (C1 — 롤백 방지)
+        if (result.declined()) {
+            throw new PaymentDeclinedException(result.failureReason());
+        }
+
         return dtoMapper.toPaymentResponse(result);
     }
 

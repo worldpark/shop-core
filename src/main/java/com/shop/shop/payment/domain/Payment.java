@@ -21,13 +21,26 @@ import java.time.Instant;
  * 신규 migration 불필요 — V1이 이미 전 필드를 포함한다.
  *
  * <p>orderId 스칼라: order Entity 직접 참조 금지(architecture-rule 모듈 경계).
- * status: 016에서 "ready"/"paid"만 사용. "failed"는 017에서 추가(markFailed).
- * method: "card"/"bank_transfer"/"virtual_account"/"mock" — 016 기본 "mock".
+ * status: "ready"/"paid"/"failed"/"cancelled"/"refunded".
+ * - "ready": 결제 시도 중(PG 호출 전 선점)
+ * - "paid": 결제 승인 완료
+ * - "failed": 결제 거절(017에서 markFailed 추가)
+ * method: "card"/"bank_transfer"/"virtual_account"/"mock" — 016 기본 "mock". (DB CHECK 허용값)
  * amount: BigDecimal(precision=12, scale=2) — 저장 정밀도 보존.
  * paidAt/pgTransactionId: nullable, 승인 시 기록.
  * created_at/updated_at: DB 트리거 소유 → BaseEntity 상속(읽기전용 매핑).
  *
- * <p>Setter 사용 금지. 정적 팩토리 {@link #create} + 의도 메서드 {@link #markPaid}.
+ * <p>Setter 사용 금지. 정적 팩토리 {@link #create} + 의도 메서드 {@link #markPaid}, {@link #markFailed}.
+ *
+ * <p>상태 전이:
+ * <ul>
+ *   <li>ready → paid: {@link #markPaid} (016 승인 경로)</li>
+ *   <li>failed → paid: {@link #markPaid} (017 재시도 승인, Ma1)</li>
+ *   <li>paid 재호출: {@link #markPaid} 멱등</li>
+ *   <li>ready → failed: {@link #markFailed} (017 거절 경로)</li>
+ *   <li>failed → failed: {@link #markFailed} 멱등(재거절 no-op)</li>
+ *   <li>paid → failed: 금지 — {@link #markFailed}에서 IllegalStateException</li>
+ * </ul>
  */
 @Entity
 @Table(name = "payments")
@@ -105,26 +118,71 @@ public class Payment extends BaseEntity {
     }
 
     /**
-     * 결제 승인 상태 전이 메서드 (ready → paid).
+     * 결제 승인 상태 전이 메서드 (ready/failed → paid).
      *
-     * <p>status가 "ready"인 결제만 "paid"로 전이할 수 있다.
-     * 이미 "paid"면 멱등 처리(재호출 무시).
+     * <p>016에서는 "ready→paid"만 허용. 017(Ma1)에서 "failed→paid" 전이를 추가 허용.
+     * 거절 후 재시도 승인 경로: failed → paid.
+     *
+     * <ul>
+     *   <li>"paid" 재호출 → 멱등(무시)</li>
+     *   <li>"ready" 또는 "failed" → "paid" 전이</li>
+     *   <li>그 외 → {@link IllegalStateException}</li>
+     * </ul>
+     *
+     * <p>Ma1: failed→paid 전이 허용으로 거절 후 재시도 승인이 가능하다.
+     * ready→paid(016 happy path)는 회귀 없이 유지된다(테스트로 보장).
      *
      * @param pgTransactionId PG 거래 번호
      * @param paidAt          결제 완료 시각
-     * @throws IllegalStateException status가 "ready"/"paid"가 아닐 때
+     * @throws IllegalStateException status가 "ready"/"failed"/"paid"가 아닐 때
      */
     public void markPaid(String pgTransactionId, Instant paidAt) {
         if ("paid".equals(this.status)) {
             // 멱등 처리 — 이미 paid면 무시
             return;
         }
-        if (!"ready".equals(this.status)) {
+        if (!"ready".equals(this.status) && !"failed".equals(this.status)) {
             throw new IllegalStateException(
-                    "결제 상태가 ready가 아니어서 paid로 전이할 수 없습니다. 현재 상태: " + this.status);
+                    "결제 상태가 ready 또는 failed가 아니어서 paid로 전이할 수 없습니다. 현재 상태: " + this.status);
         }
         this.status = "paid";
         this.pgTransactionId = pgTransactionId;
         this.paidAt = paidAt;
+    }
+
+    /**
+     * 결제 거절 상태 전이 메서드 (ready/failed → failed).
+     *
+     * <ul>
+     *   <li>"ready" → "failed" 전이</li>
+     *   <li>"failed" 재호출 → 멱등(상태 무변경 no-op, 재거절)</li>
+     *   <li>"paid" → {@link IllegalStateException}(승인된 결제를 거절로 역전이 금지)</li>
+     * </ul>
+     *
+     * <p><b>인자 현재 미영속·미사용(옵션 A)</b>: {@code failureCode}/{@code failureReason}을
+     * Entity 컬럼에 영속하지 않는다({@code payments}에 전용 컬럼 없음, 신규 migration 불필요).
+     * 이 인자들은 현재 메서드 본문에서 사용하지 않는다(상태 전이만 수행, 부작용 없음).
+     * 거절 사유는 호출부({@link com.shop.shop.payment.service.PaymentService})가
+     * 이벤트 페이로드({@code PaymentFailedEvent})·REST 402 응답에 직접 싣는다.
+     *
+     * <p><b>전이 의도·옵션 B 대비</b>: 인자를 받되 미사용인 것은 의도적 설계다.
+     * 후속 Task에서 옵션 B(사유 영속)를 도입할 때 호출부·시그니처 변경 없이
+     * 이 메서드 본문에 {@code this.failureCode = failureCode} 한 줄만 추가하면 된다.
+     *
+     * @param failureCode   실패 코드 (현재 미영속 — 옵션 A)
+     * @param failureReason 실패 사유 (현재 미영속 — 옵션 A)
+     * @throws IllegalStateException status가 "paid"일 때 (역전이 금지)
+     */
+    public void markFailed(String failureCode, String failureReason) {
+        if ("paid".equals(this.status)) {
+            throw new IllegalStateException(
+                    "승인된 결제를 거절로 역전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        if ("failed".equals(this.status)) {
+            // 멱등 처리 — 이미 failed면 no-op (재거절, 상태 무변경)
+            return;
+        }
+        // ready → failed 전이
+        this.status = "failed";
     }
 }

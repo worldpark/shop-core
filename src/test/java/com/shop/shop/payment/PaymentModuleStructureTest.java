@@ -21,6 +21,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *   <li>payment 클래스가 member 내부(domain/repository/service)를 직접 참조하지 않음 (member.spi만 허용)</li>
  *   <li>payment 클래스가 product 내부(domain/repository/service)를 직접 참조하지 않음</li>
  *   <li>OrderCompletedEvent는 order 모듈(order.event 패키지)에 위치함 (payment 모듈 미소유)</li>
+ *   <li>PaymentFailedEvent는 payment 모듈(payment.event 패키지)에 위치함 (발행 소유권, 017)</li>
  * </ol>
  */
 class PaymentModuleStructureTest {
@@ -114,6 +115,43 @@ class PaymentModuleStructureTest {
                 .that().haveSimpleName("OrderCompletedEvent")
                 .should().resideInAPackage("com.shop.shop.payment..")
                 .because("OrderCompletedEvent는 이벤트 발행 주체인 order 모듈(order.event)이 소유해야 한다.")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 5: PaymentFailedEvent는 payment 모듈(payment.event 패키지)에 위치한다(017 발행 소유권).
+     *
+     * <p>결제 실패는 payment 도메인 사건이므로 payment 모듈이 발행 소유한다(package-structure-rule).
+     * order/member/common 패키지에 위치하면 소유권이 위반된다.
+     */
+    @Test
+    @DisplayName("규칙 5: PaymentFailedEvent가 payment.event 패키지에 위치함 (017 발행 소유권)")
+    void paymentFailedEvent_resides_in_payment_event_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("PaymentFailedEvent")
+                .should().resideOutsideOfPackage("com.shop.shop.payment.event..")
+                .because("PaymentFailedEvent는 payment 모듈(payment.event)이 소유해야 한다(package-structure-rule).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 6: PaymentFailedEvent는 order/member/common 패키지에 위치하지 않는다.
+     */
+    @Test
+    @DisplayName("규칙 6: PaymentFailedEvent가 order/member/common 패키지에 위치하지 않음")
+    void paymentFailedEvent_not_in_order_or_member_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("PaymentFailedEvent")
+                .should().resideInAnyPackage(
+                        "com.shop.shop.order..",
+                        "com.shop.shop.member..",
+                        "com.shop.shop.common.."
+                )
+                .because("PaymentFailedEvent는 결제 실패 사건이므로 payment 모듈(payment.event)이 소유해야 한다.")
                 .allowEmptyShould(true);
 
         rule.check(shopClasses);

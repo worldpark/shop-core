@@ -1,7 +1,6 @@
 package com.shop.shop.order.service;
 
 import com.shop.shop.common.exception.AmountConversionException;
-import com.shop.shop.common.exception.OrderConfirmationConflictException;
 import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
@@ -43,14 +42,15 @@ import static org.mockito.Mockito.when;
  *
  * <p>검증:
  * <ul>
- *   <li>pending → paid 전이 + OrderCompletedEvent 발행</li>
- *   <li>이미 paid → 멱등 반환 (eventPublished=false, 재발행 없음)</li>
- *   <li>기타 상태 → OrderConfirmationConflictException(409)</li>
- *   <li>금액 불일치 → OrderConfirmationConflictException(409)</li>
+ *   <li>pending → paid 전이 + CONFIRMED + OrderCompletedEvent 발행</li>
+ *   <li>이미 paid → ALREADY_CONFIRMED 멱등 반환 (eventPublished=false, 재발행 없음)</li>
+ *   <li>기타 상태 → REJECTED + rejectedReason 포함 (예외 대신 값 반환)</li>
+ *   <li>금액 불일치 → REJECTED + rejectedReason 포함 (예외 대신 값 반환)</li>
  *   <li>OrderCompletedEvent 전 필드 매핑 (ArgumentCaptor)</li>
  *   <li>productName/quantity/unitPrice가 order_items 스냅샷 출처 (P4)</li>
  *   <li>금액 longValueExact 성공 / 소수부 있으면 AmountConversionException (P3)</li>
  *   <li>publishEvent 정확히 1회</li>
+ *   <li>소유권 불일치 → OrderNotFoundException(404) throw 유지</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -78,7 +78,7 @@ class OrderConfirmationImplTest {
     }
 
     @Test
-    @DisplayName("pending → paid 전이 + OrderCompletedEvent 발행")
+    @DisplayName("pending → paid 전이 + CONFIRMED + OrderCompletedEvent 발행")
     void confirmPaid_pendingToPaid_publishesEvent() {
         // given
         Order order = buildOrder(USER_ID, ORDER_NUMBER, AMOUNT, "pending");
@@ -95,8 +95,9 @@ class OrderConfirmationImplTest {
         OrderConfirmationResult result = orderConfirmation.confirmPaid(ORDER_ID, USER_ID, AMOUNT);
 
         // then
-        assertThat(result.confirmed()).isTrue();
+        assertThat(result.outcome()).isEqualTo(OrderConfirmation.Outcome.CONFIRMED);
         assertThat(result.eventPublished()).isTrue();
+        assertThat(result.rejectedReason()).isNull();
         verify(eventPublisher, times(1)).publishEvent(any(OrderCompletedEvent.class));
     }
 
@@ -169,7 +170,7 @@ class OrderConfirmationImplTest {
     }
 
     @Test
-    @DisplayName("이미 paid → 멱등 반환 (eventPublished=false, 재발행 없음)")
+    @DisplayName("이미 paid → ALREADY_CONFIRMED 멱등 반환 (eventPublished=false, 재발행 없음)")
     void confirmPaid_alreadyPaid_idempotentReturn() {
         // given
         Order order = buildOrder(USER_ID, ORDER_NUMBER, AMOUNT, "paid");
@@ -179,34 +180,45 @@ class OrderConfirmationImplTest {
         OrderConfirmationResult result = orderConfirmation.confirmPaid(ORDER_ID, USER_ID, AMOUNT);
 
         // then
-        assertThat(result.confirmed()).isTrue();
+        assertThat(result.outcome()).isEqualTo(OrderConfirmation.Outcome.ALREADY_CONFIRMED);
         assertThat(result.eventPublished()).isFalse();
+        assertThat(result.rejectedReason()).isNull();
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("pending 외 상태 → OrderConfirmationConflictException(409)")
-    void confirmPaid_nonPendingNonPaid_throwsConflict() {
+    @DisplayName("pending 외 상태 → REJECTED + rejectedReason 포함 (예외 대신 값 반환)")
+    void confirmPaid_nonPendingNonPaid_returnsRejected() {
         // given
         Order order = buildOrder(USER_ID, ORDER_NUMBER, AMOUNT, "cancelled");
         when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
-        // when & then
-        assertThatThrownBy(() -> orderConfirmation.confirmPaid(ORDER_ID, USER_ID, AMOUNT))
-                .isInstanceOf(OrderConfirmationConflictException.class);
+        // when
+        OrderConfirmationResult result = orderConfirmation.confirmPaid(ORDER_ID, USER_ID, AMOUNT);
+
+        // then
+        assertThat(result.outcome()).isEqualTo(OrderConfirmation.Outcome.REJECTED);
+        assertThat(result.eventPublished()).isFalse();
+        assertThat(result.rejectedReason()).isNotBlank();
+        assertThat(result.rejectedReason()).contains("cancelled");
         verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("금액 불일치 → OrderConfirmationConflictException(409)")
-    void confirmPaid_amountMismatch_throwsConflict() {
+    @DisplayName("금액 불일치 → REJECTED + rejectedReason 포함 (예외 대신 값 반환)")
+    void confirmPaid_amountMismatch_returnsRejected() {
         // given
         Order order = buildOrder(USER_ID, ORDER_NUMBER, AMOUNT, "pending");
         when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
 
-        // when & then
-        assertThatThrownBy(() -> orderConfirmation.confirmPaid(ORDER_ID, USER_ID, BigDecimal.valueOf(9999)))
-                .isInstanceOf(OrderConfirmationConflictException.class);
+        // when
+        OrderConfirmationResult result = orderConfirmation.confirmPaid(ORDER_ID, USER_ID, BigDecimal.valueOf(9999));
+
+        // then
+        assertThat(result.outcome()).isEqualTo(OrderConfirmation.Outcome.REJECTED);
+        assertThat(result.eventPublished()).isFalse();
+        assertThat(result.rejectedReason()).isNotBlank();
+        assertThat(result.rejectedReason()).contains("금액");
         verify(eventPublisher, never()).publishEvent(any());
     }
 
