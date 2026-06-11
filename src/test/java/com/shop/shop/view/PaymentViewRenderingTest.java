@@ -310,7 +310,8 @@ class PaymentViewRenderingTest {
                 BigDecimal.ZERO,
                 new BigDecimal("30000"),
                 address,
-                Instant.parse("2026-01-01T12:00:00Z")
+                Instant.parse("2026-01-01T12:00:00Z"),
+                List.of()
         );
     }
 

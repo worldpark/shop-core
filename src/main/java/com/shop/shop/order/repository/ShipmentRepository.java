@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Shipment JPA Repository.
@@ -15,6 +16,20 @@ import java.util.List;
  * <p>ShipmentItem 조회도 이 리포지토리에 통합한다 (별도 ShipmentItemRepository 불필요).
  */
 public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
+
+    /**
+     * shipmentId → orderId 스칼라 projection (정합1 — 락 전 orderId 획득용).
+     *
+     * <p>ship 흐름에서 orderId를 알기 위해 엔티티 적재 없이 스칼라만 반환한다.
+     * {@code findById(...).getOrderId()} 대신 반드시 이 메서드를 사용해야 한다.
+     * 엔티티를 락 전에 적재하면 JPA 1차 캐시가 stale 상태를 보관해 동시 ship 시
+     * 이벤트 중복 발행이 발생한다(정합1 — stale read 차단).
+     *
+     * @param id 배송 ID
+     * @return orderId (배송 미존재 시 empty)
+     */
+    @Query("select s.orderId from Shipment s where s.id = :id")
+    Optional<Long> findOrderIdById(@Param("id") long id);
 
     /**
      * 주문별 배송 목록 조회.

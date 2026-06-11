@@ -3,23 +3,32 @@ package com.shop.shop.order.service;
 import com.shop.shop.common.exception.InvalidShipmentItemException;
 import com.shop.shop.common.exception.OrderFulfillmentConflictException;
 import com.shop.shop.common.exception.OrderNotFoundException;
+import com.shop.shop.common.exception.ShipmentNotFoundException;
+import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.order.domain.Order;
 import com.shop.shop.order.domain.OrderItem;
 import com.shop.shop.order.domain.Shipment;
 import com.shop.shop.order.domain.ShipmentItem;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
+import com.shop.shop.order.event.ShippingStartedEvent;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
+import com.shop.shop.product.spi.ProductOrderCatalog;
+import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -29,15 +38,13 @@ import java.util.stream.Collectors;
  * {@code AdminOrderFulfillmentFacadeImpl}({@code order/service})가 다른 패키지에서 직접 호출하므로
  * public이어야 한다.
  *
- * <p>의존: {@link OrderRepository}·{@link ShipmentRepository}만 — 결제/재고/이벤트 의존 0.
- * 배송 생성은 외부계(payment/inventory/Kafka)와 무관하다 (새 cross-module 의존 0).
+ * <p>의존: {@link OrderRepository}·{@link ShipmentRepository}·{@link MemberDirectory}·
+ * {@link ProductOrderCatalog}·{@link ApplicationEventPublisher}.
+ * 배송 시작은 member.spi(연락처 해석) + product.spi(productId 해석) + Outbox 이벤트 발행이 필요하다.
+ * 새 cross-module 의존은 없으며 기존 단방향 의존(order → member.spi / order → product.spi)만 사용한다.
  *
  * <p>관리자 단일 주체 — 소유권 검사 불요 (ROLE_ADMIN 전역 권한 보장).
  * 미존재 주문은 평범한 404 반환 (관리자 경로 — 존재 은닉 불요).
- *
- * <p><b>본 Task(019)는 preparing 생성 + paid→preparing rollup까지만 구현한다.</b>
- * shipping/delivered 전이·ShippingStartedEvent 발행은 020/021 소관.
- * 이벤트 발행 0 — event_publication 무변화.
  */
 @Slf4j
 @Service
@@ -47,6 +54,9 @@ public class OrderFulfillmentService {
 
     private final OrderRepository orderRepository;
     private final ShipmentRepository shipmentRepository;
+    private final MemberDirectory memberDirectory;
+    private final ProductOrderCatalog productOrderCatalog;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 배송 생성 — 주문 row 비관락 + 상태/항목 검증 + Shipment/ShipmentItem 생성 + rollup.
@@ -180,6 +190,9 @@ public class OrderFulfillmentService {
                 shipment.getId(),
                 orderId,
                 shipment.getStatus(),
+                null, // carrier: preparing 단계 null
+                null, // trackingNumber: preparing 단계 null
+                null, // shippedAt: preparing 단계 null
                 itemResponses
         );
     }
@@ -239,6 +252,242 @@ public class OrderFulfillmentService {
                 shipment.getId(),
                 shipment.getOrderId(),
                 shipment.getStatus(),
+                shipment.getCarrier(),
+                shipment.getTrackingNumber(),
+                shipment.getShippedAt(),
+                itemResponses
+        );
+    }
+
+    /**
+     * 배송 시작 — 주문 row 비관락 + 상태 재검증 + shipment 전이 + rollup + ShippingStartedEvent 발행.
+     *
+     * <p>처리 흐름(정합1 락 순서):
+     * <ol>
+     *   <li>orderId 스칼라 projection {@link ShipmentRepository#findOrderIdById(long)} — 엔티티 적재 금지.
+     *       empty → {@link ShipmentNotFoundException}(404)</li>
+     *   <li>주문 row {@code PESSIMISTIC_WRITE} 잠금 — 동시 ship·018 취소와 직렬화</li>
+     *   <li><b>락 후</b> shipment 엔티티 최초 적재({@code findById}) — 항상 fresh, stale read 방지</li>
+     *   <li>상태 재검증:
+     *     <ul>
+     *       <li>주문 {@code cancelled}/{@code refunded} → {@link OrderFulfillmentConflictException}(409)</li>
+     *       <li>방어 가드(개선5): 주문 status ∉ {preparing, shipping} → 409</li>
+     *       <li>shipment 이미 {@code shipping} → 멱등 200(markShipping·이벤트 미실행, 기존 값 유지=정합4)</li>
+     *       <li>shipment {@code delivered}/역방향 → 409</li>
+     *       <li>{@code preparing}이면 진행</li>
+     *     </ul>
+     *   </li>
+     *   <li>시각 1회 캡처(개선4): {@code Instant now} — shippedAt/occurredAt 동일 값</li>
+     *   <li>P2 사전검증: variantId null → 409, 스냅샷 미반환(행 삭제) → 409.
+     *       비활성·품절은 통과(정합5). 만든 variantId→productId 맵을 이벤트 빌더 재사용(개선1)</li>
+     *   <li>전이: {@code shipment.markShipping(carrier, trackingNumber, now)} +
+     *       rollup: 주문 preparing이면 {@code order.markShipping()}(이미 shipping이면 생략 — 멀티 배송)</li>
+     *   <li>이벤트 구성·발행(Outbox)</li>
+     *   <li>커밋 → 200 + 갱신 {@link ShipmentResponse}</li>
+     * </ol>
+     *
+     * @param shipmentId     배송 ID
+     * @param carrier        택배사명
+     * @param trackingNumber 운송장 번호
+     * @return 갱신된 배송 응답 DTO
+     * @throws ShipmentNotFoundException         미존재 배송 (404)
+     * @throws OrderFulfillmentConflictException 상태 충돌·취소/환불 주문·P2 해석 불가 (409)
+     */
+    public ShipmentResponse ship(long shipmentId, String carrier, String trackingNumber) {
+        // 1. orderId 스칼라 projection (정합1 — 엔티티 적재 금지)
+        long orderId = shipmentRepository.findOrderIdById(shipmentId)
+                .orElseThrow(ShipmentNotFoundException::new);
+
+        // 2. 주문 row PESSIMISTIC_WRITE 잠금 (동시 ship·018 취소와 직렬화)
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        // 3. 락 후 shipment 엔티티 최초 적재 (fresh — stale read 방지, 정합1)
+        Shipment shipment = shipmentRepository.findById(shipmentId)
+                .orElseThrow(ShipmentNotFoundException::new);
+
+        // 4. 상태 재검증 (부작용 전 throw)
+        String orderStatus = order.getStatus();
+        if ("cancelled".equals(orderStatus) || "refunded".equals(orderStatus)) {
+            log.warn("배송 시작 불가 — 취소/환불 주문: orderId={}, status={}", orderId, orderStatus);
+            throw new OrderFulfillmentConflictException(
+                    "취소 또는 환불된 주문의 배송을 시작할 수 없습니다.");
+        }
+        // 방어 가드(개선5): 정상 흐름에서 주문은 preparing/shipping이어야 함
+        if (!"preparing".equals(orderStatus) && !"shipping".equals(orderStatus)) {
+            log.warn("배송 시작 불가 — 불일치 주문 상태(방어 가드): orderId={}, status={}", orderId, orderStatus);
+            throw new OrderFulfillmentConflictException(
+                    "주문 상태(" + orderStatus + ")에서 배송을 시작할 수 없습니다.");
+        }
+
+        String shipmentStatus = shipment.getStatus();
+        if ("shipping".equals(shipmentStatus)) {
+            // 멱등: 이미 shipping → markShipping·이벤트 미실행, 기존 값 반환 (정합4)
+            log.info("배송 이미 시작됨 — 멱등 반환: shipmentId={}, orderId={}", shipmentId, orderId);
+            return buildShipmentResponse(shipment, order);
+        }
+        if (!"preparing".equals(shipmentStatus)) {
+            // delivered/역방향 → 409
+            log.warn("배송 시작 불가 — 잘못된 전이: shipmentId={}, status={}", shipmentId, shipmentStatus);
+            throw new OrderFulfillmentConflictException(
+                    "배송 상태(" + shipmentStatus + ")에서 배송을 시작할 수 없습니다.");
+        }
+
+        // 5. 시각 1회 캡처 (개선4 — shippedAt/occurredAt 동일 값)
+        Instant now = Instant.now();
+
+        // 6. P2 사전검증: variantId→productId 해석 (정합5 — 비활성·품절은 통과)
+        List<ShipmentItem> shipmentItems = shipment.getItems();
+        Map<Long, OrderItem> orderItemMap = order.getItems().stream()
+                .collect(Collectors.toMap(OrderItem::getId, item -> item));
+
+        // shipment 항목의 orderItem 목록
+        List<OrderItem> targetOrderItems = shipmentItems.stream()
+                .map(si -> orderItemMap.get(si.getOrderItemId()))
+                .filter(item -> item != null)
+                .toList();
+
+        // variantId null 검증 (FK SET NULL — variant 행 삭제)
+        boolean hasNullVariant = targetOrderItems.stream()
+                .anyMatch(item -> item.getVariantId() == null);
+        if (hasNullVariant) {
+            log.warn("배송 시작 불가 — variantId null(P2): shipmentId={}", shipmentId);
+            throw new OrderFulfillmentConflictException(
+                    "배송 항목의 상품 정보를 해석할 수 없습니다(variantId null). 배송을 시작할 수 없습니다.");
+        }
+
+        List<Long> variantIds = targetOrderItems.stream()
+                .map(OrderItem::getVariantId)
+                .distinct()
+                .toList();
+
+        // 스냅샷 조회 (개선1 — 이벤트 빌더에 재사용)
+        Map<Long, Long> variantToProductId;
+        if (variantIds.isEmpty()) {
+            variantToProductId = Map.of();
+        } else {
+            List<OrderableVariantSnapshot> snapshots = productOrderCatalog.getOrderableSnapshots(variantIds);
+            variantToProductId = snapshots.stream()
+                    .collect(Collectors.toMap(OrderableVariantSnapshot::variantId, OrderableVariantSnapshot::productId));
+            // 스냅샷 미반환 = 행 삭제 → 409 (비활성·품절은 거부 안 함, 정합5)
+            boolean hasMissingSnapshot = variantIds.stream()
+                    .anyMatch(vid -> !variantToProductId.containsKey(vid));
+            if (hasMissingSnapshot) {
+                log.warn("배송 시작 불가 — 스냅샷 미반환(P2): shipmentId={}", shipmentId);
+                throw new OrderFulfillmentConflictException(
+                        "배송 항목의 상품 정보를 해석할 수 없습니다(variant 삭제됨). 배송을 시작할 수 없습니다.");
+            }
+        }
+
+        // 7. 전이: preparing → shipping
+        shipment.markShipping(carrier, trackingNumber, now);
+        log.info("배송 전이 preparing→shipping: shipmentId={}, orderId={}", shipmentId, orderId);
+
+        // rollup: 주문 preparing이면 shipping으로 (이미 shipping이면 생략 — 멀티 배송)
+        if ("preparing".equals(orderStatus)) {
+            order.markShipping();
+            log.info("주문 rollup preparing→shipping: orderId={}", orderId);
+        }
+
+        // 8. 이벤트 구성·발행 (Outbox, 개선1 — variantToProductId 재사용)
+        ShippingStartedEvent event = buildShippingStartedEvent(order, shipment, orderItemMap, variantToProductId, now);
+        log.info("ShippingStartedEvent 발행 시도: eventId={}, topic={}, orderId={}, shipmentId={}",
+                event.eventId(), ShippingStartedEvent.TOPIC, orderId, shipmentId);
+        eventPublisher.publishEvent(event);
+        log.info("ShippingStartedEvent 발행 성공: eventId={}, topic={}", event.eventId(), ShippingStartedEvent.TOPIC);
+
+        // 9. 갱신된 ShipmentResponse 반환
+        log.info("배송 시작 완료: orderId={}, shipmentId={}", orderId, shipmentId);
+        return buildShipmentResponse(shipment, order);
+    }
+
+    /**
+     * ShippingStartedEvent 페이로드 구성 (개선1 — variantToProductId 재사용).
+     *
+     * <p>member 연락처는 member.spi, item productId는 P2에서 만든 variantToProductId 맵 재사용.
+     * productName/quantity는 order_items 스냅샷(주문 시점 값). items[]는 이 배송분만.
+     * OrderConfirmationImpl.buildOrderCompletedEvent 동형.
+     *
+     * @param order              잠금 보유 주문 엔티티
+     * @param shipment           상태 전이된 배송 엔티티
+     * @param orderItemMap       orderItemId → OrderItem 맵
+     * @param variantToProductId variantId → productId 맵 (P2에서 조회, 재사용)
+     * @param now                시각 캡처 (shippedAt = occurredAt, 개선4)
+     * @return 구성된 이벤트
+     */
+    private ShippingStartedEvent buildShippingStartedEvent(
+            Order order, Shipment shipment,
+            Map<Long, OrderItem> orderItemMap, Map<Long, Long> variantToProductId, Instant now) {
+
+        // member 연락처 조회 (member.spi)
+        MemberContact contact = memberDirectory.findContactByUserId(order.getUserId());
+
+        // items[] 구성 (이 배송분만 — shipment.getItems())
+        List<ShippingStartedEvent.Item> eventItems = shipment.getItems().stream()
+                .map(si -> {
+                    OrderItem orderItem = orderItemMap.get(si.getOrderItemId());
+                    if (orderItem == null) {
+                        // 시스템 불변식 위반 — shipment_items는 항상 order_items와 연결되어야 함
+                        throw new com.shop.shop.common.exception.OrderFulfillmentConflictException(
+                                "배송 항목과 주문 항목 매핑에 실패했습니다. 시스템 불변식 위반.");
+                    }
+                    Long productId = variantToProductId.get(orderItem.getVariantId());
+                    if (productId == null) {
+                        // P2 통과 후 발생 불가 — 방어적 처리
+                        throw new com.shop.shop.common.exception.OrderFulfillmentConflictException(
+                                "배송 항목의 productId 해석에 실패했습니다. 시스템 불변식 위반.");
+                    }
+                    return new ShippingStartedEvent.Item(
+                            productId,
+                            orderItem.getProductName(),
+                            orderItem.getQuantity()
+                    );
+                })
+                .toList();
+
+        return new ShippingStartedEvent(
+                UUID.randomUUID(),
+                now,           // occurredAt = shippedAt (개선4)
+                order.getId(),
+                order.getOrderNumber(),
+                shipment.getId(),
+                order.getUserId(),
+                contact.email(),
+                contact.name(),
+                shipment.getCarrier(),
+                shipment.getTrackingNumber(),
+                eventItems,
+                now            // shippedAt = occurredAt (개선4)
+        );
+    }
+
+    /**
+     * Shipment + Order → ShipmentResponse DTO 변환 (ship 결과 반환용).
+     *
+     * <p>orderItemMap을 공유하기 위해 Order를 받아 처리한다.
+     */
+    private ShipmentResponse buildShipmentResponse(Shipment shipment, Order order) {
+        Map<Long, OrderItem> orderItemMap = order.getItems().stream()
+                .collect(Collectors.toMap(OrderItem::getId, item -> item));
+
+        List<ShipmentItemResponse> itemResponses = shipment.getItems().stream()
+                .map(si -> {
+                    OrderItem orderItem = orderItemMap.get(si.getOrderItemId());
+                    return new ShipmentItemResponse(
+                            si.getOrderItemId(),
+                            orderItem != null ? orderItem.getProductName() : "",
+                            orderItem != null ? orderItem.getQuantity() : 0
+                    );
+                })
+                .toList();
+
+        return new ShipmentResponse(
+                shipment.getId(),
+                shipment.getOrderId(),
+                shipment.getStatus(),
+                shipment.getCarrier(),
+                shipment.getTrackingNumber(),
+                shipment.getShippedAt(),
                 itemResponses
         );
     }

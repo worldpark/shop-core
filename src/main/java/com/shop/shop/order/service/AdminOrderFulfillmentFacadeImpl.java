@@ -92,6 +92,17 @@ class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
         return orderFulfillmentService.createShipment(orderId, orderItemIds);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>BusinessException(404/409)은 변환 없이 그대로 전파한다 (web이 catch → flashError).
+     */
+    @Override
+    @Transactional
+    public ShipmentResponse ship(long shipmentId, String carrier, String trackingNumber) {
+        return orderFulfillmentService.ship(shipmentId, carrier, trackingNumber);
+    }
+
     // ============================================================
     // 변환 헬퍼
     // ============================================================
@@ -149,6 +160,9 @@ class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
                 shipment.getId(),
                 shipment.getOrderId(),
                 shipment.getStatus(),
+                shipment.getCarrier(),
+                shipment.getTrackingNumber(),
+                shipment.getShippedAt(),
                 itemResponses
         );
     }

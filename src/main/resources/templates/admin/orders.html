@@ -42,11 +42,64 @@
                 <h3 class="section-title">배송 현황</h3>
                 <div th:each="s : ${o.shipments}" class="shipment-item">
                     <span class="shipment-id" th:text="'배송 #' + ${s.shipmentId}"></span>
-                    <span class="shipment-status" th:text="${s.status}"></span>
+                    <span class="shipment-status"
+                          th:with="statusLabel=(${s.status} == 'preparing' ? '배송 준비 중' :
+                                               (${s.status} == 'shipping' ? '배송 중' :
+                                               (${s.status} == 'delivered' ? '배송 완료' : ${s.status})))"
+                          th:text="${statusLabel}"></span>
                     <ul class="shipment-items-list">
                         <li th:each="si : ${s.items}"
                             th:text="${si.productName} + ' x' + ${si.quantity}"></li>
                     </ul>
+
+                    <!--
+                        shipping 배송: 택배사·운송장·배송시작시각 읽기 전용 표시.
+                        shippedAt은 Asia/Seoul 기준으로 포맷.
+                    -->
+                    <div class="shipment-tracking" th:if="${s.status == 'shipping'}">
+                        <div class="tracking-row">
+                            <span class="tracking-label">택배사:</span>
+                            <span class="tracking-value" th:text="${s.carrier}"></span>
+                        </div>
+                        <div class="tracking-row">
+                            <span class="tracking-label">운송장번호:</span>
+                            <span class="tracking-value" th:text="${s.trackingNumber}"></span>
+                        </div>
+                        <div class="tracking-row" th:if="${s.shippedAt != null}">
+                            <span class="tracking-label">배송 시작:</span>
+                            <span class="tracking-value"
+                                  th:text="${#temporals.format(s.shippedAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}"></span>
+                        </div>
+                    </div>
+
+                    <!--
+                        배송 시작 폼: preparing 배송에만 노출.
+                        POST /admin/shipments/{shipmentId}/ship (절대경로 — 클래스 매핑과 base path 다름, plan C3).
+                        th:action 사용 시 _csrf 토큰 자동 주입 (Thymeleaf + Spring Security).
+                    -->
+                    <div class="ship-form-section" th:if="${s.status == 'preparing'}">
+                        <form class="ship-start-form"
+                              method="post"
+                              th:action="@{/admin/shipments/{id}/ship(id=${s.shipmentId})}">
+                            <div class="form-group">
+                                <label th:for="'carrier-' + ${s.shipmentId}">택배사</label>
+                                <input type="text"
+                                       th:id="'carrier-' + ${s.shipmentId}"
+                                       name="carrier"
+                                       placeholder="예: CJ대한통운"
+                                       required>
+                            </div>
+                            <div class="form-group">
+                                <label th:for="'trackingNumber-' + ${s.shipmentId}">운송장번호</label>
+                                <input type="text"
+                                       th:id="'trackingNumber-' + ${s.shipmentId}"
+                                       name="trackingNumber"
+                                       placeholder="운송장 번호 입력"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">배송 시작</button>
+                        </form>
+                    </div>
                 </div>
             </div>
 

@@ -201,6 +201,30 @@ public class Order extends BaseEntity {
     }
 
     /**
+     * 배송 시작 rollup — preparing → shipping (첫 배송 시작 시).
+     *
+     * <p>배송이 시작되었음을 주문 status에 rollup으로 반영한다.
+     * 멀티 배송에서 둘째 배송 ship 시 주문이 이미 "shipping"이면
+     * 서비스가 이 메서드 호출을 생략한다(정합3 — 이미 shipping이면 skip).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"preparing" → "shipping" 전이 (첫 배송 시작)</li>
+     *   <li>그 외("paid"/"shipping"/이후 상태) → {@link IllegalStateException}
+     *       (상위 OrderFulfillmentService가 이미 차단하므로 정상 흐름 미발생 — 방어적)</li>
+     * </ul>
+     *
+     * @throws IllegalStateException status가 "preparing"이 아닐 때
+     */
+    public void markShipping() {
+        if (!"preparing".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 preparing이 아니어서 shipping으로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "shipping";
+    }
+
+    /**
      * 배송 생성 rollup — paid → preparing (첫 배송 생성 시).
      *
      * <p>배송 이행이 시작되었음을 주문 status에 rollup으로 반영한다.

@@ -4,6 +4,7 @@ import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
 import com.shop.shop.common.dto.PageResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -41,7 +42,7 @@ public class OrderServiceResponse {
         long userId = (long) authentication.getPrincipal();
         OrderService.OrderResult result = orderService.placeOrder(userId, request);
         OrderService.OrderDetail detail = orderService.getMyOrder(userId, result.orderId());
-        return dtoMapper.toOrderResponse(detail);
+        return dtoMapper.toOrderResponse(detail, List.of());
     }
 
     /**
@@ -70,6 +71,6 @@ public class OrderServiceResponse {
     public OrderResponse getMyOrder(Authentication authentication, long orderId) {
         long userId = (long) authentication.getPrincipal();
         OrderService.OrderDetail detail = orderService.getMyOrder(userId, orderId);
-        return dtoMapper.toOrderResponse(detail);
+        return dtoMapper.toOrderResponse(detail, List.of());
     }
 }

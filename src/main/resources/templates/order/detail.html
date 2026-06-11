@@ -208,6 +208,56 @@
             </div>
         </section>
 
+        <!-- 배송 목록 블록: order.shipments가 있을 때만 표시 -->
+        <section class="order-detail-shipments"
+                 th:if="${order.shipments != null and !order.shipments.isEmpty()}">
+            <h2 class="section-title">배송 정보</h2>
+            <div th:each="shipment : ${order.shipments}" class="shipment-block">
+                <div class="order-detail-row">
+                    <span class="order-detail-label">배송 번호:</span>
+                    <span class="order-detail-value" th:text="'배송 #' + ${shipment.shipmentId}">배송 #1</span>
+                </div>
+                <div class="order-detail-row">
+                    <span class="order-detail-label">배송 상태:</span>
+                    <span class="order-detail-value badge-shipment-status"
+                          th:with="shipStatusLabel=(${shipment.status} == 'preparing' ? '배송 준비 중' :
+                                                   (${shipment.status} == 'shipping' ? '배송 중' :
+                                                   (${shipment.status} == 'delivered' ? '배송 완료' : ${shipment.status})))"
+                          th:text="${shipStatusLabel}">배송 준비 중</span>
+                </div>
+
+                <!-- 포함 항목 목록 -->
+                <div class="shipment-items-block" th:if="${!shipment.items.isEmpty()}">
+                    <span class="order-detail-label">포함 상품:</span>
+                    <ul class="shipment-item-list">
+                        <li th:each="si : ${shipment.items}"
+                            th:text="${si.productName} + ' x' + ${si.quantity}">상품명 x1</li>
+                    </ul>
+                </div>
+
+                <!--
+                    shipping 배송: 택배사·운송장·배송시작시각 읽기 전용 표시.
+                    preparing 배송은 이 블록 미노출 (추적정보 null).
+                    seller_id 등 내부 필드 미표시 (ShipmentResponse에 애초에 없음).
+                -->
+                <div class="shipment-tracking-info" th:if="${shipment.status == 'shipping'}">
+                    <div class="order-detail-row">
+                        <span class="order-detail-label">택배사:</span>
+                        <span class="order-detail-value" th:text="${shipment.carrier}">-</span>
+                    </div>
+                    <div class="order-detail-row">
+                        <span class="order-detail-label">운송장번호:</span>
+                        <span class="order-detail-value" th:text="${shipment.trackingNumber}">-</span>
+                    </div>
+                    <div class="order-detail-row" th:if="${shipment.shippedAt != null}">
+                        <span class="order-detail-label">배송 시작:</span>
+                        <span class="order-detail-value"
+                              th:text="${#temporals.format(shipment.shippedAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01 00:00:00</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- 취소/환불 완료 안내: cancelled 또는 refunded 상태에서 표시 -->
         <section class="order-detail-cancelled-notice"
                  th:if="${order.status == 'cancelled' or order.status == 'refunded'}">

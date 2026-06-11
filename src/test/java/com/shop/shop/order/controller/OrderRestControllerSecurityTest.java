@@ -307,7 +307,8 @@ class OrderRestControllerSecurityTest {
                 List.of(),
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("10000"),
                 new ShippingAddressResponse("홍길동", "010-1234-5678", "12345", "서울시 강남구", "101호"),
-                Instant.now()
+                Instant.now(),
+                List.of()
         );
     }
 }

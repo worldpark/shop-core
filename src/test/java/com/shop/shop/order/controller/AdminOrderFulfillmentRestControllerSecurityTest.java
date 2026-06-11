@@ -138,7 +138,7 @@ class AdminOrderFulfillmentRestControllerSecurityTest {
     @DisplayName("POST /api/v1/admin/orders/{id}/shipments — ADMIN → 201 + ShipmentResponse(status=preparing)")
     void create_admin_returns_201() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
-                100L, 1L, "preparing",
+                100L, 1L, "preparing", null, null, null,
                 List.of(new ShipmentItemResponse(10L, "상품A", 2)));
 
         when(orderFulfillmentService.createShipment(anyLong(), anyList()))
@@ -162,7 +162,7 @@ class AdminOrderFulfillmentRestControllerSecurityTest {
     @DisplayName("POST body 생략(null) → ADMIN 성공 201 (미발송 전부 배송 생성)")
     void create_noBody_admin_returns_201() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
-                101L, 1L, "preparing", List.of());
+                101L, 1L, "preparing", null, null, null, List.of());
 
         when(orderFulfillmentService.createShipment(anyLong(), anyList()))
                 .thenReturn(mockResponse);
@@ -248,7 +248,7 @@ class AdminOrderFulfillmentRestControllerSecurityTest {
     void list_admin_returns_200() throws Exception {
         when(orderFulfillmentService.getShipments(1L))
                 .thenReturn(List.of(
-                        new ShipmentResponse(100L, 1L, "preparing",
+                        new ShipmentResponse(100L, 1L, "preparing", null, null, null,
                                 List.of(new ShipmentItemResponse(10L, "상품A", 1)))));
 
         mockMvc.perform(get("/api/v1/admin/orders/1/shipments")
@@ -334,7 +334,7 @@ class AdminOrderFulfillmentRestControllerSecurityTest {
     @DisplayName("응답 status는 lowercase(preparing) — 대문자 미사용")
     void create_responseStatusIsLowercase() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
-                100L, 1L, "preparing", List.of());
+                100L, 1L, "preparing", null, null, null, List.of());
         when(orderFulfillmentService.createShipment(anyLong(), anyList()))
                 .thenReturn(mockResponse);
         when(orderFulfillmentService.createShipment(anyLong(), org.mockito.ArgumentMatchers.isNull()))

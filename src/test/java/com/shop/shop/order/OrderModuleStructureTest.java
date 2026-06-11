@@ -252,4 +252,26 @@ class OrderModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 020 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 11: ShippingStartedEvent가 order.event 패키지에 위치한다 (020).
+     *
+     * <p>배송 시작 이벤트의 소유권은 order 모듈이다.
+     * OrderCompletedEvent/OrderCancelledEvent와 동일한 원칙.
+     */
+    @Test
+    @DisplayName("규칙 11: ShippingStartedEvent가 order.event 패키지에 위치함 (020)")
+    void shippingStartedEvent_resides_in_order_event_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("ShippingStartedEvent")
+                .should().resideOutsideOfPackage("com.shop.shop.order.event..")
+                .because("ShippingStartedEvent는 이벤트 발행 주체인 order 모듈(order.event)이 소유해야 한다(020).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

@@ -4,6 +4,7 @@ import com.shop.shop.order.dto.OrderItemOptionValueResponse;
 import com.shop.shop.order.dto.OrderItemResponse;
 import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
+import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.dto.ShippingAddressResponse;
 import com.shop.shop.order.service.OrderService.OrderDetail;
 import com.shop.shop.order.service.OrderService.OrderItemDetail;
@@ -23,9 +24,15 @@ import java.util.List;
 class OrderDtoMapper {
 
     /**
-     * OrderDetail(내부 타입) → OrderResponse(응답 DTO).
+     * OrderDetail(내부 타입) + shipments 목록 → OrderResponse(응답 DTO).
+     *
+     * <p>020 개선2: OrderResponse에 shipments 추가됨. facade에서 shipments를 합성해 전달한다.
+     * OrderService.OrderDetail은 배송 정보를 모르므로 facade가 getShipments를 호출해 합성.
+     *
+     * @param detail   주문 상세 내부 타입
+     * @param shipments 배송 목록 (facade에서 getShipments로 조회)
      */
-    OrderResponse toOrderResponse(OrderDetail detail) {
+    OrderResponse toOrderResponse(OrderDetail detail, List<ShipmentResponse> shipments) {
         List<OrderItemResponse> itemResponses = detail.items().stream()
                 .map(this::toOrderItemResponse)
                 .toList();
@@ -48,7 +55,8 @@ class OrderDtoMapper {
                 detail.shippingFee(),
                 detail.finalAmount(),
                 shippingAddress,
-                detail.createdAt()
+                detail.createdAt(),
+                shipments
         );
     }
 

@@ -48,7 +48,15 @@
                     <tr th:each="o : ${orders.content}" class="order-row">
                         <td class="order-number" th:text="${o.orderNumber}">ORD-...</td>
                         <td class="order-status">
-                            <span class="badge-order-status" th:text="${o.status}">pending</span>
+                            <span class="badge-order-status"
+                                  th:with="statusLabel=(${o.status} == 'pending' ? '결제 대기' :
+                                                       (${o.status} == 'paid' ? '결제 완료' :
+                                                       (${o.status} == 'preparing' ? '상품 준비 중' :
+                                                       (${o.status} == 'shipping' ? '배송 중' :
+                                                       (${o.status} == 'delivered' ? '배송 완료' :
+                                                       (${o.status} == 'cancelled' ? '취소됨' :
+                                                       (${o.status} == 'refunded' ? '환불됨' : ${o.status})))))))"
+                                  th:text="${statusLabel}">pending</span>
                         </td>
                         <td class="order-representative-item" th:text="${o.representativeItemName}">상품명</td>
                         <td class="order-item-count" th:text="${o.itemCount} + '건'">1건</td>

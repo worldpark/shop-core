@@ -10,6 +10,7 @@ import com.shop.shop.order.dto.OrderItemOptionValueResponse;
 import com.shop.shop.order.dto.OrderItemResponse;
 import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
+import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.product.spi.ProductOrderCatalog;
 import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
@@ -45,6 +46,7 @@ class OrderFacadeImpl implements OrderFacade {
     private final MemberDirectory memberDirectory;
     private final CartCheckoutReader cartCheckoutReader;
     private final ProductOrderCatalog productOrderCatalog;
+    private final OrderFulfillmentService orderFulfillmentService;
     private final OrderDtoMapper dtoMapper;
 
     /**
@@ -112,13 +114,15 @@ class OrderFacadeImpl implements OrderFacade {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>주문 생성 직후 배송은 0건이므로 shipments=List.of() 전달(개선2).
      */
     @Override
     public OrderResponse createOrder(String email, OrderCreateRequest request) {
         long userId = memberDirectory.findUserIdByEmail(email);
         OrderService.OrderResult result = orderService.placeOrder(userId, request);
         OrderService.OrderDetail detail = orderService.getMyOrder(userId, result.orderId());
-        return dtoMapper.toOrderResponse(detail);
+        return dtoMapper.toOrderResponse(detail, List.of());
     }
 
     /**
@@ -133,11 +137,16 @@ class OrderFacadeImpl implements OrderFacade {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>소유권 검증(getMyOrder) 통과 후 배송 목록을 합성한다(C5 — OrderDetail은 배송 정보 미포함).
+     * getShipments는 별도 readOnly 트랜잭션이므로 소유권 확인 후 안전하게 호출.
      */
     @Override
     public OrderResponse getMyOrder(String email, long orderId) {
         long userId = memberDirectory.findUserIdByEmail(email);
         OrderService.OrderDetail detail = orderService.getMyOrder(userId, orderId);
-        return dtoMapper.toOrderResponse(detail);
+        // 소유권 통과 후 배송 목록 합성 (C5, 개선2)
+        List<ShipmentResponse> shipments = orderFulfillmentService.getShipments(orderId);
+        return dtoMapper.toOrderResponse(detail, shipments);
     }
 }

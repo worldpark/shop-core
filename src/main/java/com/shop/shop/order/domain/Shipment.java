@@ -112,5 +112,31 @@ public class Shipment extends BaseEntity {
         item.assignShipment(this);
     }
 
-    // markShipping / markDelivered 는 020/021 소관 — 본 Task 미구현.
+    /**
+     * 배송 시작 상태 전이 메서드 (preparing → shipping).
+     *
+     * <p>status가 "preparing"인 배송만 "shipping"으로 전이할 수 있다.
+     * carrier/trackingNumber/shippedAt을 기록한다.
+     *
+     * <p>멱등 책임은 서비스가 소유한다. 도메인 메서드는 단일 전이(preparing→shipping)만 허용하며,
+     * 이미 "shipping"인 배송에서 호출하면 IllegalStateException을 던진다.
+     * 서비스는 shipment가 "preparing"일 때만 이 메서드를 호출한다(정합3).
+     *
+     * @param carrier        택배사명
+     * @param trackingNumber 운송장 번호
+     * @param shippedAt      배송 시작 시각
+     * @throws IllegalStateException status가 "preparing"이 아닐 때
+     */
+    public void markShipping(String carrier, String trackingNumber, Instant shippedAt) {
+        if (!"preparing".equals(this.status)) {
+            throw new IllegalStateException(
+                    "배송 상태가 preparing이 아니어서 shipping으로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "shipping";
+        this.carrier = carrier;
+        this.trackingNumber = trackingNumber;
+        this.shippedAt = shippedAt;
+    }
+
+    // markDelivered 는 021 소관 — 본 Task 미구현.
 }

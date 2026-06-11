@@ -43,4 +43,21 @@ public interface AdminOrderFulfillmentFacade {
      * @throws BusinessException 상태 충돌(409) 또는 입력 오류(400)
      */
     ShipmentResponse createShipment(long orderId, List<Long> orderItemIds);
+
+    /**
+     * 배송 시작 위임 (020).
+     *
+     * <p>{@link com.shop.shop.order.service.OrderFulfillmentService#ship}에 위임한다.
+     * preparing → shipping 전이 + ShippingStartedEvent Outbox 발행.
+     * 성공/멱등 시 {@link ShipmentResponse} 반환, 거부 시 {@link BusinessException}(404/409) 전파.
+     *
+     * <p>web이 이 facade를 경유해 호출하므로 service를 직접 참조하지 않는다(architecture-rule).
+     *
+     * @param shipmentId     대상 배송 ID
+     * @param carrier        택배사명
+     * @param trackingNumber 운송장 번호
+     * @return 갱신된 배송 응답 DTO
+     * @throws BusinessException 미존재(404), 상태 충돌·P2 해석 불가(409)
+     */
+    ShipmentResponse ship(long shipmentId, String carrier, String trackingNumber);
 }

@@ -7,6 +7,7 @@ import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.order.dto.OrderCheckoutResponse;
 import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
+import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.product.spi.ProductOrderCatalog;
 import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
  * <ul>
  *   <li>MemberDirectory.findUserIdByEmail(email) 위임</li>
  *   <li>email → userId 변환 후 OrderService 위임</li>
+ *   <li>020: getMyOrder에서 getShipments 합성 위임</li>
  *   <li>DTO 변환</li>
  * </ul>
  */
@@ -52,6 +54,9 @@ class OrderFacadeImplTest {
     private ProductOrderCatalog productOrderCatalog;
 
     @Mock
+    private OrderFulfillmentService orderFulfillmentService;
+
+    @Mock
     private OrderDtoMapper dtoMapper;
 
     private OrderFacadeImpl orderFacadeImpl;
@@ -62,7 +67,8 @@ class OrderFacadeImplTest {
     @BeforeEach
     void setUp() {
         orderFacadeImpl = new OrderFacadeImpl(
-                orderService, memberDirectory, cartCheckoutReader, productOrderCatalog, dtoMapper);
+                orderService, memberDirectory, cartCheckoutReader, productOrderCatalog,
+                orderFulfillmentService, dtoMapper);
     }
 
     @Test
@@ -131,7 +137,7 @@ class OrderFacadeImplTest {
         );
 
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
-        when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(cartCheckout);
+        when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(emptyCart(cartCheckout));
         when(productOrderCatalog.getOrderableSnapshots(List.of(variantId))).thenReturn(List.of(notPurchasable));
 
         OrderCheckoutResponse result = orderFacadeImpl.getCheckout(EMAIL);
@@ -142,12 +148,12 @@ class OrderFacadeImplTest {
     }
 
     @Test
-    @DisplayName("createOrder: email → MemberDirectory → userId → OrderService.placeOrder 위임")
+    @DisplayName("createOrder: email → MemberDirectory → userId → OrderService.placeOrder 위임, shipments=List.of()")
     void createOrder_convertsEmailToUserIdViaDirectory() {
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
         when(orderService.placeOrder(eq(USER_ID), any())).thenReturn(new OrderService.OrderResult(1L, "ORD-001"));
         when(orderService.getMyOrder(eq(USER_ID), eq(1L))).thenReturn(makeOrderDetail(1L));
-        when(dtoMapper.toOrderResponse(any())).thenReturn(makeOrderResponse(1L));
+        when(dtoMapper.toOrderResponse(any(), eq(List.of()))).thenReturn(makeOrderResponse(1L));
 
         OrderCreateRequest request = new OrderCreateRequest("홍", "010", "12345", "서울", null);
         OrderResponse result = orderFacadeImpl.createOrder(EMAIL, request);
@@ -172,18 +178,30 @@ class OrderFacadeImplTest {
     }
 
     @Test
-    @DisplayName("getMyOrder: email → userId 변환 후 orderService.getMyOrder 위임")
-    void getMyOrder_delegatesToOrderService() {
+    @DisplayName("getMyOrder: email → userId 변환 후 orderService.getMyOrder + getShipments 합성 위임 (020)")
+    void getMyOrder_delegatesToOrderServiceAndComposesShipments() {
         long orderId = 99L;
+        List<ShipmentResponse> shipments = List.of();
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
         when(orderService.getMyOrder(eq(USER_ID), eq(orderId))).thenReturn(makeOrderDetail(orderId));
-        when(dtoMapper.toOrderResponse(any())).thenReturn(makeOrderResponse(orderId));
+        when(orderFulfillmentService.getShipments(orderId)).thenReturn(shipments);
+        when(dtoMapper.toOrderResponse(any(), eq(shipments))).thenReturn(makeOrderResponse(orderId));
 
         OrderResponse result = orderFacadeImpl.getMyOrder(EMAIL, orderId);
 
         verify(memberDirectory).findUserIdByEmail(EMAIL);
         verify(orderService).getMyOrder(eq(USER_ID), eq(orderId));
+        verify(orderFulfillmentService).getShipments(orderId);
         assertThat(result.orderId()).isEqualTo(orderId);
+    }
+
+    // ============================================================
+    // 헬퍼
+    // ============================================================
+
+    private CartCheckout emptyCart(CartCheckout nonEmpty) {
+        // purchasable=false 항목이 있는 cart를 그대로 반환
+        return nonEmpty;
     }
 
     private OrderService.OrderDetail makeOrderDetail(long orderId) {
@@ -198,6 +216,6 @@ class OrderFacadeImplTest {
         return new OrderResponse(orderId, "ORD-001", "pending", List.of(),
                 BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN,
                 new com.shop.shop.order.dto.ShippingAddressResponse("홍", "010", "12345", "서울", null),
-                Instant.now());
+                Instant.now(), List.of());
     }
 }

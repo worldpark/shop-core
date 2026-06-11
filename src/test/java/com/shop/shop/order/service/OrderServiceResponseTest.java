@@ -61,7 +61,7 @@ class OrderServiceResponseTest {
         when(orderService.placeOrder(anyLong(), any())).thenReturn(new OrderService.OrderResult(1L, "ORD-001"));
         when(orderService.getMyOrder(eq(USER_ID), eq(1L))).thenReturn(makeOrderDetail(1L));
         OrderResponse expected = makeOrderResponse(1L);
-        when(dtoMapper.toOrderResponse(any())).thenReturn(expected);
+        when(dtoMapper.toOrderResponse(any(), any())).thenReturn(expected);
 
         OrderResponse result = orderServiceResponse.createOrder(authentication,
                 new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null));
@@ -76,7 +76,7 @@ class OrderServiceResponseTest {
         when(orderService.placeOrder(anyLong(), any())).thenReturn(new OrderService.OrderResult(1L, "ORD-001"));
         when(orderService.getMyOrder(anyLong(), anyLong())).thenReturn(makeOrderDetail(1L));
         OrderResponse expected = makeOrderResponse(1L);
-        when(dtoMapper.toOrderResponse(any())).thenReturn(expected);
+        when(dtoMapper.toOrderResponse(any(), any())).thenReturn(expected);
 
         OrderResponse result = orderServiceResponse.createOrder(authentication,
                 new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null));
@@ -99,6 +99,6 @@ class OrderServiceResponseTest {
         return new OrderResponse(orderId, "ORD-001", "pending", List.of(),
                 BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.TEN,
                 new ShippingAddressResponse("홍", "010", "12345", "서울", null),
-                Instant.now());
+                Instant.now(), List.of());
     }
 }
