@@ -189,4 +189,67 @@ class OrderModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 019 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 8: Shipment/ShipmentItem 엔티티가 order.domain 패키지에 위치한다 (019).
+     *
+     * <p>배송은 order 모듈의 책임 — architecture.md §5.
+     */
+    @Test
+    @DisplayName("규칙 8: Shipment/ShipmentItem이 order.domain 패키지에 위치함 (019)")
+    void shipmentEntities_reside_in_order_domain() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("Shipment").or().haveSimpleName("ShipmentItem")
+                .should().resideOutsideOfPackage("com.shop.shop.order.domain..")
+                .because("Shipment/ShipmentItem은 배송이 order 모듈 책임이므로 order.domain에 위치해야 한다(019).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 9: OrderFulfillmentService가 payment.spi/payment 패키지를 의존하지 않는다 (019).
+     *
+     * <p>배송 생성은 결제(payment) 모듈과 무관하다. 새 cross-module 의존 0.
+     */
+    @Test
+    @DisplayName("규칙 9: OrderFulfillmentService가 payment.spi/payment 패키지를 의존하지 않음 (019)")
+    void orderFulfillmentService_does_not_depend_on_payment() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderFulfillmentService")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.shop.shop.payment..",
+                        "com.shop.shop.payment.spi.."
+                )
+                .because("OrderFulfillmentService는 payment 모듈을 의존하지 않는다(019 배송 생성은 외부계 없음).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 10: OrderFulfillmentService가 inventory 패키지를 의존하지 않는다 (019).
+     *
+     * <p>배송 생성은 재고(inventory)와 무관하다. 재고는 015 차감/018 복원 소관.
+     */
+    @Test
+    @DisplayName("규칙 10: OrderFulfillmentService가 inventory 패키지를 의존하지 않음 (019)")
+    void orderFulfillmentService_does_not_depend_on_inventory() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderFulfillmentService")
+                .should().dependOnClassesThat()
+                .resideInAnyPackage(
+                        "com.shop.shop.inventory..",
+                        "com.shop.shop.inventory.spi.."
+                )
+                .because("OrderFulfillmentService는 inventory 모듈을 의존하지 않는다(019 배송 생성은 재고 무관).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

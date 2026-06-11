@@ -12,6 +12,7 @@ import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
@@ -83,6 +84,9 @@ class LayoutRenderingTest {
 
     @MockitoBean
     OrderRepository orderRepository;
+
+    @MockitoBean
+    ShipmentRepository shipmentRepository;
 
     @MockitoBean
     PaymentRepository paymentRepository;

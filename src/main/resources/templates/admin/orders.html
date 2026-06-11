@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+    관리자 주문 이행 화면.
+    view name: admin/orders
+    레이아웃: layout/base :: layout(title, content)
+    모델 키: orders (Page<AdminOrderFulfillmentView>)
+
+    보존 계약:
+      - 배송 생성 폼: method="post" th:action 자동 CSRF 주입 (th:action 사용)
+      - 폼 노출 조건: order.status가 paid/preparing이고 unshippedItems가 1건 이상일 때만
+      - 종결/pending/미발송 0건 주문은 배송 생성 폼 미노출
+      - 미발송 항목 체크박스: value=orderItemId, 미선택 시 전체 미발송 항목 포함
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>주문 이행 관리</title>
+</head>
+<body>
+<main>
+    <div class="admin-orders-container">
+        <h1 class="page-title">주문 이행 관리</h1>
+
+        <!-- 주문 목록 없음 안내 -->
+        <div th:if="${orders.content.isEmpty()}" class="empty-msg">
+            <p>이행 대상 주문이 없습니다.</p>
+        </div>
+
+        <!-- 주문 카드 반복 -->
+        <div th:each="o : ${orders.content}" class="order-card">
+            <div class="order-card-header">
+                <span class="order-number" th:text="${o.orderNumber}"></span>
+                <span class="order-status-badge"
+                      th:classappend="${o.status == 'paid'} ? 'badge-paid' : 'badge-preparing'"
+                      th:text="${o.status == 'paid'} ? '결제완료' : '상품 준비 중'"></span>
+            </div>
+
+            <!-- 기존 배송 현황 -->
+            <div class="shipments-section" th:if="${!o.shipments.isEmpty()}">
+                <h3 class="section-title">배송 현황</h3>
+                <div th:each="s : ${o.shipments}" class="shipment-item">
+                    <span class="shipment-id" th:text="'배송 #' + ${s.shipmentId}"></span>
+                    <span class="shipment-status" th:text="${s.status}"></span>
+                    <ul class="shipment-items-list">
+                        <li th:each="si : ${s.items}"
+                            th:text="${si.productName} + ' x' + ${si.quantity}"></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!--
+                배송 생성 폼.
+                노출 조건: order.status가 paid/preparing이고 unshippedItems가 1건 이상.
+                종결(cancelled/refunded)/pending/미발송 0건 주문은 폼 미노출.
+                th:action 사용 시 _csrf 토큰 자동 주입 (Thymeleaf + Spring Security).
+            -->
+            <div class="shipment-form-section"
+                 th:if="${(o.status == 'paid' or o.status == 'preparing') and !o.unshippedItems.isEmpty()}">
+                <h3 class="section-title">배송 생성</h3>
+                <form class="shipment-create-form"
+                      method="post"
+                      th:action="@{/admin/orders/{orderId}/shipments(orderId=${o.orderId})}">
+                    <div class="unshipped-items">
+                        <p class="form-hint">포함할 항목을 선택하세요. (미선택 시 미발송 항목 전부 포함)</p>
+                        <div th:each="item : ${o.unshippedItems}" class="checkbox-item">
+                            <label>
+                                <input type="checkbox"
+                                       name="orderItemIds"
+                                       th:value="${item.orderItemId}">
+                                <span th:text="${item.productName} + ' x' + ${item.quantity}"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">배송 생성</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <div class="pagination" th:if="${orders.totalPages > 0}">
+            <span class="page-info">
+                <span th:text="${orders.number + 1}">1</span> /
+                <span th:text="${orders.totalPages}">1</span> 페이지
+                (총 <span th:text="${orders.totalElements}">0</span>건)
+            </span>
+            <div class="page-nav">
+                <a th:if="${orders.number > 0}"
+                   th:href="@{/admin/orders(page=${orders.number - 1}, size=${orders.size})}"
+                   class="btn btn-sm btn-outline">이전</a>
+                <span th:if="${orders.number == 0}" class="btn btn-sm btn-outline disabled">이전</span>
+
+                <a th:if="${orders.number + 1 < orders.totalPages}"
+                   th:href="@{/admin/orders(page=${orders.number + 1}, size=${orders.size})}"
+                   class="btn btn-sm btn-outline">다음</a>
+                <span th:if="${orders.number + 1 >= orders.totalPages}" class="btn btn-sm btn-outline disabled">다음</span>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

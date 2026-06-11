@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -81,4 +82,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select o from Order o where o.id = :id")
     Optional<Order> findByIdForUpdate(@Param("id") long id);
+
+    /**
+     * 상태 목록으로 주문 페이지 조회 (이행 대상 목록 — admin facade).
+     *
+     * <p>admin facade의 {@code listFulfillableOrders}에서 {@code paid}/{@code preparing} 주문 페이지 조회에 사용한다.
+     * 최신순(createdAt DESC, id DESC) 정렬.
+     *
+     * @param statuses 조회 대상 상태 목록 (예: ["paid", "preparing"])
+     * @param pageable 페이지 요청
+     * @return 해당 상태의 주문 페이지 (최신순)
+     */
+    Page<Order> findByStatusInOrderByCreatedAtDescIdDesc(
+            Collection<String> statuses, Pageable pageable);
 }

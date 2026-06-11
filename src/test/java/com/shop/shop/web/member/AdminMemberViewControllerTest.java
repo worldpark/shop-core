@@ -15,6 +15,7 @@ import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,6 +104,9 @@ class AdminMemberViewControllerTest {
 
     @MockitoBean
     private OrderRepository orderRepository;
+
+    @MockitoBean
+    private ShipmentRepository shipmentRepository;
 
     @MockitoBean
     private PaymentRepository paymentRepository;

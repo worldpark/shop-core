@@ -15,6 +15,7 @@ import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
 import com.shop.shop.order.dto.ShippingAddressResponse;
 import com.shop.shop.order.repository.OrderRepository;
+import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.dto.PaymentStatusView;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.payment.spi.PaymentFacade;
@@ -122,6 +123,9 @@ class OrderViewControllerTest {
 
     @MockitoBean
     private OrderRepository orderRepository;
+
+    @MockitoBean
+    private ShipmentRepository shipmentRepository;
 
     @MockitoBean
     private PaymentRepository paymentRepository;

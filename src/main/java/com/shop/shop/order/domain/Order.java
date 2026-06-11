@@ -199,4 +199,32 @@ public class Order extends BaseEntity {
         }
         this.status = "refunded";
     }
+
+    /**
+     * 배송 생성 rollup — paid → preparing (첫 배송 생성 시).
+     *
+     * <p>배송 이행이 시작되었음을 주문 status에 rollup으로 반영한다.
+     * shipping/delivered rollup은 020/021의 소관이며 본 Task에서 구현하지 않는다.
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"paid" → "preparing" 전이 (첫 배송 생성)</li>
+     *   <li>"preparing" 재호출 → 멱등 no-op (추가 배송 생성 시 status 불변)</li>
+     *   <li>그 외("pending"/"shipping"/"delivered"/"cancelled"/"refunded") → {@link IllegalStateException}
+     *       (상위 OrderFulfillmentService가 이미 차단하므로 정상 흐름 미발생 — 방어적)</li>
+     * </ul>
+     *
+     * @throws IllegalStateException status가 "paid"/"preparing"이 아닐 때
+     */
+    public void markPreparing() {
+        if ("preparing".equals(this.status)) {
+            // 멱등 처리 — 이미 preparing이면 no-op (추가 배송 생성 시 status 불변)
+            return;
+        }
+        if (!"paid".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 paid가 아니어서 preparing으로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "preparing";
+    }
 }
