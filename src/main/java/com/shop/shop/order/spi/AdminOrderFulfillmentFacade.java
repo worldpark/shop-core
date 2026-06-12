@@ -2,6 +2,7 @@ package com.shop.shop.order.spi;
 
 import com.shop.shop.common.exception.BusinessException;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView;
+import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -60,4 +61,19 @@ public interface AdminOrderFulfillmentFacade {
      * @throws BusinessException 미존재(404), 상태 충돌·P2 해석 불가(409)
      */
     ShipmentResponse ship(long shipmentId, String carrier, String trackingNumber);
+
+    /**
+     * 배송 완료 위임 (021).
+     *
+     * <p>{@link com.shop.shop.order.service.OrderFulfillmentService#deliver}에 위임한다.
+     * shipping → delivered 전이 + deliveredAt 기록 + 주문 rollup 판정.
+     * 성공/멱등 시 {@link DeliverResponse} 반환, 거부 시 {@link BusinessException}(404/409) 전파.
+     *
+     * <p>web이 이 facade를 경유해 호출하므로 service를 직접 참조하지 않는다(architecture-rule).
+     *
+     * @param shipmentId 대상 배송 ID
+     * @return 배송 완료 응답 DTO ({@code orderDelivered} = 현재 주문 status가 "delivered"인지)
+     * @throws BusinessException 미존재(404), 상태 충돌·취소/환불 주문(409)
+     */
+    DeliverResponse deliver(long shipmentId);
 }

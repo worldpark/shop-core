@@ -10,6 +10,7 @@ import com.shop.shop.order.domain.Order;
 import com.shop.shop.order.domain.OrderItem;
 import com.shop.shop.order.domain.Shipment;
 import com.shop.shop.order.domain.ShipmentItem;
+import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.event.ShippingStartedEvent;
@@ -193,6 +194,7 @@ public class OrderFulfillmentService {
                 null, // carrier: preparing 단계 null
                 null, // trackingNumber: preparing 단계 null
                 null, // shippedAt: preparing 단계 null
+                null, // deliveredAt: preparing 단계 null (정합3)
                 itemResponses
         );
     }
@@ -255,6 +257,7 @@ public class OrderFulfillmentService {
                 shipment.getCarrier(),
                 shipment.getTrackingNumber(),
                 shipment.getShippedAt(),
+                shipment.getDeliveredAt(), // 정합3 — delivered 아니면 자동 null
                 itemResponses
         );
     }
@@ -488,7 +491,118 @@ public class OrderFulfillmentService {
                 shipment.getCarrier(),
                 shipment.getTrackingNumber(),
                 shipment.getShippedAt(),
+                shipment.getDeliveredAt(), // 정합3 — delivered 아니면 자동 null
                 itemResponses
         );
+    }
+
+    /**
+     * 배송 완료 — 주문 row 비관락 + 상태 재검증(revision-2 확정 순서) + shipment 전이 + rollup 판정.
+     *
+     * <p>처리 흐름(정합1 락 순서):
+     * <ol>
+     *   <li>orderId 스칼라 projection {@link ShipmentRepository#findOrderIdById(long)} — 엔티티 적재 금지.
+     *       empty → {@link ShipmentNotFoundException}(404)</li>
+     *   <li>주문 row {@code PESSIMISTIC_WRITE} 잠금 — 동시 deliver·018 취소와 직렬화</li>
+     *   <li><b>락 후</b> shipment 엔티티 최초 적재({@code findById}) — 항상 fresh, stale read 방지</li>
+     *   <li>상태 재검증(revision-2 정합6 확정 순서 — 멱등 체크가 방어 가드보다 반드시 앞):
+     *     <ul>
+     *       <li>① 주문 {@code cancelled}/{@code refunded} → {@link OrderFulfillmentConflictException}(409)</li>
+     *       <li>② shipment 이미 {@code delivered} → 멱등 200(markDelivered 미호출, 현재 상태 반환)</li>
+     *       <li>③ 방어 가드: {@code order.status != "shipping"} → 409(이 지점 도달 시 shipment != delivered)</li>
+     *       <li>④ shipment {@code preparing}/역방향 → 409</li>
+     *       <li>⑤ {@code shipping}이면 진행</li>
+     *     </ul>
+     *   </li>
+     *   <li>시각 1회 캡처: {@code Instant now} — deliveredAt.</li>
+     *   <li>전이: {@code shipment.markDelivered(now)}</li>
+     *   <li>rollup 판정: (a) 미배정 항목 0 && (b) 전 배송 delivered → {@code order.markDelivered()}.
+     *       아니면 주문 status 불변(부분 배송 완료는 "shipping" 유지).</li>
+     *   <li>커밋 → 200 + {@link DeliverResponse}</li>
+     * </ol>
+     *
+     * <p>신규 의존 없음: {@link OrderRepository}·{@link ShipmentRepository}만 사용(C1 — 이벤트/member/product 불필요).
+     *
+     * @param shipmentId 배송 ID
+     * @return 배송 완료 응답 DTO ({@code orderDelivered} = 현재 주문 status가 "delivered"인지)
+     * @throws ShipmentNotFoundException         미존재 배송 (404)
+     * @throws OrderFulfillmentConflictException 상태 충돌·취소/환불 주문 (409)
+     */
+    public DeliverResponse deliver(long shipmentId) {
+        // 1. orderId 스칼라 projection (정합1 — 엔티티 적재 금지)
+        long orderId = shipmentRepository.findOrderIdById(shipmentId)
+                .orElseThrow(ShipmentNotFoundException::new);
+
+        // 2. 주문 row PESSIMISTIC_WRITE 잠금 (동시 deliver·018 취소와 직렬화)
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        // 3. 락 후 shipment 엔티티 최초 적재 (fresh — stale read 방지, 정합1)
+        Shipment shipment = shipmentRepository.findById(shipmentId)
+                .orElseThrow(ShipmentNotFoundException::new);
+
+        // 4. 상태 재검증 (revision-2 정합6 확정 순서 — 멱등 체크가 방어 가드보다 반드시 앞)
+        String orderStatus = order.getStatus();
+
+        // ① 주문 cancelled/refunded → 409 (018 상호작용 모순 방지)
+        if ("cancelled".equals(orderStatus) || "refunded".equals(orderStatus)) {
+            log.warn("배송 완료 불가 — 취소/환불 주문: orderId={}, status={}", orderId, orderStatus);
+            throw new OrderFulfillmentConflictException(
+                    "취소 또는 환불된 주문의 배송을 완료할 수 없습니다.");
+        }
+
+        String shipmentStatus = shipment.getStatus();
+
+        // ② shipment 이미 delivered → 멱등 200 (방어 가드보다 앞 — 단일/마지막 rollup 후 재-deliver도 멱등 200)
+        if ("delivered".equals(shipmentStatus)) {
+            log.info("배송 이미 완료됨 — 멱등 반환: shipmentId={}, orderId={}", shipmentId, orderId);
+            boolean orderDelivered = "delivered".equals(order.getStatus());
+            return new DeliverResponse(buildShipmentResponse(shipment, order), orderDelivered);
+        }
+
+        // ③ 방어 가드: 정상 흐름에서 shipment가 shipping이면 주문도 shipping이어야 함 (이 지점 도달 시 shipment != delivered)
+        if (!"shipping".equals(orderStatus)) {
+            log.warn("배송 완료 불가 — 불일치 주문 상태(방어 가드): orderId={}, status={}", orderId, orderStatus);
+            throw new OrderFulfillmentConflictException(
+                    "주문 상태(" + orderStatus + ")에서 배송을 완료할 수 없습니다.");
+        }
+
+        // ④ shipment preparing/역방향 → 409 (shipping 아니면 진행 불가)
+        if (!"shipping".equals(shipmentStatus)) {
+            log.warn("배송 완료 불가 — 잘못된 전이: shipmentId={}, status={}", shipmentId, shipmentStatus);
+            throw new OrderFulfillmentConflictException(
+                    "배송 상태(" + shipmentStatus + ")에서 배송을 완료할 수 없습니다.");
+        }
+
+        // ⑤ shipment shipping → 진행
+        // 5. 시각 1회 캡처
+        Instant now = Instant.now();
+
+        // 6. 전이: shipping → delivered
+        shipment.markDelivered(now);
+        log.info("배송 전이 shipping→delivered: shipmentId={}, orderId={}", shipmentId, orderId);
+
+        // 7. rollup 판정(기존 쿼리 재사용 — 신규 쿼리 추가 금지)
+        // (a) 미배정 항목 0 판정: order.getItems() id 집합 − findAssignedOrderItemIds(orderId) 차집합
+        Set<Long> allOrderItemIds = order.getItems().stream()
+                .map(OrderItem::getId)
+                .collect(Collectors.toSet());
+        Set<Long> assignedIds = Set.copyOf(shipmentRepository.findAssignedOrderItemIds(orderId));
+        boolean allAssigned = allOrderItemIds.stream().allMatch(assignedIds::contains);
+
+        // (b) 전 배송 delivered 판정: findByOrderId(orderId) — 방금 markDelivered한 managed 엔티티 포함
+        boolean allDelivered = shipmentRepository.findByOrderId(orderId).stream()
+                .allMatch(s -> "delivered".equals(s.getStatus()));
+
+        // (a) && (b) 충족 && 주문 shipping이면 rollup
+        if (allAssigned && allDelivered && "shipping".equals(order.getStatus())) {
+            order.markDelivered();
+            log.info("주문 rollup shipping→delivered: orderId={}", orderId);
+        }
+
+        // 8. 응답 구성
+        boolean orderDelivered = "delivered".equals(order.getStatus());
+        log.info("배송 완료: orderId={}, shipmentId={}, orderDelivered={}", orderId, shipmentId, orderDelivered);
+        return new DeliverResponse(buildShipmentResponse(shipment, order), orderDelivered);
     }
 }

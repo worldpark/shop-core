@@ -148,7 +148,7 @@ class AdminOrderViewRenderingTest {
     /** preparing 주문 + 미발송 항목 1건 + 기존 배송 1건 */
     private AdminOrderFulfillmentView preparingOrderWithUnshipped() {
         ShipmentItemResponse si = new ShipmentItemResponse(101L, "티셔츠", 2);
-        ShipmentResponse shipment = new ShipmentResponse(10L, 2L, "preparing", null, null, null, List.of(si));
+        ShipmentResponse shipment = new ShipmentResponse(10L, 2L, "preparing", null, null, null, null, List.of(si));
         return new AdminOrderFulfillmentView(
                 2L,
                 "ORD-TEST-0002",
@@ -396,7 +396,7 @@ class AdminOrderViewRenderingTest {
     @WithMockUser(roles = "ADMIN", username = "admin@example.com")
     void post_createShipment_success_flashSuccessAndRedirect() throws Exception {
         ShipmentItemResponse si = new ShipmentItemResponse(101L, "티셔츠", 2);
-        ShipmentResponse response = new ShipmentResponse(10L, 1L, "preparing", null, null, null, List.of(si));
+        ShipmentResponse response = new ShipmentResponse(10L, 1L, "preparing", null, null, null, null, List.of(si));
         when(adminOrderFulfillmentFacade.createShipment(anyLong(), anyList()))
                 .thenReturn(response);
 
@@ -413,7 +413,7 @@ class AdminOrderViewRenderingTest {
     @WithMockUser(roles = "ADMIN", username = "admin@example.com")
     void post_createShipment_noItemIds_success_redirect() throws Exception {
         ShipmentItemResponse si = new ShipmentItemResponse(101L, "티셔츠", 2);
-        ShipmentResponse response = new ShipmentResponse(10L, 1L, "preparing", null, null, null, List.of(si));
+        ShipmentResponse response = new ShipmentResponse(10L, 1L, "preparing", null, null, null, null, List.of(si));
         when(adminOrderFulfillmentFacade.createShipment(anyLong(), any()))
                 .thenReturn(response);
 

@@ -1,5 +1,6 @@
 package com.shop.shop.order.controller;
 
+import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipRequest;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.service.OrderFulfillmentService;
@@ -48,5 +49,24 @@ class AdminShipmentRestController {
             @Valid @RequestBody ShipRequest req) {
         ShipmentResponse response = orderFulfillmentService.ship(shipmentId, req.carrier(), req.trackingNumber());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 배송 완료.
+     * POST /api/v1/admin/shipments/{shipmentId}/deliver
+     *
+     * <p>shipping → delivered 전이 + deliveredAt 기록 + 주문 rollup 판정.
+     * 이미 delivered인 배송에 재호출 시 멱등 200 반환(상태 불변).
+     * 입력 본문 없음 — deliver는 추가 파라미터가 불필요하다.
+     *
+     * <p>인가: SecurityConfig REST 체인 {@code /api/v1/admin/**} → {@code hasRole("ADMIN")} catch-all 커버.
+     * 신규 보안 규칙 불요(plan §0 C9, SecurityConfig 무변경).
+     *
+     * @param shipmentId 배송 ID
+     * @return 200 OK + {@link DeliverResponse}
+     */
+    @PostMapping("/api/v1/admin/shipments/{shipmentId}/deliver")
+    ResponseEntity<DeliverResponse> deliver(@PathVariable long shipmentId) {
+        return ResponseEntity.ok(orderFulfillmentService.deliver(shipmentId));
     }
 }

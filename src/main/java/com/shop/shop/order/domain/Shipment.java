@@ -138,5 +138,25 @@ public class Shipment extends BaseEntity {
         this.shippedAt = shippedAt;
     }
 
-    // markDelivered 는 021 소관 — 본 Task 미구현.
+    /**
+     * 배송 완료 상태 전이 메서드 (shipping → delivered).
+     *
+     * <p>status가 "shipping"인 배송만 "delivered"로 전이할 수 있다.
+     * deliveredAt을 기록한다.
+     *
+     * <p>멱등 책임은 서비스가 소유한다. 도메인 메서드는 단일 전이(shipping→delivered)만 허용하며,
+     * "shipping"이 아닌 상태(preparing/delivered 재호출/역방향)에서 호출하면 IllegalStateException을 던진다.
+     * 서비스는 shipment가 "shipping"일 때만 이 메서드를 호출한다(정합4 — 멱등 아님).
+     *
+     * @param deliveredAt 배송 완료 시각
+     * @throws IllegalStateException status가 "shipping"이 아닐 때
+     */
+    public void markDelivered(Instant deliveredAt) {
+        if (!"shipping".equals(this.status)) {
+            throw new IllegalStateException(
+                    "배송 상태가 shipping이 아니어서 delivered로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "delivered";
+        this.deliveredAt = deliveredAt;
+    }
 }

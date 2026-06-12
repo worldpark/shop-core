@@ -294,7 +294,7 @@ class OrderShipmentViewRenderingTest {
         ShipmentResponse shipment = new ShipmentResponse(
                 30L, 1L, "shipping",
                 "CJ대한통운", "1234567890",
-                Instant.parse("2026-06-11T10:00:00Z"),
+                Instant.parse("2026-06-11T10:00:00Z"), null,
                 List.of(si)
         );
         return new OrderResponse(
@@ -324,7 +324,7 @@ class OrderShipmentViewRenderingTest {
         ShipmentItemResponse si = new ShipmentItemResponse(1L, "테스트 상품", 1);
         ShipmentResponse shipment = new ShipmentResponse(
                 31L, 1L, "preparing",
-                null, null, null,
+                null, null, null, null,
                 List.of(si)
         );
         return new OrderResponse(

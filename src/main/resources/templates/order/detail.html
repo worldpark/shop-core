@@ -255,6 +255,20 @@
                               th:text="${#temporals.format(shipment.shippedAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01 00:00:00</span>
                     </div>
                 </div>
+
+                <!--
+                    delivered 배송: 배송완료시각 읽기 전용 표시 (021).
+                    deliveredAt은 Asia/Seoul 기준으로 포맷 (shippedAt과 동일 포맷 패턴).
+                    status 라벨('배송 완료')은 이미 위 badge-shipment-status span에 존재 — 무변경.
+                    ownerId·seller_id·로컬경로 등 내부정보 미노출 (ShipmentResponse에 없음).
+                -->
+                <div class="shipment-delivered-info" th:if="${shipment.status == 'delivered' and shipment.deliveredAt != null}">
+                    <div class="order-detail-row">
+                        <span class="order-detail-label">배송 완료:</span>
+                        <span class="order-detail-value"
+                              th:text="${#temporals.format(shipment.deliveredAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}">2026-01-01 00:00:00</span>
+                    </div>
+                </div>
             </div>
         </section>
 

@@ -5,6 +5,7 @@ import com.shop.shop.order.domain.OrderItem;
 import com.shop.shop.order.domain.Shipment;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView.UnshippedItem;
+import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.repository.OrderRepository;
@@ -30,7 +31,8 @@ import java.util.stream.Collectors;
  *
  * <p>책임:
  * <ul>
- *   <li>paid/preparing 주문 페이지 조회 + 미발송 항목 + 배송 현황 → {@link AdminOrderFulfillmentView} 변환</li>
+ *   <li>paid/preparing/shipping(이행 중) 주문 페이지 조회 + 미발송 항목 + 배송 현황 → {@link AdminOrderFulfillmentView} 변환</li>
+ *   <li>delivered/cancelled/refunded(종결) 주문은 제외</li>
  *   <li>{@link OrderFulfillmentService#createShipment} 위임 + {@link ShipmentResponse} 전파</li>
  * </ul>
  */
@@ -39,7 +41,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
 
-    private static final List<String> FULFILLABLE_STATUSES = List.of("paid", "preparing");
+    private static final List<String> FULFILLABLE_STATUSES = List.of("paid", "preparing", "shipping");
 
     private final OrderRepository orderRepository;
     private final ShipmentRepository shipmentRepository;
@@ -48,7 +50,7 @@ class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
     /**
      * {@inheritDoc}
      *
-     * <p>paid/preparing 주문 페이지 조회 → 각 주문의 미발송 항목·배송 현황 집계 →
+     * <p>paid/preparing/shipping(이행 중) 주문 페이지 조회 → 각 주문의 미발송 항목·배송 현황 집계 →
      * {@link AdminOrderFulfillmentView} DTO 변환.
      *
      * <p>미발송 항목 = order.getItems() − 이미 shipment_items에 배정된 order_item_id.
@@ -101,6 +103,17 @@ class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
     @Transactional
     public ShipmentResponse ship(long shipmentId, String carrier, String trackingNumber) {
         return orderFulfillmentService.ship(shipmentId, carrier, trackingNumber);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>BusinessException(404/409)은 변환 없이 그대로 전파한다 (web이 catch → flashError).
+     */
+    @Override
+    @Transactional
+    public DeliverResponse deliver(long shipmentId) {
+        return orderFulfillmentService.deliver(shipmentId);
     }
 
     // ============================================================
@@ -163,6 +176,7 @@ class AdminOrderFulfillmentFacadeImpl implements AdminOrderFulfillmentFacade {
                 shipment.getCarrier(),
                 shipment.getTrackingNumber(),
                 shipment.getShippedAt(),
+                shipment.getDeliveredAt(), // 정합3 — delivered 아니면 자동 null
                 itemResponses
         );
     }

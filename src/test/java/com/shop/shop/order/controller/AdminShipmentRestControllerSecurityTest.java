@@ -141,7 +141,7 @@ class AdminShipmentRestControllerSecurityTest {
     void ship_admin_returns_200_statusShipping() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
                 100L, 1L, "shipping",
-                "CJ대한통운", "TRK-001", SHIPPED_AT,
+                "CJ대한통운", "TRK-001", SHIPPED_AT, null,
                 List.of(new ShipmentItemResponse(10L, "상품A", 2)));
 
         when(orderFulfillmentService.ship(anyLong(), anyString(), anyString()))
@@ -163,7 +163,7 @@ class AdminShipmentRestControllerSecurityTest {
     @DisplayName("POST — 응답에 items 배열 포함")
     void ship_admin_responseIncludesItems() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
-                100L, 1L, "shipping", "한진택배", "HJ-999", SHIPPED_AT,
+                100L, 1L, "shipping", "한진택배", "HJ-999", SHIPPED_AT, null,
                 List.of(new ShipmentItemResponse(10L, "상품A", 2)));
 
         when(orderFulfillmentService.ship(anyLong(), anyString(), anyString()))
@@ -188,7 +188,7 @@ class AdminShipmentRestControllerSecurityTest {
     @DisplayName("POST — 이미 shipping 배송 → 멱등 200 (기존 carrier/trackingNumber 반환)")
     void ship_alreadyShipping_idempotent_200() throws Exception {
         ShipmentResponse existingResponse = new ShipmentResponse(
-                100L, 1L, "shipping", "기존택배", "기존TRK", SHIPPED_AT, List.of());
+                100L, 1L, "shipping", "기존택배", "기존TRK", SHIPPED_AT, null, List.of());
 
         when(orderFulfillmentService.ship(anyLong(), anyString(), anyString()))
                 .thenReturn(existingResponse);
@@ -326,7 +326,7 @@ class AdminShipmentRestControllerSecurityTest {
     @DisplayName("응답 status는 lowercase(shipping) — 대문자 미사용")
     void ship_responseStatusIsLowercase() throws Exception {
         ShipmentResponse mockResponse = new ShipmentResponse(
-                100L, 1L, "shipping", "CJ", "TRK", SHIPPED_AT, List.of());
+                100L, 1L, "shipping", "CJ", "TRK", SHIPPED_AT, null, List.of());
         when(orderFulfillmentService.ship(anyLong(), anyString(), anyString()))
                 .thenReturn(mockResponse);
 

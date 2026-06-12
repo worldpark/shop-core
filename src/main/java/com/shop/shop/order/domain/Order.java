@@ -225,6 +225,29 @@ public class Order extends BaseEntity {
     }
 
     /**
+     * 배송 완료 rollup — shipping → delivered.
+     *
+     * <p>모든 배송이 delivered 상태가 되었음을 주문 status에 rollup으로 반영한다.
+     * 서비스가 rollup 조건 충족 && 주문이 "shipping"일 때만 호출한다(정합4 — 멱등 아님).
+     *
+     * <p>상태 전이표:
+     * <ul>
+     *   <li>"shipping" → "delivered" 전이 (모든 배송 완료 시 rollup)</li>
+     *   <li>그 외("delivered"/"preparing"/"paid"/"cancelled"/"refunded" 등) → {@link IllegalStateException}
+     *       (상위 OrderFulfillmentService가 rollup 조건을 검증하므로 정상 흐름 미발생 — 방어적)</li>
+     * </ul>
+     *
+     * @throws IllegalStateException status가 "shipping"이 아닐 때
+     */
+    public void markDelivered() {
+        if (!"shipping".equals(this.status)) {
+            throw new IllegalStateException(
+                    "주문 상태가 shipping이 아니어서 delivered로 전이할 수 없습니다. 현재 상태: " + this.status);
+        }
+        this.status = "delivered";
+    }
+
+    /**
      * 배송 생성 rollup — paid → preparing (첫 배송 생성 시).
      *
      * <p>배송 이행이 시작되었음을 주문 status에 rollup으로 반영한다.

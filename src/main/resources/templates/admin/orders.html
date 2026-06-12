@@ -73,6 +73,32 @@
                     </div>
 
                     <!--
+                        delivered 배송: 배송완료시각 읽기 전용 표시.
+                        deliveredAt은 Asia/Seoul 기준으로 포맷 (shippedAt과 동일 포맷 패턴).
+                        status 라벨('배송 완료')은 이미 위 shipment-status span에 존재 — 무변경.
+                    -->
+                    <div class="shipment-delivered-info" th:if="${s.status == 'delivered' and s.deliveredAt != null}">
+                        <div class="tracking-row">
+                            <span class="tracking-label">배송 완료:</span>
+                            <span class="tracking-value"
+                                  th:text="${#temporals.format(s.deliveredAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}"></span>
+                        </div>
+                    </div>
+
+                    <!--
+                        배송 완료 폼: shipping 배송에만 노출 (021).
+                        POST /admin/shipments/{shipmentId}/deliver (절대경로, th:action 자동 CSRF 주입).
+                        입력 파라미터 없음 — 버튼 클릭만으로 완료 처리.
+                    -->
+                    <div class="deliver-form-section" th:if="${s.status == 'shipping'}">
+                        <form class="ship-deliver-form"
+                              method="post"
+                              th:action="@{/admin/shipments/{id}/deliver(id=${s.shipmentId})}">
+                            <button type="submit" class="btn btn-primary btn-sm">배송 완료</button>
+                        </form>
+                    </div>
+
+                    <!--
                         배송 시작 폼: preparing 배송에만 노출.
                         POST /admin/shipments/{shipmentId}/ship (절대경로 — 클래스 매핑과 base path 다름, plan C3).
                         th:action 사용 시 _csrf 토큰 자동 주입 (Thymeleaf + Spring Security).
