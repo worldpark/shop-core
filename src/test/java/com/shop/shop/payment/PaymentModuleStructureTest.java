@@ -198,4 +198,42 @@ class PaymentModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 022 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 9: UnpaidOrderExpiryScheduler·OrderExpiryProperties·OrderExpirySchedulingConfig가 payment 모듈에 위치한다 (022).
+     *
+     * <p>만료 오케스트레이션은 payment 모듈이 소유한다(018 대칭 — 순환 없음).
+     */
+    @Test
+    @DisplayName("규칙 9: 만료 스케줄러 컴포넌트가 payment 모듈(payment.service)에 위치함 (022)")
+    void expiryScheduler_resides_in_payment_service_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("UnpaidOrderExpiryScheduler")
+                .should().resideOutsideOfPackage("com.shop.shop.payment.service..")
+                .because("만료 스케줄러는 payment 모듈이 소유해야 한다(022 — 018 대칭 순환 없음).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 10: OrderExpiryReader가 order.spi 패키지에 위치한다 (022).
+     *
+     * <p>만료 대상 조회 SPI는 order 모듈이 소유한다.
+     */
+    @Test
+    @DisplayName("규칙 10: OrderExpiryReader가 order.spi 패키지에 위치함 (022)")
+    void orderExpiryReader_resides_in_order_spi_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderExpiryReader")
+                .should().resideOutsideOfPackage("com.shop.shop.order.spi..")
+                .because("만료 대상 조회 SPI는 order 모듈(order.spi)이 소유해야 한다(022).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

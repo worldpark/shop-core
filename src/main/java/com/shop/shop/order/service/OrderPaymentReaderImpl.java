@@ -120,6 +120,31 @@ class OrderPaymentReaderImpl implements OrderPaymentReader {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>시스템 만료 전용 — orders row PESSIMISTIC_WRITE 잠금, 소유권 검증 없음(시스템 주도).
+     * PaymentService.expirePendingOrder의 쓰기 트랜잭션 안에서 호출.
+     * 락은 같은 트랜잭션의 cancelByExpiry까지 유효(재진입, R3).
+     */
+    @Override
+    @Transactional
+    public OrderSnapshotView getOrderForExpiry(long orderId) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        // 소유권 검증 없음 — 시스템 주도
+
+        return new OrderSnapshotView(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getUserId(),
+                order.getStatus(),
+                order.getFinalAmount(),
+                CURRENCY_KRW
+        );
+    }
+
+    /**
      * 이벤트 완결성 사전검증.
      *
      * <p>variantId → productId 해석 불가 또는 member 연락처 미존재 시

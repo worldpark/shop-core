@@ -49,6 +49,22 @@ public interface OrderCancellation {
     OrderCancellationResult cancel(long orderId, long requesterUserId, RefundInfo refundInfo);
 
     /**
+     * 시스템 주도 미결제 만료 취소 — 소유권 검사 없음.
+     *
+     * <p>{@code pending} 전용·환불 없음({@code RefundInfo(false, 0, "KRW")} 고정).
+     * 사용자 취소 {@link #cancel(long, long, RefundInfo)}와 <b>전이+복원+이벤트 코어를 공유</b>(R2 — 로직 복제 금지).
+     * orders row 락 재진입(R3).
+     *
+     * <p>정상 흐름 Outcome = {@link Outcome#CANCELLED}, 이미 종결 = {@link Outcome#ALREADY_CANCELLED}(멱등).
+     * 만료 정상 흐름에서 {@link Outcome#REJECTED}(이행단계) 미발생 — {@code pending}만 조회·재검증되므로.
+     *
+     * @param orderId 주문 ID
+     * @return 취소 결과
+     * @throws com.shop.shop.common.exception.OrderNotFoundException 미존재 주문 (404)
+     */
+    OrderCancellationResult cancelByExpiry(long orderId);
+
+    /**
      * 환불 정보 — payment 모듈이 환불 결정 후 전달.
      *
      * @param refunded        환불 여부 (결제완료 취소=true, 미결제 취소=false)

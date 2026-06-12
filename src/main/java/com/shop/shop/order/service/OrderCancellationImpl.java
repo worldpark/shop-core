@@ -33,12 +33,22 @@ import java.util.stream.Collectors;
  *
  * <p>처리:
  * <ol>
- *   <li>orders row {@code PESSIMISTIC_WRITE} 비관락 + 소유권 재검증</li>
- *   <li>status 분기 (ALREADY_CANCELLED/REJECTED/진행)</li>
- *   <li>종결 전이 (markRefunded 또는 markCancelled, #3)</li>
- *   <li>재고 복원 (variantId 오름차순 increase, null skip+log)</li>
- *   <li>OrderCancelledEvent 구성·발행 (Outbox)</li>
+ *   <li>orders row {@code PESSIMISTIC_WRITE} 비관락 + (사용자 취소 경로) 소유권 재검증</li>
+ *   <li>{@code doCancel(lockedOrder, refundInfo)} 코어 공유(R2):
+ *     <ul>
+ *       <li>status 분기 (ALREADY_CANCELLED/REJECTED/진행)</li>
+ *       <li>종결 전이 (markRefunded 또는 markCancelled, #3)</li>
+ *       <li>재고 복원 (variantId 오름차순 increase, null skip+log)</li>
+ *       <li>OrderCancelledEvent 구성·발행 (Outbox)</li>
+ *     </ul>
+ *   </li>
  * </ol>
+ *
+ * <p>진입점:
+ * <ul>
+ *   <li>{@link #cancel(long, long, RefundInfo)} — 사용자 취소(소유권 검증 O)</li>
+ *   <li>{@link #cancelByExpiry(long)} — 시스템 만료(소유권 검증 없음, RefundInfo 고정)</li>
+ * </ul>
  */
 @Slf4j
 @Service
@@ -56,6 +66,9 @@ class OrderCancellationImpl implements OrderCancellation {
 
     /**
      * {@inheritDoc}
+     *
+     * <p>사용자 취소 진입점: orders row 비관락 → 소유권 검증 → {@link #doCancel} 코어.
+     * 기존 동작·시그니처 보존(R2 — 회귀 0).
      */
     @Override
     public OrderCancellationResult cancel(long orderId, long requesterUserId, RefundInfo refundInfo) {
@@ -68,15 +81,49 @@ class OrderCancellationImpl implements OrderCancellation {
             throw new OrderNotFoundException();
         }
 
-        String currentStatus = order.getStatus();
+        // 3. 코어 위임
+        return doCancel(order, refundInfo);
+    }
 
-        // 3. status 분기
+    /**
+     * {@inheritDoc}
+     *
+     * <p>시스템 만료 진입점: orders row 비관락(재진입, R3) → 소유권 검증 없음 → {@link #doCancel} 코어.
+     * {@code pending} 전용·환불 없음({@code RefundInfo(false, 0, "KRW")} 고정).
+     */
+    @Override
+    public OrderCancellationResult cancelByExpiry(long orderId) {
+        // 1. orders row 비관락 (PaymentService.expirePendingOrder가 이미 잡은 락 재진입, R3)
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        // 2. 소유권 검증 없음 (시스템 주도 — userId 없음)
+
+        // 3. 코어 위임 (refunded=false, refundedAmount=0, currency=KRW 고정)
+        return doCancel(order, new RefundInfo(false, 0L, CURRENCY_KRW));
+    }
+
+    /**
+     * 취소 코어 — status 분기 + 종결 전이 + 재고 복원 + 이벤트 발행(R2).
+     *
+     * <p>소유권 검증은 호출자({@link #cancel} / {@link #cancelByExpiry})가 담당한다.
+     * 이미 락·(사용자 경로)소유권을 통과한 {@link Order}를 받는다.
+     *
+     * @param lockedOrder 락 획득·(필요 시)소유권 검증 완료된 주문
+     * @param refundInfo  환불 정보
+     * @return 취소 결과
+     */
+    private OrderCancellationResult doCancel(Order lockedOrder, RefundInfo refundInfo) {
+        long orderId = lockedOrder.getId();
+        String currentStatus = lockedOrder.getStatus();
+
+        // status 분기
         // 이미 종결 → 멱등 반환 (재복원·재발행 없음)
         if ("cancelled".equals(currentStatus) || "refunded".equals(currentStatus)) {
             log.info("주문 이미 취소/환불 — 멱등 반환: orderId={}, status={}", orderId, currentStatus);
             return new OrderCancellationResult(
-                    order.getId(),
-                    order.getOrderNumber(),
+                    lockedOrder.getId(),
+                    lockedOrder.getOrderNumber(),
                     Outcome.ALREADY_CANCELLED,
                     currentStatus,
                     false,
@@ -89,8 +136,8 @@ class OrderCancellationImpl implements OrderCancellation {
         if ("preparing".equals(currentStatus) || "shipping".equals(currentStatus) || "delivered".equals(currentStatus)) {
             log.warn("주문 이행단계 취소 불가(OrderCancellation 내부): orderId={}, status={}", orderId, currentStatus);
             return new OrderCancellationResult(
-                    order.getId(),
-                    order.getOrderNumber(),
+                    lockedOrder.getId(),
+                    lockedOrder.getOrderNumber(),
                     Outcome.REJECTED,
                     currentStatus,
                     false,
@@ -101,19 +148,20 @@ class OrderCancellationImpl implements OrderCancellation {
 
         Instant cancelledAt = Instant.now();
 
-        // 4. 종결 전이 (#3: refunded 동반=markRefunded→refunded / 미결제=markCancelled→cancelled)
+        // 종결 전이 (#3: refunded 동반=markRefunded→refunded / 미결제=markCancelled→cancelled)
         if (refundInfo.refunded()) {
-            order.markRefunded();  // paid → refunded
+            lockedOrder.markRefunded();  // paid → refunded
         } else {
-            order.markCancelled(); // pending → cancelled
+            lockedOrder.markCancelled(); // pending → cancelled
         }
 
-        // 5. 재고 복원 — variantId 오름차순, null skip+log (best-effort)
-        List<OrderItem> items = order.getItems();
+        // 재고 복원 — variantId 오름차순, null skip+log (best-effort)
+        List<OrderItem> items = lockedOrder.getItems();
         List<OrderItem> sortedItems = items.stream()
                 .filter(item -> {
                     if (item.getVariantId() == null) {
-                        log.warn("재고 복원 skip(variantId null): orderId={}, productName={}", orderId, item.getProductName());
+                        log.warn("재고 복원 skip(variantId null): orderId={}, productName={}",
+                                orderId, item.getProductName());
                         return false;
                     }
                     return true;
@@ -125,8 +173,8 @@ class OrderCancellationImpl implements OrderCancellation {
             inventoryStockPort.increase(item.getVariantId(), item.getQuantity());
         }
 
-        // 6. OrderCancelledEvent 구성·발행
-        OrderCancelledEvent event = buildOrderCancelledEvent(order, refundInfo, cancelledAt);
+        // OrderCancelledEvent 구성·발행
+        OrderCancelledEvent event = buildOrderCancelledEvent(lockedOrder, refundInfo, cancelledAt);
 
         log.info("OrderCancelledEvent 발행 시도: eventId={}, topic={}, orderId={}",
                 event.eventId(), OrderCancelledEvent.TOPIC, orderId);
@@ -135,10 +183,10 @@ class OrderCancellationImpl implements OrderCancellation {
                 event.eventId(), OrderCancelledEvent.TOPIC);
 
         return new OrderCancellationResult(
-                order.getId(),
-                order.getOrderNumber(),
+                lockedOrder.getId(),
+                lockedOrder.getOrderNumber(),
                 Outcome.CANCELLED,
-                order.getStatus(),
+                lockedOrder.getStatus(),
                 true,
                 cancelledAt,
                 null
@@ -148,9 +196,10 @@ class OrderCancellationImpl implements OrderCancellation {
     /**
      * OrderCancelledEvent 페이로드 구성.
      *
-     * <p>member 연락처는 member.spi, item productId는 product.spi 해석.
+     * <p>member 연락처는 member.spi, item productId는 product.spi 해석(R4 — 만료 경로도 동일).
      * productName/quantity는 order_items 스냅샷 출처(주문 시점 값, 이후 변경 무영향).
      * 삭제된 variant(variantId null) 항목은 이벤트 items에서 제외하고 로깅.
+     *
      * @param order       취소된 주문 (items lazy 로딩 허용 — 같은 트랜잭션)
      * @param refundInfo  환불 정보
      * @param cancelledAt 취소 처리 시각
@@ -211,5 +260,4 @@ class OrderCancellationImpl implements OrderCancellation {
                 cancelledAt
         );
     }
-
 }

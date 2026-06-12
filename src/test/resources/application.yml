@@ -28,6 +28,10 @@ spring:
 # secret: 충분한 길이(32자 이상) 더미값 — 운영 환경 secret과 무관
 # TTL: 테스트 검증 편의를 위해 짧은 값 사용
 shop:
+  order:
+    pending-expiry:
+      enabled: false  # 테스트 컨텍스트: 스케줄러 빈 비활성 (verification-gate §4)
+
   security:
     jwt:
       secret: test-secret-key-for-shop-core-test-environment-only-32chars

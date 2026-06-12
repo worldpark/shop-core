@@ -10,7 +10,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -95,4 +97,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     Page<Order> findByStatusInOrderByCreatedAtDescIdDesc(
             Collection<String> statuses, Pageable pageable);
+
+    /**
+     * TTL 초과 pending 주문 id 스칼라 조회 (만료 스케줄러 전용).
+     *
+     * <p>{@code status = 'pending' AND created_at < :threshold} 조건으로 id만 조회한다.
+     * Entity 적재 없음 — 과도한 락·메모리 방지.
+     * 정렬: {@code created_at ASC, id ASC}(오래된 것 먼저).
+     * {@code Pageable}로 배치 한도({@code PageRequest.of(0, batchLimit)})를 주입한다.
+     *
+     * @param threshold 만료 판정 기준 시각 ({@code now - ttl})
+     * @param pageable  배치 한도 (PageRequest.of(0, limit))
+     * @return 만료 대상 주문 id 목록
+     */
+    @Query("select o.id from Order o where o.status = 'pending' and o.createdAt < :threshold " +
+           "order by o.createdAt asc, o.id asc")
+    List<Long> findExpiredPendingOrderIds(@Param("threshold") Instant threshold, Pageable pageable);
 }

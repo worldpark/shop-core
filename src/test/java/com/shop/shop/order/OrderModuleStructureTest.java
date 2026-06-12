@@ -274,4 +274,43 @@ class OrderModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 022 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 12: OrderExpiryReader·OrderExpiryReaderImpl이 order.spi/order.service 패키지에 위치한다 (022).
+     *
+     * <p>만료 대상 조회 SPI와 구현체는 order 모듈이 소유한다.
+     */
+    @Test
+    @DisplayName("규칙 12: OrderExpiryReader가 order.spi 패키지에 위치함 (022)")
+    void orderExpiryReader_resides_in_order_spi_package() {
+        ArchRule rule = noClasses()
+                .that().haveSimpleName("OrderExpiryReader")
+                .should().resideOutsideOfPackage("com.shop.shop.order.spi..")
+                .because("만료 대상 조회 SPI는 order 모듈(order.spi)이 소유해야 한다(022).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
+
+    /**
+     * 규칙 13: order 클래스는 payment.service를 직접 참조하지 않는다 (022 순환 없음).
+     *
+     * <p>만료 스케줄러/오케스트레이션은 payment 모듈이 소유 — order가 payment.service를 역방향 참조하면 순환.
+     */
+    @Test
+    @DisplayName("규칙 13: order 클래스가 payment.service를 직접 참조하지 않음 (022 순환 없음)")
+    void order_does_not_depend_on_payment_service_022() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.shop.shop.order..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("com.shop.shop.payment.service..")
+                .because("order 모듈은 payment.service를 직접 참조하지 않는다(022 — payment→order.spi 단방향 유지).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

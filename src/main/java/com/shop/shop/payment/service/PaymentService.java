@@ -11,6 +11,7 @@ import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.order.spi.OrderCancellation;
 import com.shop.shop.order.spi.OrderCancellation.OrderCancellationResult;
+import com.shop.shop.order.spi.OrderCancellation.Outcome;
 import com.shop.shop.order.spi.OrderCancellation.RefundInfo;
 import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.order.spi.OrderConfirmation.OrderConfirmationResult;
@@ -283,6 +284,59 @@ public class PaymentService {
         } else {
             return CancelResult.cancelled(orderId, snapshot.orderNumber(), cancellationResult.orderStatus());
         }
+    }
+
+    /**
+     * 시스템 주도 미결제 만료 오케스트레이션.
+     *
+     * <p>소유권 검사 없음(시스템). {@code pending} 전용·환불 없음.
+     * R1: 별도 빈(UnpaidOrderExpiryScheduler)에서 호출 — self-invocation 프록시 우회 없음.
+     * R3: 1단계 locked reader 락이 4단계 cancelByExpiry까지 유지(재진입).
+     *
+     * <p>처리 흐름:
+     * <ol>
+     *   <li>시스템 만료 locked reader로 orders row {@code PESSIMISTIC_WRITE} 잠금(소유권 없음)</li>
+     *   <li>락 후 권위 재검증: {@code pending}이면 진행, 그 외 멱등 skip(return)</li>
+     *   <li>결제 row 있으면({@code ready}/{@code failed}) {@code Payment.markCancelled}. PG 환불 없음. (R3 — 1단계 락 보유 상태)</li>
+     *   <li>{@link OrderCancellation#cancelByExpiry} 위임(소유권 없음) → 종결 전이 + 재고 복원 + 이벤트 발행</li>
+     *   <li>방어: Outcome이 {@code CANCELLED} 아니면 {@link IllegalStateException}(락 불변식 위반)</li>
+     * </ol>
+     *
+     * @param orderId 주문 ID
+     * @throws IllegalStateException cancelByExpiry가 CANCELLED 외 Outcome 반환 시 (락 불변식 위반, 500)
+     */
+    @Transactional
+    public void expirePendingOrder(long orderId) {
+        // ① 시스템 만료 locked reader — orders row PESSIMISTIC_WRITE 잠금, 소유권 없음 (R3 락 우선)
+        OrderSnapshotView snapshot = orderPaymentReader.getOrderForExpiry(orderId);
+
+        String status = snapshot.status();
+
+        // ② 락 후 권위 재검증 — pending이 아니면 멱등 skip (만료/결제 race 차단)
+        if (!"pending".equals(status)) {
+            log.info("만료 대상 아님 — 멱등 skip: orderId={}, status={}", orderId, status);
+            return;
+        }
+
+        // ③ 결제 row 전이 (1단계 락 보유 상태, R3) — PG 환불 없음
+        Payment payment = paymentRepository.findByOrderId(orderId).orElse(null);
+        if (payment != null) {
+            payment.markCancelled(); // ready/failed → cancelled
+        }
+
+        // ④ order.spi 시스템 취소 위임 — 소유권 없음, pending 전용, refunded=false
+        OrderCancellationResult result = orderCancellation.cancelByExpiry(orderId);
+
+        // 방어 검증: 2단계에서 pending 확인했으므로 같은 락 하에서 CANCELLED여야 함
+        if (result.outcome() != Outcome.CANCELLED) {
+            throw new IllegalStateException(
+                    "cancelByExpiry가 CANCELLED 외 Outcome을 반환했습니다 — 락 불변식 위반. orderId=" + orderId
+                    + ", outcome=" + result.outcome());
+        }
+
+        log.info("미결제 주문 만료 완료: orderId={}, orderNumber={}", orderId, snapshot.orderNumber());
+
+        // ⑤ 원자 커밋 (orders cancelled + payments cancelled? + stock 증가 + event_publication 1행)
     }
 
     /**

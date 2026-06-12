@@ -75,6 +75,21 @@ public interface OrderPaymentReader {
     OrderSnapshotView getOrderForCancel(long orderId, long requesterUserId);
 
     /**
+     * 시스템 만료 전용 locked 주문 스냅샷 조회.
+     *
+     * <p><b>orders row PESSIMISTIC_WRITE 잠금, 소유권 검증 없음(시스템 주도).</b>
+     * 환불 결정 전 락 선점(R3) — 동시 결제({@code confirmPaid})·동시 사용자 취소와 직렬화.
+     * 같은 트랜잭션의 {@link OrderCancellation#cancelByExpiry}까지 락 유효(재진입).
+     *
+     * <p>{@link #getOrderForCancel}(소유권 검증 O)과 대비.
+     *
+     * @param orderId 주문 ID
+     * @return 만료 판정용 주문 스냅샷 (orders row 락 획득 상태, 소유권 없음)
+     * @throws com.shop.shop.common.exception.OrderNotFoundException 미존재 주문 (404)
+     */
+    OrderSnapshotView getOrderForExpiry(long orderId);
+
+    /**
      * 결제 준비용 주문 스냅샷 (Entity 미노출, scalar only).
      *
      * @param orderId     주문 PK
