@@ -3,6 +3,7 @@ package com.shop.shop.member;
 import com.shop.shop.member.controller.MemberRestController;
 import com.shop.shop.web.member.MemberSignupViewController;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberServiceResponse;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -53,6 +54,9 @@ class MemberSignupWiringTest {
 
     @MockitoBean
     MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     MemberUserDetailsService memberUserDetailsService;

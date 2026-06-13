@@ -2,6 +2,7 @@ package com.shop.shop.web.member;
 
 import com.shop.shop.common.exception.DuplicateEmailException;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.member.spi.MemberSignupFacade;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -67,6 +68,9 @@ class MemberSignupViewControllerTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberSignupFacade memberSignupFacade;

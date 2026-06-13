@@ -14,6 +14,7 @@ import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.common.exception.CartItemNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
@@ -78,6 +79,9 @@ class CartRestControllerSecurityTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

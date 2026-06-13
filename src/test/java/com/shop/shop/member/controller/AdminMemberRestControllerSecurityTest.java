@@ -5,6 +5,7 @@ import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.RoleChangeRequest;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.common.exception.MemberNotFoundException;
 import com.shop.shop.common.exception.RoleChangeNotAllowedException;
@@ -81,6 +82,9 @@ class AdminMemberRestControllerSecurityTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

@@ -6,6 +6,7 @@ import com.shop.shop.common.exception.ProductAccessDeniedException;
 import com.shop.shop.common.storage.AssetUrlResolver;
 import com.shop.shop.common.storage.StorageProperties;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductImage;
@@ -83,6 +84,9 @@ class SellerProductImageRestControllerSecurityTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

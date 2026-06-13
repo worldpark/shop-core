@@ -1,6 +1,7 @@
 package com.shop.shop.view;
 
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
@@ -51,6 +52,9 @@ class LayoutRenderingTest {
 
     @MockitoBean
     MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     MemberUserDetailsService memberUserDetailsService;

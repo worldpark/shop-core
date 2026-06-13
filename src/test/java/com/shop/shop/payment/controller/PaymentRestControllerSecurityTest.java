@@ -10,6 +10,7 @@ import com.shop.shop.common.exception.PaymentEventResolutionException;
 import com.shop.shop.common.exception.PaymentInProgressException;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
@@ -81,6 +82,9 @@ class PaymentRestControllerSecurityTest {
     // Repository mocks (DB 자동설정 제외 환경)
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
     @MockitoBean

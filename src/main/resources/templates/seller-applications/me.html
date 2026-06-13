@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!--
+    내 판매자 신청 상태 화면.
+    view name: seller-applications/me
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약 (view-implementor 인수 사항):
+      - model.sellerApplication (SellerApplicationResponse, nullable): 신청 이력 없으면 null
+        ('application'은 Thymeleaf 암묵 scope 객체와 충돌하므로 사용 금지 — E2E로 발견)
+        - id, status (PENDING|APPROVED|REJECTED as String), businessName,
+          businessRegistrationNumber, contactPhone, rejectReason (nullable),
+          createdAt, decidedAt (nullable)
+      - sellerApplication=null: 신청 이력 없음 안내 + 신청 화면 링크
+      - sellerApplication!=null: 신청 상태 표시 (status 별 분기)
+      - flash.flashSuccess: 신청 성공 메시지 (layout/base 경유 자동 표시)
+      - flash.flashError: 오류 메시지 (layout/base 경유 자동 표시)
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>내 판매자 신청 현황</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">내 판매자 신청 현황</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- 신청 이력 없음 -->
+        <div th:if="${sellerApplication == null}">
+            <p style="color: #555; margin-bottom: 16px;">아직 판매자 신청 이력이 없습니다.</p>
+            <a th:href="@{/seller-applications/apply}" class="btn btn-primary">판매자 신청하기</a>
+        </div>
+
+        <!-- 신청 이력 있음 -->
+        <div th:if="${sellerApplication != null}" style="max-width: 600px;">
+
+            <!-- 상태 배지 -->
+            <div style="margin-bottom: 20px;">
+                <span th:if="${sellerApplication.status == 'PENDING'}"
+                      class="alert alert-info"
+                      style="display: inline-block; padding: 6px 14px; border-radius: 4px;">
+                    심사 중 (PENDING)
+                </span>
+                <span th:if="${sellerApplication.status == 'APPROVED'}"
+                      class="alert alert-success"
+                      style="display: inline-block; padding: 6px 14px; border-radius: 4px;">
+                    승인됨 (APPROVED)
+                </span>
+                <span th:if="${sellerApplication.status == 'REJECTED'}"
+                      class="alert alert-error"
+                      style="display: inline-block; padding: 6px 14px; border-radius: 4px;">
+                    반려됨 (REJECTED)
+                </span>
+            </div>
+
+            <!-- 신청 정보 테이블 -->
+            <div class="table-wrapper">
+                <table class="members-table">
+                    <tbody>
+                        <tr>
+                            <th style="width: 160px;">신청 상태</th>
+                            <td th:text="${sellerApplication.status}"></td>
+                        </tr>
+                        <tr>
+                            <th>상호명</th>
+                            <td th:text="${sellerApplication.businessName}"></td>
+                        </tr>
+                        <tr>
+                            <th>사업자등록번호</th>
+                            <td th:text="${sellerApplication.businessRegistrationNumber}"></td>
+                        </tr>
+                        <tr>
+                            <th>담당자 연락처</th>
+                            <td th:text="${sellerApplication.contactPhone}"></td>
+                        </tr>
+                        <tr th:if="${sellerApplication.rejectReason != null}">
+                            <th>반려 사유</th>
+                            <td th:text="${sellerApplication.rejectReason}" style="color: #721c24;"></td>
+                        </tr>
+                        <tr>
+                            <th>신청일</th>
+                            <td th:text="${sellerApplication.createdAt}"></td>
+                        </tr>
+                        <tr th:if="${sellerApplication.decidedAt != null}">
+                            <th>처리일</th>
+                            <td th:text="${sellerApplication.decidedAt}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- REJECTED 시 재신청 안내 -->
+            <div th:if="${sellerApplication.status == 'REJECTED'}" style="margin-top: 20px;">
+                <p style="color: #555; margin-bottom: 12px;">반려된 신청입니다. 사유를 확인하고 다시 신청할 수 있습니다.</p>
+                <a th:href="@{/seller-applications/apply}" class="btn btn-primary">다시 신청하기</a>
+            </div>
+
+            <!-- PENDING 시 안내 -->
+            <div th:if="${sellerApplication.status == 'PENDING'}" style="margin-top: 16px;">
+                <p style="color: #555; font-size: 14px;">심사 진행 중입니다. 결과가 나오면 이 화면에서 확인할 수 있습니다.</p>
+            </div>
+
+            <!-- APPROVED 시 안내 -->
+            <div th:if="${sellerApplication.status == 'APPROVED'}" style="margin-top: 16px;">
+                <p style="color: #276749; font-size: 14px;">판매자 신청이 승인되었습니다. 이제 상품을 등록할 수 있습니다.</p>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

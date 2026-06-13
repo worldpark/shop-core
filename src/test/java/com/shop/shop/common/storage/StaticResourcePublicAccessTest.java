@@ -1,6 +1,7 @@
 package com.shop.shop.common.storage;
 
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
@@ -64,6 +65,9 @@ class StaticResourcePublicAccessTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

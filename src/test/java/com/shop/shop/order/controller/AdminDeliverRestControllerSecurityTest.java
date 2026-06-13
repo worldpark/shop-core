@@ -7,6 +7,7 @@ import com.shop.shop.common.exception.OrderFulfillmentConflictException;
 import com.shop.shop.common.exception.ShipmentNotFoundException;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipmentItemResponse;
@@ -78,6 +79,9 @@ class AdminDeliverRestControllerSecurityTest {
     // 컨텍스트 로드에 필요한 Repository mocks
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

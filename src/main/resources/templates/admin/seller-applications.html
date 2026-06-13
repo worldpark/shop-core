@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<!--
+    관리자 판매자 신청 심사 화면.
+    view name: admin/seller-applications
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약 (view-implementor 인수 사항):
+      - model.applications (Page<SellerApplicationSummaryResponse>): 신청 목록
+        - id, userId, status (PENDING|APPROVED|REJECTED as String), businessName,
+          businessRegistrationNumber, contactPhone, decidedAt (nullable), createdAt
+      - model.status (String, 빈 문자열=전체): 현재 필터 상태
+      - 목록 필터: GET th:action="@{/admin/seller-applications}" status 파라미터
+      - 승인 폼: POST /admin/seller-applications/{id}/approve (CSRF 자동 — th:action 사용)
+      - 반려 폼: POST /admin/seller-applications/{id}/reject + rejectReason 입력 필드 (Backend-View Contract)
+      - PENDING 행에만 승인/반려 폼 노출
+      - flash.flashSuccess / flash.flashError: layout/base 경유 자동 표시
+      - 페이지네이션: applications.number, applications.totalPages, applications.totalElements
+      - 008 admin/members.html 패턴 계승
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>판매자 신청 심사</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">판매자 신청 심사</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- 상태 필터 폼 (GET — CSRF 불요) -->
+        <form class="search-form"
+              method="get"
+              th:action="@{/admin/seller-applications}">
+            <div class="search-form-row">
+                <div class="form-group search-role">
+                    <label for="status">신청 상태</label>
+                    <select id="status" name="status" class="role-select" style="min-width: 140px;">
+                        <option value="" th:selected="${status == '' or status == null}">전체</option>
+                        <option value="PENDING" th:selected="${status == 'PENDING'}">심사 중 (PENDING)</option>
+                        <option value="APPROVED" th:selected="${status == 'APPROVED'}">승인 (APPROVED)</option>
+                        <option value="REJECTED" th:selected="${status == 'REJECTED'}">반려 (REJECTED)</option>
+                    </select>
+                </div>
+                <div class="form-group search-submit">
+                    <button type="submit" class="btn btn-primary">필터 적용</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- 신청 목록 테이블 -->
+        <div class="table-wrapper">
+            <table class="members-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>신청자 ID</th>
+                        <th>상호명</th>
+                        <th>사업자등록번호</th>
+                        <th>연락처</th>
+                        <th>상태</th>
+                        <th>신청일</th>
+                        <th>처리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 목록 없음 안내 -->
+                    <tr th:if="${applications.content.isEmpty()}">
+                        <td colspan="8" class="empty-msg">신청 내역이 없습니다.</td>
+                    </tr>
+                    <!-- 신청 행 반복 (applications.content — Page 내부 실제 목록) -->
+                    <tr th:each="app : ${applications.content}">
+                        <td th:text="${app.id}"></td>
+                        <td th:text="${app.userId}"></td>
+                        <td th:text="${app.businessName}"></td>
+                        <td th:text="${app.businessRegistrationNumber}"></td>
+                        <td th:text="${app.contactPhone}"></td>
+                        <td>
+                            <span th:if="${app.status == 'PENDING'}"
+                                  style="color: #1a4971; font-weight: 600;"
+                                  th:text="${app.status}"></span>
+                            <span th:if="${app.status == 'APPROVED'}"
+                                  style="color: #276749; font-weight: 600;"
+                                  th:text="${app.status}"></span>
+                            <span th:if="${app.status == 'REJECTED'}"
+                                  style="color: #721c24; font-weight: 600;"
+                                  th:text="${app.status}"></span>
+                        </td>
+                        <td th:text="${app.createdAt}"></td>
+                        <td>
+                            <!-- PENDING 행에만 승인/반려 폼 노출 -->
+                            <div th:if="${app.status == 'PENDING'}" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- 승인 폼 (POST — th:action 사용 시 _csrf 자동 주입) -->
+                                <form th:action="@{/admin/seller-applications/{id}/approve(id=${app.id})}"
+                                      method="post"
+                                      style="display: inline;">
+                                    <button type="submit"
+                                            class="btn btn-sm btn-primary"
+                                            onclick="return confirm('신청 ID ' + /*[[${app.id}]]*/ '' + '을 승인하시겠습니까?');">
+                                        승인
+                                    </button>
+                                </form>
+                                <!-- 반려 폼 (POST — rejectReason 필드는 Backend-View Contract) -->
+                                <form th:action="@{/admin/seller-applications/{id}/reject(id=${app.id})}"
+                                      method="post"
+                                      style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <input type="text"
+                                           name="rejectReason"
+                                           placeholder="반려 사유 입력"
+                                           required
+                                           style="width: 160px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;">
+                                    <button type="submit" class="btn btn-sm btn-secondary">반려</button>
+                                </form>
+                            </div>
+                            <!-- 비-PENDING 행: 처리 완료 표시 -->
+                            <div th:if="${app.status != 'PENDING'}">
+                                <span style="color: #888; font-size: 13px;">처리 완료</span>
+                                <div th:if="${app.decidedAt != null}"
+                                     style="font-size: 12px; color: #aaa; margin-top: 2px;"
+                                     th:text="${app.decidedAt}"></div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 페이지네이션 (008 admin/members.html 패턴 계승) -->
+        <div class="pagination" th:if="${applications.totalPages > 0}">
+            <span class="page-info">
+                <span th:text="${applications.number + 1}">1</span> /
+                <span th:text="${applications.totalPages}">1</span> 페이지
+                (총 <span th:text="${applications.totalElements}">0</span>건)
+            </span>
+            <div class="page-nav">
+                <!-- 이전 페이지 -->
+                <a th:if="${applications.number > 0}"
+                   th:href="@{/admin/seller-applications(status=${status}, page=${applications.number - 1}, size=${applications.size})}"
+                   class="btn btn-sm btn-outline">이전</a>
+                <span th:if="${applications.number == 0}"
+                      class="btn btn-sm btn-outline disabled">이전</span>
+
+                <!-- 다음 페이지 -->
+                <a th:if="${applications.number + 1 < applications.totalPages}"
+                   th:href="@{/admin/seller-applications(status=${status}, page=${applications.number + 1}, size=${applications.size})}"
+                   class="btn btn-sm btn-outline">다음</a>
+                <span th:if="${applications.number + 1 >= applications.totalPages}"
+                      class="btn btn-sm btn-outline disabled">다음</span>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

@@ -5,6 +5,7 @@ import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.common.exception.OrderCancellationConflictException;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.OrderItemOptionValueResponse;
 import com.shop.shop.order.dto.OrderItemResponse;
@@ -93,6 +94,9 @@ class OrderCancelViewRenderingTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

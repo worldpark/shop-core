@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+    판매자 신청 폼 화면.
+    view name: seller-applications/apply
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약 (view-implementor 인수 사항):
+      - model.eligible (boolean): 신청 자격 여부
+      - model.reason (String, nullable): 부적격 사유 (eligible=false 시)
+      - model.form (SellerApplicationForm): 폼 백킹 객체
+      - 폼 th:action="@{/seller-applications}" method="post"
+      - 필드: businessName / businessRegistrationNumber (숫자 10자리) / contactPhone
+      - CSRF: th:action 자동 주입
+      - 자격 미달(eligible=false) 시 안내 메시지 + 홈/내 신청 링크 (보안 차단 아님, 안내 분기)
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>판매자 신청</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">판매자 신청</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- 부적격 안내 (eligible=false) — 보안 차단이 아닌 UI 안내 분기 -->
+        <div th:if="${not eligible}" class="alert alert-info">
+            <p th:if="${reason != null}" th:text="${reason}">자격 안내</p>
+            <p th:if="${reason == null}">현재 판매자 신청 자격이 없습니다.</p>
+            <div style="margin-top: 12px;">
+                <a th:href="@{/}" class="btn btn-outline btn-sm">홈으로</a>
+                <a th:href="@{/seller-applications/me}" class="btn btn-outline btn-sm" style="margin-left: 8px;">내 신청 현황</a>
+            </div>
+        </div>
+
+        <!-- 신청 폼 (자격 있을 때만 노출) -->
+        <form th:if="${eligible}"
+              th:action="@{/seller-applications}"
+              method="post"
+              th:object="${form}"
+              class="seller-apply-form"
+              style="max-width: 480px;">
+
+            <div class="form-group">
+                <label for="businessName">상호명</label>
+                <input type="text"
+                       id="businessName"
+                       th:field="*{businessName}"
+                       placeholder="상호명을 입력하세요"
+                       autocomplete="organization">
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('businessName')}"
+                      th:errors="*{businessName}"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="businessRegistrationNumber">사업자등록번호 <span class="optional">(숫자 10자리)</span></label>
+                <input type="text"
+                       id="businessRegistrationNumber"
+                       th:field="*{businessRegistrationNumber}"
+                       placeholder="숫자 10자리 (예: 1234567890)"
+                       maxlength="10"
+                       autocomplete="off">
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('businessRegistrationNumber')}"
+                      th:errors="*{businessRegistrationNumber}"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="contactPhone">담당자 연락처</label>
+                <input type="text"
+                       id="contactPhone"
+                       th:field="*{contactPhone}"
+                       placeholder="예: 010-0000-0000"
+                       autocomplete="tel">
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('contactPhone')}"
+                      th:errors="*{contactPhone}"></span>
+            </div>
+
+            <div style="margin-top: 24px;">
+                <button type="submit" class="btn btn-primary">신청하기</button>
+                <a th:href="@{/}" class="btn btn-outline" style="margin-left: 8px;">취소</a>
+            </div>
+        </form>
+    </div>
+</main>
+</body>
+</html>

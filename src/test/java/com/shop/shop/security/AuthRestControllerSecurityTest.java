@@ -5,6 +5,7 @@ import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberService;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -76,6 +77,9 @@ class AuthRestControllerSecurityTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberService memberService;

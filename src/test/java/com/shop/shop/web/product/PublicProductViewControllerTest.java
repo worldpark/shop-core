@@ -2,6 +2,7 @@ package com.shop.shop.web.product;
 
 import com.shop.shop.common.exception.ProductNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.PublicCategoryResponse;
@@ -75,6 +76,9 @@ class PublicProductViewControllerTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;

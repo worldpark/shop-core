@@ -2,6 +2,7 @@ package com.shop.shop.product;
 
 import com.shop.shop.member.adapter.MemberUserDirectoryAdapter;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.controller.AdminCategoryRestController;
 import com.shop.shop.product.controller.CategoryRestController;
@@ -64,6 +65,9 @@ class ProductWiringTest {
 
     @MockitoBean
     MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     MemberUserDetailsService memberUserDetailsService;

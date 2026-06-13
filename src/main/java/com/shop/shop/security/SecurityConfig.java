@@ -76,6 +76,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/products/*").permitAll()
                     // 관리자 전용 REST API (anyRequest 앞에 배치)
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                    // 판매자 신청 REST API — 보안 floor authenticated (자격은 서비스 409 — Task 027 §1.1)
+                    // admin REST(/api/v1/admin/**)가 이미 ADMIN 커버. consumer 신청만 의도 명시.
+                    .requestMatchers("/api/v1/seller-applications/**").authenticated()
                     // 판매자 이상 REST API (ADMIN 함의) — anyRequest 앞에 배치
                     .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
                     // 장바구니 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
@@ -124,6 +127,9 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/products/*").permitAll()
                     // 관리자 전용 View 경로 (anyRequest 앞에 배치)
                     .requestMatchers("/admin/**").hasRole("ADMIN")
+                    // 판매자 신청 View 경로 — 보안 floor authenticated (자격은 서비스 409 — Task 027 §1.1)
+                    // hasRole("CONSUMER") 금지: SELLER/ADMIN도 진입 가능(안내 화면 도달 보장)
+                    .requestMatchers("/seller-applications/**").authenticated()
                     // 판매자 이상 View 경로 (ADMIN 함의) — anyRequest 앞에 배치
                     .requestMatchers("/seller/**").hasRole("SELLER")
                     // 장바구니 View 경로 — 최소 ROLE_CONSUMER (미인증은 formLogin이 302→/login)

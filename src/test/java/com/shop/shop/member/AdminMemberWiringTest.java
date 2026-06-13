@@ -3,6 +3,7 @@ package com.shop.shop.member;
 import com.shop.shop.member.controller.AdminMemberRestController;
 import com.shop.shop.web.member.AdminMemberViewController;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.AdminMemberServiceResponse;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.repository.CategoryRepository;
@@ -52,6 +53,9 @@ class AdminMemberWiringTest {
 
     @MockitoBean
     MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     MemberUserDetailsService memberUserDetailsService;

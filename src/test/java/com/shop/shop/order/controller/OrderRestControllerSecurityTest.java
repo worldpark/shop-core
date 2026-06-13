@@ -8,6 +8,7 @@ import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.common.exception.ProductNotPurchasableForOrderException;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
@@ -80,6 +81,9 @@ class OrderRestControllerSecurityTest {
     // Repository mocks (DB 자동설정 제외 환경)
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
     @MockitoBean

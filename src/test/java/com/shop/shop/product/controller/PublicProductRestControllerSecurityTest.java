@@ -3,6 +3,7 @@ package com.shop.shop.product.controller;
 import com.shop.shop.common.dto.PageResponse;
 import com.shop.shop.common.exception.ProductNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
+import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.dto.PublicCategoryResponse;
 import com.shop.shop.product.dto.PublicProductDetailResponse;
@@ -76,6 +77,9 @@ class PublicProductRestControllerSecurityTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    SellerApplicationRepository sellerApplicationRepository;
 
     @MockitoBean
     private MemberUserDetailsService memberUserDetailsService;
