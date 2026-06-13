@@ -42,11 +42,14 @@ spring:
           enabled: false
 
   kafka:
-    # producer 설정: StringSerializer(key) + JsonSerializer(value) — Modulith 외부화 어댑터와 호환
+    # producer 설정: key=StringSerializer, value=ByteArraySerializer
+    # Modulith ByteArrayJsonMessageConverter가 이미 이벤트를 JSON byte[]로 변환해 KafkaTemplate에 넘긴다.
+    # ByteArraySerializer는 그 byte[]를 추가 인코딩 없이 wire에 그대로 전송(plain JSON 보장).
+    # JsonSerializer를 쓰면 byte[]를 다시 JSON 직렬화해 base64 문자열로 이중 인코딩된다(버그).
     bootstrap-servers: ${SHOP_CORE_KAFKA_BOOTSTRAP:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
 
   # Redis 접속 설정 — 로컬 단일 Redis, DB index 0(shop-core 전용)
   # 운영 전환 시 SHOP_CORE_REDIS_HOST 환경변수로 인스턴스 분리 가능
