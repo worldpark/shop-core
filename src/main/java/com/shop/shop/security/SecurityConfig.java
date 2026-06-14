@@ -125,6 +125,10 @@ public class SecurityConfig {
                     // 공개 상품 목록/상세 View (인증 불필요) — anyRequest 앞에 배치
                     .requestMatchers(HttpMethod.GET, "/products").permitAll()
                     .requestMatchers(HttpMethod.GET, "/products/*").permitAll()
+                    // 계정 self-service View 경로 (anyRequest 앞에 배치)
+                    // /account, /account/** — authenticated (CONSUMER/SELLER/ADMIN 모두 본인 계정 관리)
+                    // REST /api/v1/members/me/**는 anyRequest authenticated가 이미 커버 (별 matcher 불요)
+                    .requestMatchers("/account", "/account/**").authenticated()
                     // 관리자 전용 View 경로 (anyRequest 앞에 배치)
                     .requestMatchers("/admin/**").hasRole("ADMIN")
                     // 판매자 신청 View 경로 — 보안 floor authenticated (자격은 서비스 409 — Task 027 §1.1)

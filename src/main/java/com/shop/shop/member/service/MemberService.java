@@ -63,6 +63,12 @@ public class MemberService {
             throw new InvalidCredentialsException();
         }
 
+        // 탈퇴 사용자 차단 — 계정 열거 방지를 위해 동일 메시지(InvalidCredentials) 사용.
+        // UserDetails 미경유 경로(REST 로그인)는 enabled=false가 무효이므로 직접 가드 추가(C 정정).
+        if (!user.isActive()) {
+            throw new InvalidCredentialsException();
+        }
+
         return user;
     }
 

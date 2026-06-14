@@ -10,11 +10,25 @@ import java.lang.reflect.Method;
  *
  * <p>SignupRequest(record accessor: password()/passwordConfirm())와
  * SignupForm(Getter: getPassword()/getPasswordConfirm()) 두 타입을 모두 처리한다.
+ * PasswordChangeRequest/PasswordChangeForm(field="newPassword", confirmField="newPasswordConfirm")도 지원.
  *
- * <p>접근 전략: getter 우선(getPassword), 없으면 record accessor(password) 시도.
- * 불일치 시 {@code passwordConfirm} 필드에 위반을 보고 — View BindingResult 필드별 에러 표시 가능.
+ * <p>접근 전략: getter 우선(getXxx), 없으면 record accessor(xxx) 시도.
+ * 불일치 시 {@code confirmField} 이름 필드에 위반을 보고 — View BindingResult 필드별 에러 표시 가능.
+ *
+ * <p>일반화 이유: 기존 하드코딩("password"/"passwordConfirm")은 다른 필드명 DTO에서
+ * 두 값이 모두 null이 되어 검증이 조용히 통과(보안 결함)된다.
+ * initialize()에서 어노테이션 속성을 읽어 동적으로 비교한다.
  */
 public class PasswordMatchesValidator implements ConstraintValidator<PasswordMatches, Object> {
+
+    private String field;
+    private String confirmField;
+
+    @Override
+    public void initialize(PasswordMatches constraintAnnotation) {
+        this.field = constraintAnnotation.field();
+        this.confirmField = constraintAnnotation.confirmField();
+    }
 
     @Override
     public boolean isValid(Object value, ConstraintValidatorContext context) {
@@ -22,8 +36,8 @@ public class PasswordMatchesValidator implements ConstraintValidator<PasswordMat
             return true;
         }
 
-        String password = extractField(value, "password");
-        String passwordConfirm = extractField(value, "passwordConfirm");
+        String password = extractField(value, this.field);
+        String passwordConfirm = extractField(value, this.confirmField);
 
         if (password == null && passwordConfirm == null) {
             return true;
@@ -32,10 +46,10 @@ public class PasswordMatchesValidator implements ConstraintValidator<PasswordMat
         boolean matches = password != null && password.equals(passwordConfirm);
 
         if (!matches) {
-            // 글로벌 에러 대신 passwordConfirm 필드에 위반 보고
+            // 글로벌 에러 대신 confirmField 이름의 필드에 위반 보고 (View BindingResult 필드 에러 지원)
             context.disableDefaultConstraintViolation();
             context.buildConstraintViolationWithTemplate(context.getDefaultConstraintMessageTemplate())
-                    .addPropertyNode("passwordConfirm")
+                    .addPropertyNode(this.confirmField)
                     .addConstraintViolation();
         }
 

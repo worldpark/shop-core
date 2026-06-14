@@ -113,6 +113,60 @@ class MemberServiceTest {
     }
 
     @Test
+    @DisplayName("authenticate 실패 — WITHDRAWN 사용자: InvalidCredentialsException (동일 메시지로 계정 열거 방지)")
+    void authenticate_fails_on_withdrawn_user() {
+        // WITHDRAWN 상태 User 구성: of()는 ACTIVE로 생성하므로 withdraw()로 상태 전이
+        User withdrawnUser = User.of(EMAIL, passwordEncoder.encode(RAW_PASSWORD), "탈퇴자", null, Role.CONSUMER);
+        withdrawnUser.withdraw();
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(withdrawnUser));
+
+        // WITHDRAWN + 비번 matches=true 여도 InvalidCredentialsException 발생
+        assertThatThrownBy(() -> memberService.authenticate(EMAIL, RAW_PASSWORD))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
+    }
+
+    @Test
+    @DisplayName("authenticate 실패 — WITHDRAWN 메시지가 이메일없음/비번불일치와 동일 (계정 열거 방지)")
+    void authenticate_withdrawn_same_message_as_other_failures() {
+        // 이메일 없음 케이스 메시지
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+        String messageForUnknownEmail;
+        try {
+            memberService.authenticate(EMAIL, RAW_PASSWORD);
+            throw new AssertionError("예외가 발생해야 합니다");
+        } catch (InvalidCredentialsException e) {
+            messageForUnknownEmail = e.getMessage();
+        }
+
+        // WITHDRAWN 케이스 메시지
+        User withdrawnUser = User.of(EMAIL, passwordEncoder.encode(RAW_PASSWORD), "탈퇴자", null, Role.CONSUMER);
+        withdrawnUser.withdraw();
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(withdrawnUser));
+        String messageForWithdrawn;
+        try {
+            memberService.authenticate(EMAIL, RAW_PASSWORD);
+            throw new AssertionError("예외가 발생해야 합니다");
+        } catch (InvalidCredentialsException e) {
+            messageForWithdrawn = e.getMessage();
+        }
+
+        assertThat(messageForWithdrawn).isEqualTo(messageForUnknownEmail);
+    }
+
+    @Test
+    @DisplayName("authenticate 성공 — ACTIVE 사용자는 정상 통과 (WITHDRAWN 가드 대비)")
+    void authenticate_active_user_passes_guard() {
+        User activeUser = User.of(EMAIL, passwordEncoder.encode(RAW_PASSWORD), "활성유저", null, Role.CONSUMER);
+        when(memberRepository.findByEmail(EMAIL)).thenReturn(Optional.of(activeUser));
+
+        User result = memberService.authenticate(EMAIL, RAW_PASSWORD);
+
+        assertThat(result).isNotNull();
+        assertThat(result.isActive()).isTrue();
+    }
+
+    @Test
     @DisplayName("getById 성공 — 존재하는 userId로 User 반환")
     void getById_success() {
         User user = User.of(EMAIL, "hash", "테스터", null, Role.CONSUMER);

@@ -93,6 +93,46 @@ class AuthServiceResponseTest {
     }
 
     @Test
+    @DisplayName("refresh 거부 — WITHDRAWN 사용자가 유효한 refresh token으로 재발급 시 InvalidTokenException")
+    void refresh_fails_for_withdrawn_user() {
+        // 로그인으로 refresh token 발급 (ACTIVE 상태)
+        when(memberService.authenticate(EMAIL, "password")).thenReturn(testUser);
+        TokenResponse loginResponse = authServiceResponse.login(new LoginRequest(EMAIL, "password"));
+        String refreshToken = loginResponse.refreshToken();
+
+        // 이후 사용자가 탈퇴한 상황: getById가 WITHDRAWN User 반환
+        User withdrawnUser = User.of(EMAIL, "hashed_pw", "탈퇴자", null, Role.CONSUMER);
+        try {
+            var idField = User.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(withdrawnUser, 1L);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        withdrawnUser.withdraw();
+        when(memberService.getById(1L)).thenReturn(withdrawnUser);
+
+        // matchesRefresh=true 이지만 user.isActive()=false → InvalidTokenException
+        assertThatThrownBy(() -> authServiceResponse.refresh(new RefreshRequest(refreshToken)))
+                .isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    @DisplayName("refresh 성공 — ACTIVE 사용자는 새 access token 정상 재발급 (WITHDRAWN 가드 대비)")
+    void refresh_active_user_issues_new_access() {
+        when(memberService.authenticate(EMAIL, "password")).thenReturn(testUser);
+        when(memberService.getById(1L)).thenReturn(testUser);
+
+        TokenResponse loginResponse = authServiceResponse.login(new LoginRequest(EMAIL, "password"));
+        String refreshToken = loginResponse.refreshToken();
+
+        TokenResponse refreshResponse = authServiceResponse.refresh(new RefreshRequest(refreshToken));
+
+        assertThat(refreshResponse.accessToken()).isNotBlank();
+        assertThat(refreshResponse.refreshToken()).isEqualTo(refreshToken);
+    }
+
+    @Test
     @DisplayName("logout 후 동일 refresh token으로 재발급 시 InvalidTokenException (재사용 차단)")
     void logout_then_refresh_reuse_fails() {
         when(memberService.authenticate(EMAIL, "password")).thenReturn(testUser);

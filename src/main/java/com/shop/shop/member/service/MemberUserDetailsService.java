@@ -33,7 +33,9 @@ public class MemberUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = memberRepository.findByEmail(email)
+        // 활성 회원만 조회 — 탈퇴(WITHDRAWN) 계정은 findActiveByEmail에서 empty 반환 → UsernameNotFoundException(C 정정).
+        // findByEmail 대신 findActiveByEmail 사용으로 View formLogin 탈퇴 차단.
+        User user = memberRepository.findActiveByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + email));
 
         return org.springframework.security.core.userdetails.User

@@ -1,5 +1,6 @@
 package com.shop.shop.member.repository;
 
+import com.shop.shop.member.domain.MemberStatus;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import org.springframework.data.domain.Page;
@@ -19,8 +20,21 @@ public interface MemberRepository extends JpaRepository<User, Long> {
     /**
      * 이메일로 회원 조회.
      * citext 컬럼이므로 DB 레벨에서 대소문자 무시 비교.
+     * 탈퇴 회원을 포함한 전체 조회 — admin 검색 등 공유 경로에서 사용. 무변경.
      */
     Optional<User> findByEmail(String email);
+
+    /**
+     * 활성 회원을 이메일로 조회 (ACTIVE 상태만).
+     * citext 컬럼이므로 DB 레벨에서 대소문자 무시 비교.
+     * 탈퇴 차단 가드(MemberUserDetailsService, AccountFacade)에서 사용.
+     * findByEmail은 무변경 — 시그니처 변경 시 admin 검색 등 회귀 차단.
+     *
+     * @param email 이메일
+     * @return 활성 회원 (ACTIVE), 없거나 탈퇴면 Optional.empty()
+     */
+    @Query("select u from User u where u.email = :email and u.status = com.shop.shop.member.domain.MemberStatus.ACTIVE")
+    Optional<User> findActiveByEmail(@Param("email") String email);
 
     /**
      * 관리자 회원 검색 — keyword(email/name 부분일치) + role 필터 + 페이지네이션.

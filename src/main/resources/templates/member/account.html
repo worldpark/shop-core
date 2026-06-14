@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<!--
+    계정 self-service 화면.
+    view name: member/account
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약 (view-implementor 인수 사항):
+      - model.accountInfo (AccountInfo): email/name/phone — 비밀번호·해시 비노출
+        ('account'는 Thymeleaf 예약어 충돌 위험으로 사용 금지 — 도메인 접두사 accountInfo 사용)
+      - model.passwordForm (PasswordChangeForm): 비번 변경 폼 백킹 객체
+      - model.profileForm (ProfileUpdateForm): 정보 수정 폼 백킹 객체
+      - 비번 변경 폼 th:action="@{/account/password}" method="post"
+      - 정보 수정 폼 th:action="@{/account/profile}" method="post"
+      - 탈퇴 폼 th:action="@{/account/withdraw}" method="post"
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - 비번 필드(currentPassword/newPassword/newPasswordConfirm) value echo 금지
+        (AccountViewController가 검증 실패 시 null clear)
+      - flash.flashSuccess / flash.flashError: layout/base 경유 fragments/messages 자동 표시
+      - param.password: 비번 변경 성공 안내
+      - param.profile: 정보 수정 성공 안내
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>계정 설정</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">계정 설정</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- PRG 완료 안내 (쿼리 파라미터) -->
+        <div class="alert alert-success" th:if="${param.password}">
+            비밀번호가 성공적으로 변경되었습니다.
+        </div>
+        <div class="alert alert-success" th:if="${param.profile}">
+            회원 정보가 성공적으로 수정되었습니다.
+        </div>
+
+        <!-- ============================================================
+             현재 계정 정보 표시
+             ============================================================ -->
+        <section class="account-section" style="max-width: 600px; margin-bottom: 32px;">
+            <h2 class="section-title" style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #333;">내 계정 정보</h2>
+            <div class="table-wrapper">
+                <table class="members-table">
+                    <tbody>
+                        <tr>
+                            <th style="width: 120px;">이메일</th>
+                            <td th:text="${accountInfo.email}"></td>
+                        </tr>
+                        <tr>
+                            <th>이름</th>
+                            <td th:text="${accountInfo.name}"></td>
+                        </tr>
+                        <tr>
+                            <th>전화번호</th>
+                            <td th:text="${accountInfo.phone != null} ? ${accountInfo.phone} : '(미등록)'"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ============================================================
+             비밀번호 변경 폼
+             ============================================================ -->
+        <section class="account-section" style="max-width: 480px; margin-bottom: 40px;">
+            <h2 class="section-title" style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #333;">비밀번호 변경</h2>
+            <!--
+                비번 필드는 검증 실패 재렌더 시 AccountViewController가 null로 clear한다.
+                th:field 를 사용하면 null이 빈 문자열("")로 렌더되므로 value echo 가 차단된다.
+                CSRF: th:action 으로 자동 주입.
+            -->
+            <form th:action="@{/account/password}" method="post"
+                  th:object="${passwordForm}" autocomplete="off">
+
+                <!-- 현재 비밀번호 -->
+                <div class="form-group">
+                    <label for="currentPassword">현재 비밀번호</label>
+                    <input type="password"
+                           id="currentPassword"
+                           th:field="*{currentPassword}"
+                           placeholder="현재 비밀번호를 입력하세요"
+                           autocomplete="current-password">
+                    <span class="field-error"
+                          th:if="${#fields.hasErrors('currentPassword')}"
+                          th:errors="*{currentPassword}"></span>
+                </div>
+
+                <!-- 새 비밀번호 -->
+                <div class="form-group">
+                    <label for="newPassword">새 비밀번호</label>
+                    <input type="password"
+                           id="newPassword"
+                           th:field="*{newPassword}"
+                           placeholder="새 비밀번호를 입력하세요 (8자 이상)"
+                           autocomplete="new-password">
+                    <span class="field-error"
+                          th:if="${#fields.hasErrors('newPassword')}"
+                          th:errors="*{newPassword}"></span>
+                </div>
+
+                <!-- 새 비밀번호 확인 -->
+                <div class="form-group">
+                    <label for="newPasswordConfirm">새 비밀번호 확인</label>
+                    <input type="password"
+                           id="newPasswordConfirm"
+                           th:field="*{newPasswordConfirm}"
+                           placeholder="새 비밀번호를 다시 입력하세요"
+                           autocomplete="new-password">
+                    <span class="field-error"
+                          th:if="${#fields.hasErrors('newPasswordConfirm')}"
+                          th:errors="*{newPasswordConfirm}"></span>
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <button type="submit" class="btn btn-primary">비밀번호 변경</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ============================================================
+             회원 정보 수정 폼
+             ============================================================ -->
+        <section class="account-section" style="max-width: 480px; margin-bottom: 40px;">
+            <h2 class="section-title" style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #333;">회원 정보 수정</h2>
+            <!--
+                이메일은 수정 불가(표시 전용), name/phone만 수정 가능.
+                CSRF: th:action 으로 자동 주입.
+            -->
+            <form th:action="@{/account/profile}" method="post"
+                  th:object="${profileForm}">
+
+                <!-- 이름 -->
+                <div class="form-group">
+                    <label for="name">이름</label>
+                    <input type="text"
+                           id="name"
+                           th:field="*{name}"
+                           placeholder="이름을 입력하세요"
+                           autocomplete="name">
+                    <span class="field-error"
+                          th:if="${#fields.hasErrors('name')}"
+                          th:errors="*{name}"></span>
+                </div>
+
+                <!-- 전화번호 (선택) -->
+                <div class="form-group">
+                    <label for="phone">전화번호 <span class="optional">(선택)</span></label>
+                    <input type="text"
+                           id="phone"
+                           th:field="*{phone}"
+                           placeholder="전화번호를 입력하세요"
+                           autocomplete="tel">
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <button type="submit" class="btn btn-primary">정보 수정</button>
+                </div>
+            </form>
+        </section>
+
+        <!-- ============================================================
+             회원 탈퇴 폼
+             ============================================================ -->
+        <section class="account-section" style="max-width: 480px; margin-bottom: 40px;
+               border: 1px solid #f5c6cb; border-radius: 4px; padding: 20px; background: #fff5f5;">
+            <h2 class="section-title" style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #721c24;">회원 탈퇴</h2>
+            <p style="color: #721c24; font-size: 14px; margin-bottom: 16px;">
+                탈퇴하시면 계정이 비활성화되고 동일 이메일로 재가입이 불가능합니다.
+                주문·배송 이력 등 연관 데이터는 보존됩니다.
+            </p>
+
+            <!--
+                확인 체크박스: 실수 방지 UX. 서버에는 전달하지 않음(순수 UI 가드).
+                체크하지 않으면 폼 제출 버튼이 비활성화된다 (JS 없이 HTML attribute 활용).
+                CSRF: th:action 으로 자동 주입.
+            -->
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #555;">
+                    <input type="checkbox" id="withdrawConfirm"
+                           onchange="document.getElementById('withdrawBtn').disabled = !this.checked;">
+                    탈퇴 내용을 확인했으며 동의합니다.
+                </label>
+            </div>
+
+            <form th:action="@{/account/withdraw}" method="post" id="withdrawForm">
+                <button type="submit"
+                        id="withdrawBtn"
+                        disabled
+                        class="btn btn-outline"
+                        style="border-color: #721c24; color: #721c24;"
+                        onclick="return confirm('정말 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.');">
+                    탈퇴하기
+                </button>
+            </form>
+        </section>
+
+    </div>
+</main>
+</body>
+</html>

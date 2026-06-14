@@ -72,6 +72,12 @@ public class AuthServiceResponse {
         }
 
         User user = memberService.getById(userId);
+
+        // 탈퇴 사용자 refresh 재발급 거부 — deleteRefresh로 hash가 이미 삭제되어 자연 실패하나 의도 명시(C 정정)
+        if (!user.isActive()) {
+            throw new InvalidTokenException("탈퇴한 계정은 토큰을 재발급할 수 없습니다.");
+        }
+
         String newAccessToken = jwtTokenProvider.createAccess(
                 user.getId(), user.getEmail(), List.of(user.getRole().authority()));
 
