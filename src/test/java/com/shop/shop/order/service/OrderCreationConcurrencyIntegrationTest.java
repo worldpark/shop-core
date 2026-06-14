@@ -99,7 +99,7 @@ class OrderCreationConcurrencyIntegrationTest {
         when(cartCheckoutReader.getCheckoutCart(userId2))
                 .thenReturn(new CartCheckout(2L, List.of(new CartCheckoutItem(2L, variantId, 1))));
 
-        OrderCreateRequest request = new OrderCreateRequest("홍길동", "010-1234-5678", "12345", "서울", null);
+        OrderCreateRequest request = new OrderCreateRequest("홍길동", "010-1234-5678", "12345", "서울", null, null);
 
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger conflictCount = new AtomicInteger(0);

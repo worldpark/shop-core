@@ -126,6 +126,12 @@ class SellerProductVariantsRenderingTest {
 
     @MockitoBean
     private SellerProductVariantFacade sellerProductVariantFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final long PRODUCT_ID = 10L;
     private static final long OPTION_ID = 20L;

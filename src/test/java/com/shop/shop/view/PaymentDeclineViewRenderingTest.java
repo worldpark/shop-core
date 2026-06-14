@@ -143,6 +143,12 @@ class PaymentDeclineViewRenderingTest {
 
     @MockitoBean
     private PaymentFacade paymentFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final String FAILURE_REASON = "카드사에서 결제가 거절되었습니다.";
 

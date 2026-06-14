@@ -113,6 +113,12 @@ class MemberSignupViewControllerTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     @Test
     @DisplayName("POST /signup 정상 제출(csrf) → 302 redirect:/login?signup, MemberSignupFacade.signup 호출")

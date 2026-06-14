@@ -86,6 +86,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/seller/**").hasRole("SELLER")
                     // 장바구니 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
                     .requestMatchers("/api/v1/cart/**").hasRole("CONSUMER")
+                    // 쿠폰 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
+                    .requestMatchers("/api/v1/coupons/**").hasRole("CONSUMER")
                     // 결제 경로 — Task 016 명시 권한 (api-authorization-rule: ROLE_CONSUMER 최소, 소유권 서비스 레이어 검증)
                     // /api/v1/orders/**가 이미 CONSUMER 덮음 — 의도 명시 + 회귀 방지용 전용 matcher
                     .requestMatchers("/api/v1/orders/*/payment").hasRole("CONSUMER")

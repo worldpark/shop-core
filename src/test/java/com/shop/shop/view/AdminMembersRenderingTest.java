@@ -121,6 +121,12 @@ class AdminMembersRenderingTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     /** 테스트용 비밀번호 hash — 본문에 절대 노출되면 안 됨 */
     private static final String SENSITIVE_PASSWORD_HASH = "SUPER_SECRET_HASH_SHOULD_NOT_APPEAR";

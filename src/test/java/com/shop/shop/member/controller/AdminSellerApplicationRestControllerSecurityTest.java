@@ -118,6 +118,12 @@ class AdminSellerApplicationRestControllerSecurityTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private String adminToken;
     private String sellerToken;

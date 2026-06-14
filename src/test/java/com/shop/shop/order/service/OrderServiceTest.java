@@ -72,6 +72,9 @@ class OrderServiceTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private CouponService couponService;
+
     private OrderService orderService;
 
     private static final long USER_ID = 1L;
@@ -79,13 +82,13 @@ class OrderServiceTest {
     private static final long VARIANT_ID_2 = 20L;
 
     private static final OrderCreateRequest VALID_REQUEST = new OrderCreateRequest(
-            "홍길동", "010-1234-5678", "12345", "서울시 강남구", "101호"
+            "홍길동", "010-1234-5678", "12345", "서울시 강남구", "101호", null
     );
 
     @BeforeEach
     void setUp() {
         orderService = new OrderService(
-                cartCheckoutReader, productOrderCatalog, inventoryStockPort, orderRepository);
+                cartCheckoutReader, productOrderCatalog, inventoryStockPort, orderRepository, couponService);
         // self-injection: 단위 테스트에서 self = orderService 자신 (프록시 없이 직접 참조)
         orderService.self = orderService;
     }

@@ -87,9 +87,9 @@ public class Order extends BaseEntity {
     private List<OrderItem> items = new ArrayList<>();
 
     /**
-     * 주문 생성 정적 팩토리.
+     * 주문 생성 정적 팩토리 (8-arg, 기존 시그니처 유지 — discount=ZERO 위임).
      *
-     * <p>discount=0/shipping=0/final=items 고정 (이번 Task 범위).
+     * <p>기존 호출부·테스트 회귀 0. 9-arg 오버로드에 discountAmount=ZERO 위임.
      *
      * @param userId       소유자 userId
      * @param orderNumber  주문 번호 (unique)
@@ -99,19 +99,55 @@ public class Order extends BaseEntity {
      * @param shipPostcode 우편번호
      * @param shipAddress1 주소1
      * @param shipAddress2 주소2 (nullable)
-     * @return 새 Order 인스턴스 (status="pending")
+     * @return 새 Order 인스턴스 (status="pending", discount=ZERO)
      */
     public static Order create(long userId, String orderNumber, BigDecimal itemsAmount,
                                String shipRecipient, String shipPhone, String shipPostcode,
                                String shipAddress1, String shipAddress2) {
+        return create(userId, orderNumber, itemsAmount, BigDecimal.ZERO,
+                shipRecipient, shipPhone, shipPostcode, shipAddress1, shipAddress2);
+    }
+
+    /**
+     * 주문 생성 정적 팩토리 (9-arg, 할인 주입 오버로드).
+     *
+     * <p>도메인 불변식: discountAmount ≥ 0 AND finalAmount = itemsAmount - discountAmount ≥ 0.
+     * 위반 시 IllegalStateException (서비스가 사전 보장해야 함 — 방어적).
+     *
+     * @param userId         소유자 userId
+     * @param orderNumber    주문 번호 (unique)
+     * @param itemsAmount    상품 합계금액
+     * @param discountAmount 할인액 (≥ 0)
+     * @param shipRecipient  수령인
+     * @param shipPhone      수령인 전화번호
+     * @param shipPostcode   우편번호
+     * @param shipAddress1   주소1
+     * @param shipAddress2   주소2 (nullable)
+     * @return 새 Order 인스턴스 (status="pending")
+     * @throws IllegalStateException discountAmount < 0 또는 finalAmount < 0
+     */
+    public static Order create(long userId, String orderNumber, BigDecimal itemsAmount,
+                               BigDecimal discountAmount,
+                               String shipRecipient, String shipPhone, String shipPostcode,
+                               String shipAddress1, String shipAddress2) {
+        if (discountAmount == null || discountAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException("discountAmount는 0 이상이어야 합니다: " + discountAmount);
+        }
+        BigDecimal finalAmount = itemsAmount.subtract(discountAmount);
+        if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalStateException(
+                    "finalAmount는 0 이상이어야 합니다: itemsAmount=" + itemsAmount
+                    + ", discountAmount=" + discountAmount);
+        }
+
         Order order = new Order();
         order.userId = userId;
         order.orderNumber = orderNumber;
         order.status = "pending";
         order.itemsAmount = itemsAmount;
-        order.discountAmount = BigDecimal.ZERO;
+        order.discountAmount = discountAmount;
         order.shippingFee = BigDecimal.ZERO;
-        order.finalAmount = itemsAmount; // discount=0, shipping=0이므로 final=items
+        order.finalAmount = finalAmount;
         order.shipRecipient = shipRecipient;
         order.shipPhone = shipPhone;
         order.shipPostcode = shipPostcode;

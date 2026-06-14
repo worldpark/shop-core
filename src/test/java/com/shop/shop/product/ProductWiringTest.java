@@ -107,6 +107,12 @@ class ProductWiringTest {
 
     @MockitoBean
     PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     // ============================================================
     // 신규 진입 빈 등록 단언

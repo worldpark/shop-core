@@ -49,6 +49,12 @@ class MemberAccountRestControllerSecurityTest {
 
     @MockitoBean
     private AccountServiceResponse accountServiceResponse;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final long USER_ID = 1L;
 

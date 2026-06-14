@@ -117,6 +117,12 @@ class PublicProductListRenderingTest {
 
     @MockitoBean
     private PublicProductFacade publicProductFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     @BeforeEach
     void setUp() {

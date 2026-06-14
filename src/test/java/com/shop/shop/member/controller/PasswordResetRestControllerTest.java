@@ -112,6 +112,12 @@ class PasswordResetRestControllerTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     // ──────────────────────────────────────────────────────────────────────────
     // /request — permitAll + 200 동일 본문 (enumeration 방지)

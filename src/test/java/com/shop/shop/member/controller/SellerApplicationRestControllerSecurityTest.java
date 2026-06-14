@@ -117,6 +117,12 @@ class SellerApplicationRestControllerSecurityTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private String consumerToken;
     private String sellerToken;

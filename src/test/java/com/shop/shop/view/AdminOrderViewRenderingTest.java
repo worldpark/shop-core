@@ -130,6 +130,12 @@ class AdminOrderViewRenderingTest {
 
     @MockitoBean
     private AdminOrderFulfillmentFacade adminOrderFulfillmentFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     // ============================================================
     // 헬퍼 데이터

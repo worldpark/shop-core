@@ -137,6 +137,12 @@ class CartViewControllerTest {
      */
     @MockitoBean
     private OrderFacade orderFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final String USER_EMAIL = "user@example.com";
 

@@ -120,7 +120,8 @@ public class OrderViewController {
                     form.getPhone(),
                     form.getPostcode(),
                     form.getAddress1(),
-                    form.getAddress2()
+                    form.getAddress2(),
+                    null // View 쿠폰 선택 UI는 후속 Task 범위 — 고정 null
             );
             OrderResponse created = orderFacade.createOrder(actor.email(), request);
             return "redirect:/orders/" + created.orderId();

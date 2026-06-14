@@ -64,7 +64,7 @@ class OrderServiceResponseTest {
         when(dtoMapper.toOrderResponse(any(), any())).thenReturn(expected);
 
         OrderResponse result = orderServiceResponse.createOrder(authentication,
-                new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null));
+                new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null, null));
 
         assertThat(result.orderId()).isEqualTo(1L);
     }
@@ -79,7 +79,7 @@ class OrderServiceResponseTest {
         when(dtoMapper.toOrderResponse(any(), any())).thenReturn(expected);
 
         OrderResponse result = orderServiceResponse.createOrder(authentication,
-                new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null));
+                new com.shop.shop.order.dto.OrderCreateRequest("홍", "010", "12345", "서울", null, null));
 
         // OrderResponse record에 userId 필드 없음
         assertThat(result).isNotNull();

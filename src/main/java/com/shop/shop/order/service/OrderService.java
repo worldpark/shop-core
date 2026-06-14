@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -66,6 +67,7 @@ public class OrderService {
     private final ProductOrderCatalog productOrderCatalog;
     private final InventoryStockPort inventoryStockPort;
     private final OrderRepository orderRepository;
+    private final CouponService couponService;
 
     /**
      * Self-injection: 트랜잭션 프록시 적용을 위해 @Autowired @Lazy로 자기 자신 주입.
@@ -190,11 +192,32 @@ public class OrderService {
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        Order order = Order.create(
-                userId, orderNumber, itemsAmount,
-                request.recipient(), request.phone(), request.postcode(),
-                request.address1(), request.address2()
-        );
+        // [신규] 쿠폰 할인 계산 (itemsAmount 확정 직후, Order.create 전)
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        Long appliedCouponId = null;
+        if (request.userCouponId() != null) {
+            CouponService.AppliedDiscount applied = couponService.computeDiscount(
+                    userId, request.userCouponId(), itemsAmount);
+            discountAmount = applied.discountAmount();
+            appliedCouponId = applied.couponId();
+        }
+
+        Order order;
+        if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {
+            // 할인 있음 → 9-arg 오버로드
+            order = Order.create(
+                    userId, orderNumber, itemsAmount, discountAmount,
+                    request.recipient(), request.phone(), request.postcode(),
+                    request.address1(), request.address2()
+            );
+        } else {
+            // 할인 없음 → 기존 8-arg (discount=ZERO, 기존 흐름 완전 동일)
+            order = Order.create(
+                    userId, orderNumber, itemsAmount,
+                    request.recipient(), request.phone(), request.postcode(),
+                    request.address1(), request.address2()
+            );
+        }
 
         for (CartCheckoutItem cartItem : cartItems) {
             OrderableVariantSnapshot snapshot = authorizedByVariantId.get(cartItem.variantId());
@@ -216,6 +239,12 @@ public class OrderService {
         }
 
         Order savedOrder = orderRepository.save(order);
+
+        // [신규] 쿠폰 소비 조건부 UPDATE 2건 (order 저장 후)
+        if (request.userCouponId() != null && appliedCouponId != null) {
+            Instant now = Instant.now();
+            couponService.consume(request.userCouponId(), userId, appliedCouponId, savedOrder.getId(), now);
+        }
 
         // 7. 장바구니 비우기
         cartCheckoutReader.clearCart(userId);

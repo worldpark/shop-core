@@ -106,6 +106,12 @@ class SignupRenderingTest {
 
     @MockitoBean
     private PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     /** footer 프래그먼트 식별 마커 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

@@ -142,6 +142,12 @@ class OrderCancelViewRenderingTest {
 
     @MockitoBean
     private PaymentFacade paymentFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     @BeforeEach
     void setUp() {

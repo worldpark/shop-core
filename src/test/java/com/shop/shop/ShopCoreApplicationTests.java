@@ -82,6 +82,12 @@ class ShopCoreApplicationTests {
 
     @MockitoBean
     PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     @Test
     void contextLoads() {

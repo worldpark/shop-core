@@ -63,6 +63,7 @@ class OrderCancellationImpl implements OrderCancellation {
     private final MemberDirectory memberDirectory;
     private final ProductOrderCatalog productOrderCatalog;
     private final ApplicationEventPublisher eventPublisher;
+    private final CouponService couponService;
 
     /**
      * {@inheritDoc}
@@ -172,6 +173,9 @@ class OrderCancellationImpl implements OrderCancellation {
         for (OrderItem item : sortedItems) {
             inventoryStockPort.increase(item.getVariantId(), item.getQuantity());
         }
+
+        // [신규] 쿠폰 복원 (재고 복원 직후, 이벤트 발행 전 — 멱등)
+        couponService.restoreByOrder(orderId);
 
         // OrderCancelledEvent 구성·발행
         OrderCancelledEvent event = buildOrderCancelledEvent(lockedOrder, refundInfo, cancelledAt);

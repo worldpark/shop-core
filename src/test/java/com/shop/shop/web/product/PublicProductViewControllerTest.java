@@ -125,6 +125,12 @@ class PublicProductViewControllerTest {
      */
     @MockitoBean
     private PublicProductFacade publicProductFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final long PRODUCT_ID = 1L;
 

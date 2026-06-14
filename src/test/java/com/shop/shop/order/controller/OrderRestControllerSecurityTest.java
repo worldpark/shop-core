@@ -114,6 +114,12 @@ class OrderRestControllerSecurityTest {
 
     @MockitoBean
     private OrderServiceResponse orderServiceResponse;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private String adminToken;
     private String sellerToken;
@@ -301,7 +307,7 @@ class OrderRestControllerSecurityTest {
 
     private String validRequestJson() throws Exception {
         return objectMapper.writeValueAsString(
-                new OrderCreateRequest("홍길동", "010-1234-5678", "12345", "서울시 강남구", "101호")
+                new OrderCreateRequest("홍길동", "010-1234-5678", "12345", "서울시 강남구", "101호", null)
         );
     }
 

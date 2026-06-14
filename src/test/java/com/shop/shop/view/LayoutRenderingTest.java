@@ -94,6 +94,12 @@ class LayoutRenderingTest {
 
     @MockitoBean
     PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     /** footer 프래그먼트 식별 마커 — fragments/footer.html 의 실제 텍스트와 일치 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

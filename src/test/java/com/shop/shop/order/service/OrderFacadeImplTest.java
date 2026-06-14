@@ -155,7 +155,7 @@ class OrderFacadeImplTest {
         when(orderService.getMyOrder(eq(USER_ID), eq(1L))).thenReturn(makeOrderDetail(1L));
         when(dtoMapper.toOrderResponse(any(), eq(List.of()))).thenReturn(makeOrderResponse(1L));
 
-        OrderCreateRequest request = new OrderCreateRequest("홍", "010", "12345", "서울", null);
+        OrderCreateRequest request = new OrderCreateRequest("홍", "010", "12345", "서울", null, null);
         OrderResponse result = orderFacadeImpl.createOrder(EMAIL, request);
 
         verify(memberDirectory).findUserIdByEmail(EMAIL);

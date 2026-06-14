@@ -62,6 +62,8 @@ class OrderCancellationExpiryTest {
     private ProductOrderCatalog productOrderCatalog;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private CouponService couponService;
 
     private OrderCancellationImpl cancellationImpl;
 
@@ -71,7 +73,7 @@ class OrderCancellationExpiryTest {
     @BeforeEach
     void setUp() {
         cancellationImpl = new OrderCancellationImpl(
-                orderRepository, inventoryStockPort, memberDirectory, productOrderCatalog, eventPublisher);
+                orderRepository, inventoryStockPort, memberDirectory, productOrderCatalog, eventPublisher, couponService);
 
         when(memberDirectory.findContactByUserId(anyLong()))
                 .thenReturn(new MemberContact("buyer@example.com", "구매자"));

@@ -123,6 +123,12 @@ class SellerProductViewControllerTest {
      */
     @MockitoBean
     private SellerProductFacade sellerProductFacade;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private static final long SELLER_ID = 2L;
     private static final long PRODUCT_ID = 10L;

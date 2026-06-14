@@ -95,6 +95,12 @@ class AdminMemberWiringTest {
 
     @MockitoBean
     PaymentRepository paymentRepository;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     @Test
     @DisplayName("운영 배선: AdminMemberRestController 빈이 컨텍스트에 등록된다")

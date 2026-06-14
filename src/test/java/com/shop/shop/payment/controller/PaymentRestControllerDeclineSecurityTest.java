@@ -107,6 +107,12 @@ class PaymentRestControllerDeclineSecurityTest {
 
     @MockitoBean
     private PaymentServiceResponse paymentServiceResponse;
+    @MockitoBean
+    private com.shop.shop.order.repository.CouponRepository couponRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
+
 
     private String consumerToken;
 
