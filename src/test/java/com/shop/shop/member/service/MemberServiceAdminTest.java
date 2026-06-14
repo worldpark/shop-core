@@ -7,6 +7,7 @@ import com.shop.shop.member.domain.User;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.security.RefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,13 +48,16 @@ class MemberServiceAdminTest {
     @Mock
     private RefreshTokenStore refreshTokenStore;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private PasswordEncoder passwordEncoder;
     private MemberService memberService;
 
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        memberService = new MemberService(memberRepository, passwordEncoder, refreshTokenStore);
+        memberService = new MemberService(memberRepository, passwordEncoder, refreshTokenStore, eventPublisher);
         // 트랜잭션 동기화 매니저 초기화 (afterCommit 등록을 위해 활성화)
         TransactionSynchronizationManager.initSynchronization();
     }

@@ -7,6 +7,7 @@ import com.shop.shop.member.domain.User;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.security.RefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,9 @@ class MemberServiceTest {
     @Mock
     private RefreshTokenStore refreshTokenStore;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private PasswordEncoder passwordEncoder;
 
     private MemberService memberService;
@@ -45,7 +49,7 @@ class MemberServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        memberService = new MemberService(memberRepository, passwordEncoder, refreshTokenStore);
+        memberService = new MemberService(memberRepository, passwordEncoder, refreshTokenStore, eventPublisher);
     }
 
     @Test

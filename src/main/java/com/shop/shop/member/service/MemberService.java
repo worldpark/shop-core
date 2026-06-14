@@ -8,10 +8,12 @@ import com.shop.shop.common.exception.MemberNotFoundException;
 import com.shop.shop.common.exception.RoleChangeNotAllowedException;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
+import com.shop.shop.member.event.MemberRegisteredEvent;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.security.RefreshTokenStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+
+import java.time.Instant;
+import java.util.UUID;
 
 /**
  * 회원 도메인 서비스.
@@ -36,6 +41,7 @@ public class MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenStore refreshTokenStore;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 이메일/비밀번호 자격증명 검증.
@@ -122,6 +128,9 @@ public class MemberService {
             User user = memberRepository.save(
                     User.of(normalizedEmail, hash, name.trim(), normalizePhone(phone), Role.CONSUMER));
             log.info("회원가입 완료: userId={}", user.getId());   // 원문/해시 로그 금지 (Constraint)
+            eventPublisher.publishEvent(new MemberRegisteredEvent(
+                    UUID.randomUUID(), Instant.now(),
+                    user.getId(), user.getEmail(), user.getName()));
             return user;
         } catch (DataIntegrityViolationException e) {
             // 동시성 경합: 사전 체크 통과 후 INSERT 시 unique 위반 — DuplicateEmailException으로 변환
