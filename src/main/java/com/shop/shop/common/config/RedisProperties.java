@@ -28,7 +28,7 @@ public record RedisProperties(
     /** 기본값 폴백 — 환경변수/yml 미지정 시 사용. SecurityUserProperties 패턴과 동일. */
     public RedisProperties {
         if (auth == null) {
-            auth = new Auth(null, null, null, null);
+            auth = new Auth(null, null, null, null, null, null);
         }
         if (lock == null) {
             lock = new Lock(null, null);
@@ -36,15 +36,18 @@ public record RedisProperties(
     }
 
     /**
-     * JWT refresh token + access token blacklist key namespace / TTL.
+     * JWT refresh token + access token blacklist + 비밀번호 재설정 토큰 key namespace / TTL.
      * 키 식별자(userId vs jti) 기준은 JWT Task에서 확정한다.
      * blacklist TTL은 access token 잔여 만료 시간으로 JWT Task에서 동적 산정 예정 — 여기 기본값은 access TTL 가정치.
+     * resetTtl은 PasswordResetService.requestReset에서 실제 참조(TokenStore store TTL 출처 SSOT).
      */
     public record Auth(
             String refreshPrefix,
             Duration refreshTtl,
             String blacklistPrefix,
-            Duration blacklistTtl
+            Duration blacklistTtl,
+            String resetPrefix,
+            Duration resetTtl
     ) {
 
         public Auth {
@@ -59,6 +62,12 @@ public record RedisProperties(
             }
             if (blacklistTtl == null) {
                 blacklistTtl = Duration.ofMinutes(30);  // PT30M — access token 가정 TTL
+            }
+            if (resetPrefix == null || resetPrefix.isBlank()) {
+                resetPrefix = "shopcore:auth:reset:";
+            }
+            if (resetTtl == null) {
+                resetTtl = Duration.ofMinutes(30);  // PT30M — 비밀번호 재설정 토큰 TTL
             }
         }
     }

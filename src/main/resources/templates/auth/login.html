@@ -38,6 +38,11 @@
             탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.
         </div>
 
+        <!-- 비밀번호 재설정 완료 안내 -->
+        <div class="alert alert-success" th:if="${param.reset}">
+            비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.
+        </div>
+
         <!--
             th:action 을 사용하면 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
             수동으로 _csrf 히든 필드를 추가하지 않는다.
@@ -57,6 +62,11 @@
             </div>
             <button type="submit">로그인</button>
         </form>
+
+        <!-- 비밀번호 재설정 링크 -->
+        <p class="form-footer-link">
+            <a th:href="@{/password-reset}">비밀번호를 잊으셨나요?</a>
+        </p>
 
         <!-- 회원가입 링크 -->
         <p class="form-footer-link">

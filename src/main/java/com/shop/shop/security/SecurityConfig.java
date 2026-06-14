@@ -67,6 +67,9 @@ public class SecurityConfig {
                     // 로그인 / 토큰 재발급은 공개 (인증 불필요)
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
+                    // 비밀번호 재설정 (비로그인 — enumeration 방지, 토큰 capability 기반)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/request").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/password-reset/confirm").permitAll()
                     // 회원가입은 공개 (인증 불필요)
                     .requestMatchers(HttpMethod.POST, "/api/v1/members/signup").permitAll()
                     // 카테고리 목록 조회는 공개 (인증 불필요) — anyRequest 앞에 배치
@@ -122,6 +125,11 @@ public class SecurityConfig {
                     // 회원가입 화면 공개 (GET 표시 + POST 폼 제출 — CSRF 보호 유지)
                     .requestMatchers(HttpMethod.GET, "/signup").permitAll()
                     .requestMatchers(HttpMethod.POST, "/signup").permitAll()
+                    // 비밀번호 재설정 화면 공개 (GET/POST 모두 — 비로그인 흐름)
+                    .requestMatchers(HttpMethod.GET, "/password-reset").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/password-reset").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/password-reset/**").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/password-reset/**").permitAll()
                     // 공개 상품 목록/상세 View (인증 불필요) — anyRequest 앞에 배치
                     .requestMatchers(HttpMethod.GET, "/products").permitAll()
                     .requestMatchers(HttpMethod.GET, "/products/*").permitAll()

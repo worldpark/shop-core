@@ -61,6 +61,9 @@ spring:
       timeout: 2s
 
 shop:
+  app:
+    base-url: ${SHOP_APP_BASE_URL:http://localhost:8080}
+
   order:
     pending-expiry:
       enabled: ${SHOP_ORDER_EXPIRY_ENABLED:true}    # 운영 활성 (테스트는 false로 명시 비활성)
@@ -90,6 +93,10 @@ shop:
       blacklist-prefix: ${SHOP_REDIS_AUTH_BLACKLIST_PREFIX:shopcore:auth:blacklist:}
       # [주의] blacklist-ttl은 코드에서 참조하지 않음. TTL은 access 잔여 만료 시간으로 동적 산정
       blacklist-ttl: ${SHOP_REDIS_AUTH_BLACKLIST_TTL:PT30M}
+      # 비밀번호 재설정 토큰 — 키: {SHA-256(token)}, TTL은 resetTtl(30분)
+      reset-prefix: ${SHOP_REDIS_AUTH_RESET_PREFIX:shopcore:auth:reset:}
+      # [SSOT] reset-ttl은 PasswordResetService.requestReset에서 참조. 기본 30분.
+      reset-ttl: ${SHOP_REDIS_AUTH_RESET_TTL:PT30M}
     lock:
       # 분산락 — 키는 {resource}, 실제 락 획득/해제는 분산락 Task에서 구현(Redisson 재검토 포함)
       prefix: ${SHOP_REDIS_LOCK_PREFIX:shopcore:lock:}

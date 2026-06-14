@@ -36,6 +36,9 @@ class RedisPropertiesTest {
             assertThat(props.auth().refreshTtl()).isEqualTo(Duration.ofDays(14));
             assertThat(props.auth().blacklistPrefix()).isEqualTo("shopcore:auth:blacklist:");
             assertThat(props.auth().blacklistTtl()).isEqualTo(Duration.ofMinutes(30));
+            // 비밀번호 재설정 토큰 기본값 (Task 030)
+            assertThat(props.auth().resetPrefix()).isEqualTo("shopcore:auth:reset:");
+            assertThat(props.auth().resetTtl()).isEqualTo(Duration.ofMinutes(30));
             assertThat(props.lock().prefix()).isEqualTo("shopcore:lock:");
             assertThat(props.lock().ttl()).isEqualTo(Duration.ofSeconds(10));
         });
@@ -73,6 +76,7 @@ class RedisPropertiesTest {
 
             assertThat(props.auth().refreshPrefix()).startsWith("shopcore:");
             assertThat(props.auth().blacklistPrefix()).startsWith("shopcore:");
+            assertThat(props.auth().resetPrefix()).startsWith("shopcore:");
             assertThat(props.lock().prefix()).startsWith("shopcore:");
         });
     }
