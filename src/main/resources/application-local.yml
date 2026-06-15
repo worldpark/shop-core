@@ -3,6 +3,20 @@ spring:
     activate:
       on-profile: local
 
+  thymeleaf:
+    cache: false
+    prefix: file:src/main/resources/templates/
+
+  web:
+    resources:
+      static-locations:
+        - file:src/main/resources/static/
+        - classpath:/static/
+      cache:
+        period: 0
+      chain:
+        cache: false
+
 shop:
   security:
     jwt:
@@ -12,4 +26,3 @@ shop:
   storage:
     root: ${SHOP_STORAGE_ROOT:./build/local-uploads}
     asset-base-url: ${SHOP_STORAGE_ASSET_BASE_URL:http://localhost:8080}
-
