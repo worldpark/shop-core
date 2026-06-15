@@ -56,13 +56,78 @@ header {
     font-size: 14px;
 }
 
+.header-auth > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 사용자 칩 (아바타 아이콘 + 이름) */
 .header-user {
-    color: #555;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    max-width: 220px;
+    padding: 5px 12px 5px 8px;
+    background: #eef2f7;
+    border-radius: 999px;
+    color: #334155;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.header-user::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #337ab7;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Ccircle cx='12' cy='9' r='3.2'/%3E%3Cpath d='M5.5 19c0-3.7 3-5.6 6.5-5.6s6.5 1.9 6.5 5.6z'/%3E%3C/svg%3E");
+    background-size: 14px;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 .header-logout-form {
-    display: inline;
+    display: inline-flex;
     margin: 0;
+}
+
+/* 헤더 인증 버튼 — 공용 .btn-link(밑줄 링크) 대신 헤더 전용으로 버튼화 (스코프 한정) */
+.header-auth a.btn-link {
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: #337ab7;
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: background-color 0.2s;
+}
+.header-auth a.btn-link:hover {
+    background: #286090;
+    color: #fff;
+}
+.header-auth button.btn-link {
+    text-decoration: none;
+    padding: 6px 12px;
+    border: 1px solid #d4dae1;
+    border-radius: 6px;
+    background: #fff;
+    color: #5a6470;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.4;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.header-auth button.btn-link:hover {
+    background: #f5f7f9;
+    border-color: #aab2bd;
+    color: #333;
 }
 
 /* ── 네비게이션 ── */
@@ -204,7 +269,11 @@ label {
 }
 
 input[type="text"],
-input[type="password"] {
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+input[type="url"] {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #ccc;
@@ -215,7 +284,11 @@ input[type="password"] {
 }
 
 input[type="text"]:focus,
-input[type="password"]:focus {
+input[type="password"]:focus,
+input[type="tel"]:focus,
+input[type="number"]:focus,
+input[type="search"]:focus,
+input[type="url"]:focus {
     border-color: #337ab7;
 }
 
@@ -560,20 +633,23 @@ input[type="email"]:focus {
     padding: 24px;
 }
 
-/* ── 주문 목록 테이블 ── */
-.order-list-container .table-wrapper {
+/* ── 주문 목록 / 주문서 테이블 (동일 스타일 공유) ── */
+.order-list-container .table-wrapper,
+.checkout-container .table-wrapper {
     border: 1px solid #e8e8e8;
     border-radius: 8px;
     overflow: hidden;
     background: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
-.order-table {
+.order-table,
+.checkout-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
 }
-.order-table thead th {
+.order-table thead th,
+.checkout-table thead th {
     background-color: #f7f8fa;
     font-weight: 600;
     color: #555;
@@ -582,18 +658,27 @@ input[type="email"]:focus {
     white-space: nowrap;
     border-bottom: 2px solid #ececec;
 }
-.order-table td {
+.order-table td,
+.checkout-table td {
     padding: 14px 16px;
     border-bottom: 1px solid #f0f0f0;
     vertical-align: middle;
     color: #333;
 }
-.order-table tbody tr:last-child td {
+.order-table tbody tr:last-child td,
+.checkout-table tbody tr:last-child td {
     border-bottom: none;
 }
-.order-table tbody tr:hover {
+.order-table tbody tr:hover,
+.checkout-table tbody tr:hover {
     background-color: #fafbfc;
 }
+/* 주문서 셀 정렬 (주문 목록과 동일 톤) */
+.checkout-table .checkout-item-name { font-weight: 600; color: #2c3e50; }
+.checkout-table .checkout-item-option { color: #777; }
+.checkout-table .checkout-item-price { text-align: right; white-space: nowrap; color: #444; }
+.checkout-table .checkout-item-quantity { text-align: center; color: #777; white-space: nowrap; }
+.checkout-table .checkout-item-line-amount { text-align: right; font-weight: 700; color: #222; white-space: nowrap; }
 .order-table .order-number {
     font-weight: 600;
     color: #2c3e50;
@@ -641,6 +726,183 @@ input[type="email"]:focus {
 .badge-delivered  { background: #c8e6c9; color: #1b5e20; }
 .badge-cancelled  { background: #f8d7da; color: #a02834; }
 .badge-refunded   { background: #e9ecef; color: #6c757d; }
+
+/* ── 주문서(checkout) 레이아웃 ── */
+.checkout-container {
+    max-width: 760px;
+    margin: 0 auto;
+}
+.checkout-items-section,
+.checkout-summary-section,
+.checkout-shipping-section {
+    margin-bottom: 28px;
+}
+.checkout-summary {
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.checkout-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 0;
+    font-size: 14px;
+    color: #555;
+}
+.checkout-summary-row + .checkout-summary-row {
+    border-top: 1px solid #f3f3f3;
+}
+.checkout-summary-value {
+    font-weight: 600;
+    color: #333;
+}
+.checkout-total-row {
+    margin-top: 2px;
+    padding-top: 14px;
+    border-top: 2px solid #ececec;
+}
+.checkout-total-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: #222;
+}
+.checkout-total-amount {
+    font-size: 20px;
+    font-weight: 800;
+    color: #d9534f;
+}
+.checkout-form {
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    background: #fff;
+    padding: 20px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.checkout-form .form-control {
+    width: 100%;
+}
+.checkout-action {
+    margin-top: 20px;
+}
+.checkout-action .btn-lg {
+    width: 100%;
+}
+.checkout-back-link {
+    margin-top: 20px;
+    text-align: center;
+}
+
+/* ── 주문 상세(order detail) (주문내역/주문서와 동일 톤) ── */
+.order-detail-container {
+    max-width: 760px;
+    margin: 0 auto;
+}
+.order-detail-header,
+.order-detail-items,
+.order-detail-amount,
+.order-detail-shipping,
+.order-detail-payment,
+.order-detail-cancel,
+.order-detail-shipments,
+.order-detail-cancelled-notice {
+    margin-bottom: 28px;
+}
+/* 정보 카드(헤더/배송지/결제/취소/배송 블록 공통) */
+.order-detail-meta,
+.shipping-info,
+.payment-info,
+.cancel-section,
+.shipment-block {
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    background: #fff;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.shipment-block + .shipment-block {
+    margin-top: 14px;
+}
+/* 라벨/값 행 */
+.order-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 14px;
+}
+.order-detail-row + .order-detail-row {
+    border-top: 1px solid #f5f5f5;
+}
+.order-detail-label {
+    flex: 0 0 92px;
+    color: #888;
+    font-weight: 600;
+}
+.order-detail-value {
+    color: #333;
+}
+/* 상세 항목 테이블 셀 정렬 (.checkout-table 공유 + order-item-* 셀) */
+.checkout-table .order-item-name { font-weight: 600; color: #2c3e50; }
+.checkout-table .order-item-option,
+.checkout-table .order-item-option-values { color: #777; }
+.checkout-table .order-item-price { text-align: right; white-space: nowrap; color: #444; }
+.checkout-table .order-item-quantity { text-align: center; color: #777; white-space: nowrap; }
+.checkout-table .order-item-line-amount { text-align: right; font-weight: 700; color: #222; white-space: nowrap; }
+.option-value-list { list-style: none; margin: 0; padding: 0; }
+.option-value-item { font-size: 12px; color: #777; line-height: 1.5; }
+/* 결제 상태 / 배송 배지 */
+.payment-status-paid { color: #1e7e34; font-weight: 700; }
+.payment-status-pending { color: #8a6d3b; font-weight: 700; }
+.badge-shipment-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #cfe8ff;
+    color: #1c5d99;
+}
+.payment-form-section,
+.payment-action {
+    margin-top: 16px;
+}
+/* 취소/안내 */
+.cancel-notice {
+    color: #a02834;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+.cancel-complete-info {
+    border: 1px solid #f5d2d2;
+    background: #fdf3f4;
+    border-radius: 8px;
+    padding: 14px 18px;
+}
+.cancel-complete-label {
+    color: #a02834;
+    font-weight: 600;
+}
+/* 배송 포함 상품 목록 */
+.shipment-items-block {
+    margin: 10px 0;
+}
+.shipment-item-list {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: #555;
+    font-size: 13px;
+}
+.shipment-tracking-info,
+.shipment-delivered-info {
+    margin-top: 6px;
+}
+.order-detail-back {
+    margin-top: 20px;
+    text-align: center;
+}
 
 .role-change-form {
     display: flex;

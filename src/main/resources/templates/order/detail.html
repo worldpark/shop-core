@@ -39,6 +39,7 @@
                 <div class="order-detail-row">
                     <span class="order-detail-label">주문 상태:</span>
                     <span class="order-detail-value badge-order-status"
+                          th:classappend="' badge-' + ${order.status}"
                           th:with="statusLabel=(${order.status} == 'pending' ? '결제 대기' :
                                                (${order.status} == 'paid' ? '결제 완료' :
                                                (${order.status} == 'preparing' ? '상품 준비 중' :
