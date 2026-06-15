@@ -29,14 +29,24 @@
         -->
         <form th:action="@{/signup}" method="post" th:object="${signupForm}">
 
-            <!-- 이메일 -->
+            <!-- 이메일 (아이디 + 도메인 선택) -->
             <div class="form-group">
-                <label for="email">이메일</label>
-                <input type="email"
-                       id="email"
-                       th:field="*{email}"
-                       placeholder="이메일을 입력하세요"
-                       autocomplete="email">
+                <label for="email-local">이메일</label>
+                <div class="email-compose">
+                    <input type="text" id="email-local" class="email-local"
+                           placeholder="아이디" autocomplete="off">
+                    <span class="email-at">@</span>
+                    <select id="email-domain" class="email-domain" aria-label="이메일 도메인">
+                        <option value="gmail.com">gmail.com</option>
+                        <option value="naver.com">naver.com</option>
+                        <option value="daum.net">daum.net</option>
+                        <option value="">직접입력</option>
+                    </select>
+                    <input type="text" id="email-domain-custom" class="email-domain-custom"
+                           placeholder="도메인 직접입력" autocomplete="off" style="display:none;">
+                </div>
+                <!-- 실제 전송 필드(서버 계약 유지) — 합성된 전체 이메일 -->
+                <input type="hidden" th:field="*{email}">
                 <span class="field-error" th:if="${#fields.hasErrors('email')}"
                       th:errors="*{email}"></span>
             </div>
@@ -95,6 +105,54 @@
             이미 계정이 있으신가요? <a th:href="@{/login}">로그인</a>
         </p>
     </div>
+
+    <!-- 이메일 합성: 아이디 + 도메인(select/직접입력) → hidden email 필드. 서버 전송 필드는 email 하나만 유지 -->
+    <script th:inline="none">
+        (function () {
+            var local = document.getElementById('email-local');
+            var select = document.getElementById('email-domain');
+            var custom = document.getElementById('email-domain-custom');
+            var hidden = document.getElementById('email');
+            if (!local || !select || !custom || !hidden) return;
+
+            function domain() {
+                return select.value === '' ? custom.value.trim() : select.value;
+            }
+            function compose() {
+                var l = local.value.trim();
+                var d = domain();
+                hidden.value = l && d ? l + '@' + d : (l ? l + '@' : '');
+            }
+            function syncCustom() {
+                custom.style.display = select.value === '' ? '' : 'none';
+            }
+            // 검증 실패 재표시 등으로 hidden에 값이 있으면 UI 복원
+            (function restore() {
+                var v = hidden.value || '';
+                var at = v.lastIndexOf('@');
+                if (at > 0) {
+                    local.value = v.slice(0, at);
+                    var dom = v.slice(at + 1);
+                    var matched = false;
+                    for (var i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === dom && dom !== '') { select.value = dom; matched = true; break; }
+                    }
+                    if (!matched) { select.value = ''; custom.value = dom; }
+                }
+                syncCustom();
+            })();
+
+            local.addEventListener('input', compose);
+            custom.addEventListener('input', compose);
+            select.addEventListener('change', function () {
+                syncCustom();
+                if (select.value === '') custom.focus();
+                compose();
+            });
+            var form = hidden.closest('form');
+            if (form) form.addEventListener('submit', compose);
+        })();
+    </script>
 </main>
 </body>
 </html>

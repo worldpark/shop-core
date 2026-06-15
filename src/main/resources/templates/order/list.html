@@ -49,6 +49,7 @@
                         <td class="order-number" th:text="${o.orderNumber}">ORD-...</td>
                         <td class="order-status">
                             <span class="badge-order-status"
+                                  th:classappend="' badge-' + ${o.status}"
                                   th:with="statusLabel=(${o.status} == 'pending' ? '결제 대기' :
                                                        (${o.status} == 'paid' ? '결제 완료' :
                                                        (${o.status} == 'preparing' ? '상품 준비 중' :

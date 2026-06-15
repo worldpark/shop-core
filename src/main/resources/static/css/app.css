@@ -111,6 +111,22 @@ nav {
     padding: 0 24px;
 }
 
+/* ── 공통 풀 레이아웃 body: sticky footer (footer margin-top:auto가 동작하도록 flex 컬럼+최소 100vh) ── */
+body.app-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+/* main이 남는 세로 공간을 채워 footer를 화면 맨 아래로 밀어냄.
+   width:100%로 기존 max-width:1200 + margin:0 auto 중앙정렬을 flex 컨텍스트에서도 유지 */
+body.app-body main {
+    flex: 1 0 auto;
+    width: 100%;
+}
+body.app-body > footer {
+    flex-shrink: 0;
+}
+
 /* ── 공통 메인 래퍼 ── */
 main {
     max-width: 1200px;
@@ -203,13 +219,46 @@ input[type="password"]:focus {
     border-color: #337ab7;
 }
 
+/* ── 이메일 입력(아이디 + 도메인 선택) ── */
+.email-compose {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.email-compose .email-local {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.email-compose .email-at {
+    color: #666;
+    flex: 0 0 auto;
+}
+.email-compose .email-domain-custom {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.email-compose .email-domain {
+    flex: 0 0 auto;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 15px;
+    background-color: #fff;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.email-compose .email-domain:focus {
+    border-color: #337ab7;
+}
+
 /* ── 로그인 컨테이너 ── */
 .login-container {
     background: #fff;
     border-radius: 8px;
-    padding: 40px 36px;
-    max-width: 400px;
-    width: 100%;
+    padding: 40px 44px;
+    width: 520px;
+    max-width: 100%;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -246,6 +295,7 @@ input[type="password"]:focus {
     padding: 48px 40px;
     max-width: 480px;
     width: 100%;
+    margin: 0 auto;
     text-align: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -509,6 +559,88 @@ input[type="email"]:focus {
     color: #888;
     padding: 24px;
 }
+
+/* ── 주문 목록 테이블 ── */
+.order-list-container .table-wrapper {
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.order-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+.order-table thead th {
+    background-color: #f7f8fa;
+    font-weight: 600;
+    color: #555;
+    padding: 13px 16px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 2px solid #ececec;
+}
+.order-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+    color: #333;
+}
+.order-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.order-table tbody tr:hover {
+    background-color: #fafbfc;
+}
+.order-table .order-number {
+    font-weight: 600;
+    color: #2c3e50;
+    white-space: nowrap;
+}
+.order-table .order-representative-item {
+    color: #444;
+}
+.order-table .order-item-count {
+    text-align: center;
+    color: #777;
+    white-space: nowrap;
+}
+.order-table .order-final-amount {
+    text-align: right;
+    font-weight: 700;
+    color: #222;
+    white-space: nowrap;
+}
+.order-table .order-created-at {
+    color: #999;
+    white-space: nowrap;
+}
+.order-table .order-detail-link {
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 주문 상태 배지 */
+.badge-order-status {
+    display: inline-block;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    background: #eef0f3;
+    color: #555;
+}
+.badge-pending    { background: #fff3cd; color: #8a6d3b; }
+.badge-paid       { background: #d4edda; color: #1e7e34; }
+.badge-preparing  { background: #e2e3ff; color: #3f3f9e; }
+.badge-shipping   { background: #cfe8ff; color: #1c5d99; }
+.badge-delivered  { background: #c8e6c9; color: #1b5e20; }
+.badge-cancelled  { background: #f8d7da; color: #a02834; }
+.badge-refunded   { background: #e9ecef; color: #6c757d; }
 
 .role-change-form {
     display: flex;

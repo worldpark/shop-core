@@ -20,9 +20,9 @@
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <script th:src="@{/js/app.js}" defer></script>
 </head>
-<body>
+<body class="app-body">
     <th:block th:replace="~{fragments/header :: header}"></th:block>
-    <th:block th:replace="~{fragments/nav :: nav('home')}"></th:block>
+    <th:block th:replace="~{fragments/nav :: nav(${activeNav} ?: 'home')}"></th:block>
     <div class="flash-region">
         <th:block th:replace="~{fragments/messages :: messages}"></th:block>
     </div>
