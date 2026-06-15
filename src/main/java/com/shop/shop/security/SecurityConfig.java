@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -16,6 +17,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+
+import java.util.Set;
 
 /**
  * 전역 보안 설정 — REST 체인(@Order(1)) + View 체인(@Order(2)) 분리.
@@ -179,10 +185,30 @@ public class SecurityConfig {
                     .logoutSuccessUrl(LOGIN_PAGE + "?logout")
                     .permitAll()
             )
+            // saved-request를 HTML 네비게이션 요청만 저장하도록 제한.
+            // Chrome DevTools probe(/.well-known/...json), favicon, XHR/fetch(json, */*) 같은
+            // 백그라운드 요청이 SavedRequest로 저장돼 로그인 후 엉뚱한 URL로 복귀하는 것을 방지.
+            .requestCache(rc -> rc.requestCache(htmlNavigationRequestCache()))
             .userDetailsService(userDetailsService);
         // CSRF: 기본 활성 유지 (폼 th:action 으로 _csrf 히든 자동 주입)
 
         return http.build();
+    }
+
+    /**
+     * HTML 네비게이션 요청만 저장하는 RequestCache.
+     *
+     * <p>Accept 헤더가 text/html과 호환되는 요청(브라우저 페이지 이동)만 SavedRequest로 저장한다.
+     * 와일드카드 Accept(XHR/fetch/일부 백그라운드 probe)는 MediaType.ALL ignore로 제외해, Chrome
+     * DevTools의 {@code /.well-known/appspecific/com.chrome.devtools.json} probe나 favicon 등이
+     * 저장돼 로그인 직후 그 URL로 복귀하는 현상을 막는다. (기본 동작: 저장된 요청 없으면 defaultSuccessUrl "/")
+     */
+    private RequestCache htmlNavigationRequestCache() {
+        MediaTypeRequestMatcher htmlMatcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
+        htmlMatcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setRequestMatcher(htmlMatcher);
+        return requestCache;
     }
 
     /**
