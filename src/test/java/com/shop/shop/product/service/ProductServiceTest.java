@@ -15,13 +15,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -164,6 +171,56 @@ class ProductServiceTest {
                         new BigDecimal("-1"), ProductStatus.DRAFT))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getStatus().value()).isEqualTo(400));
+    }
+
+    // ============================================================
+    // getMyProducts
+    // ============================================================
+
+    @Test
+    @DisplayName("getMyProducts — productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc를 ownerId·pageable로 호출한다")
+    void getMyProducts_delegates_to_repository_with_ownerId_and_pageable() {
+        long ownerId = 5L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Product p = productWithOwner(ownerId);
+        Page<Product> expected = new PageImpl<>(List.of(p), pageable, 1);
+        when(productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(eq(ownerId), eq(pageable)))
+                .thenReturn(expected);
+
+        Page<Product> result = productService.getMyProducts(ownerId, pageable);
+
+        verify(productRepository).findByOwnerIdOrderByCreatedAtDescIdDesc(ownerId, pageable);
+        assertThat(result).isSameAs(expected);
+    }
+
+    @Test
+    @DisplayName("getMyProducts — 빈 결과를 정상으로 반환한다 (예외 없음)")
+    void getMyProducts_returns_empty_page_without_exception() {
+        long ownerId = 99L;
+        Pageable pageable = PageRequest.of(0, 10);
+        when(productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(eq(ownerId), eq(pageable)))
+                .thenReturn(Page.empty(pageable));
+
+        Page<Product> result = productService.getMyProducts(ownerId, pageable);
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("getMyProducts — 반환 Page의 원소를 그대로 전달한다 (추가 변환 없음)")
+    void getMyProducts_returns_page_as_is_from_repository() {
+        long ownerId = 3L;
+        Pageable pageable = PageRequest.of(0, 5);
+        Product p1 = productWithOwner(ownerId);
+        Product p2 = productWithOwner(ownerId);
+        Page<Product> expected = new PageImpl<>(List.of(p1, p2), pageable, 2);
+        when(productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(any(), any()))
+                .thenReturn(expected);
+
+        Page<Product> result = productService.getMyProducts(ownerId, pageable);
+
+        assertThat(result.getContent()).containsExactly(p1, p2);
     }
 
     // ============================================================

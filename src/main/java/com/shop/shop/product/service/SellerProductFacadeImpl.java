@@ -4,9 +4,12 @@ import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductSummaryView;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.product.spi.UserDirectory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -62,6 +65,20 @@ class SellerProductFacadeImpl implements SellerProductFacade {
         return Arrays.stream(ProductStatus.values())
                 .map(ProductStatus::name)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>actorEmail → ownerId 변환 후 {@link ProductService#getMyProducts}에 위임한다.
+     * {@link Page#map(java.util.function.Function)}으로 Entity Page를 DTO Page로 즉시 변환.
+     * Entity는 facade 반환 타입에 포함되지 않는다(모듈 경계 누출 금지).
+     */
+    @Override
+    public Page<SellerProductSummaryView> getMyProducts(String actorEmail, Pageable pageable) {
+        long ownerId = userDirectory.findUserIdByEmail(actorEmail);
+        return productService.getMyProducts(ownerId, pageable)
+                .map(SellerProductSummaryView::from);
     }
 
     /**

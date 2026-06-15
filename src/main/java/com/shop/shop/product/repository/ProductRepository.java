@@ -165,4 +165,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("keyword") String keyword,
             @Param("categoryId") Long categoryId,
             Pageable pageable);
+
+    // =============================================================
+    // 판매자 본인 상품 목록 — 최신순 (createdAt DESC, id DESC)
+    // =============================================================
+
+    /**
+     * 판매자 본인 상품 목록 — 최신순 파생 쿼리.
+     *
+     * <p>ownerId 필터로 IDOR 차단. 상태(DRAFT/HIDDEN 포함) 무관 전체 조회.
+     * 정렬은 메서드명에 고정(createdAt DESC, id DESC) — Pageable sort 무시.
+     * 공개 목록 집계(@Query, GROUP BY, displayPrice)와 달리 집계 없음(파생 쿼리로 충분).
+     *
+     * @param ownerId  소유자 userId (본인 한정 — IDOR 방지)
+     * @param pageable 페이지 정보 (size/page 사용, sort는 메서드명 고정)
+     * @return 소유자 상품 Page
+     */
+    Page<Product> findByOwnerIdOrderByCreatedAtDescIdDesc(Long ownerId, Pageable pageable);
 }

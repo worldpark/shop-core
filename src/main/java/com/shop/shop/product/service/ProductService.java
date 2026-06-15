@@ -13,6 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 
 import com.shop.shop.common.exception.BusinessException;
@@ -117,6 +120,23 @@ public class ProductService {
     @Transactional(readOnly = true)
     public Product getForEdit(long actorId, boolean actorIsAdmin, long productId) {
         return getOwnedProduct(actorId, actorIsAdmin, productId);
+    }
+
+    /**
+     * 판매자 본인 상품 목록 조회.
+     *
+     * <p>ownerId 한정 페이지 조회 — 소유 필터는 쿼리가 구조적으로 보장한다.
+     * 빈 결과는 정상(예외 없음). 상태 무관 전체(DRAFT/HIDDEN 포함).
+     *
+     * <p><b>ADMIN 특례 없음</b> — 목록은 항상 본인 ownerId. IDOR 방지 단순화.
+     *
+     * @param ownerId  소유자 userId (본인 한정)
+     * @param pageable 페이지 정보
+     * @return 소유자 상품 Page (Entity — facade 경계에서 DTO 변환)
+     */
+    @Transactional(readOnly = true)
+    public Page<Product> getMyProducts(long ownerId, Pageable pageable) {
+        return productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(ownerId, pageable);
     }
 
     /**

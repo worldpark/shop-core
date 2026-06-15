@@ -35,11 +35,19 @@ public class NavActiveControllerAdvice {
         if (uri.startsWith("/products")) {
             return "products";
         }
+        if (uri.startsWith("/admin/seller-applications")) {
+            return "admin-seller-applications";
+        }
         if (uri.startsWith("/admin/members")) {
             return "admin-members";
         }
-        if (uri.startsWith("/seller/products")) {
+        if (uri.startsWith("/seller/products/new")) {
+            // 등록 폼만 상품 등록 메뉴 활성 — 더 구체적인 경로를 먼저 검사(prefix 순서 의존 주의)
             return "seller-product-new";
+        }
+        if (uri.startsWith("/seller/products")) {
+            // 목록·수정·이미지·옵션은 내 상품 메뉴 활성 (수정/이미지/옵션은 목록의 하위 작업)
+            return "seller-products";
         }
         return "home";
     }

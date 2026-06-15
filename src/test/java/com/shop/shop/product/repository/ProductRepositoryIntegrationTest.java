@@ -71,22 +71,32 @@ class ProductRepositoryIntegrationTest {
 
     // 데이터셋 식별자 — @BeforeEach에서 채움
     private Long ownerId;
+    private Long ownerBId;      // IDOR 검증용 타 판매자
     private Long catAId;
     private Long catBId;
-    private Long blueShirtId;   // ON_SALE, catA, displayPrice 80, purchasable 1
-    private Long redShoesId;    // ON_SALE, catB, variant 없음 → displayPrice = basePrice 200, purchasable 0
-    private Long greenHatId;    // SOLD_OUT, catA, displayPrice 40, purchasable 1
-    private Long hiddenItemId;  // HIDDEN  → 화이트리스트 제외
-    private Long draftItemId;   // DRAFT   → 화이트리스트 제외
+    private Long blueShirtId;   // ON_SALE, catA, displayPrice 80, purchasable 1 (ownerA)
+    private Long redShoesId;    // ON_SALE, catB, variant 없음 → displayPrice = basePrice 200, purchasable 0 (ownerA)
+    private Long greenHatId;    // SOLD_OUT, catA, displayPrice 40, purchasable 1 (ownerA)
+    private Long hiddenItemId;  // HIDDEN  → 화이트리스트 제외 (ownerA)
+    private Long draftItemId;   // DRAFT   → 화이트리스트 제외 (ownerA)
+    private Long ownerBProductId; // ownerB 상품 — IDOR 검증 대상
 
     @BeforeEach
     void setUp() {
-        // owner FK(users.id) 충족용 사용자 1명 — product 모듈에 User Entity가 없어 native insert 사용
+        // owner FK(users.id) 충족용 사용자 2명 — product 모듈에 User Entity가 없어 native insert 사용
         em.getEntityManager().createNativeQuery(
                 "INSERT INTO users (email, password_hash, name, role) "
                         + "VALUES ('seller@test.com', 'x', 'Seller', 'SELLER')").executeUpdate();
         ownerId = ((Number) em.getEntityManager()
                 .createNativeQuery("SELECT id FROM users WHERE email = 'seller@test.com'")
+                .getSingleResult()).longValue();
+
+        // 타 판매자(IDOR 검증용)
+        em.getEntityManager().createNativeQuery(
+                "INSERT INTO users (email, password_hash, name, role) "
+                        + "VALUES ('seller-b@test.com', 'x', 'SellerB', 'SELLER')").executeUpdate();
+        ownerBId = ((Number) em.getEntityManager()
+                .createNativeQuery("SELECT id FROM users WHERE email = 'seller-b@test.com'")
                 .getSingleResult()).longValue();
 
         Category catA = persistCategory("Apparel", "apparel");
@@ -111,9 +121,13 @@ class ProductRepositoryIntegrationTest {
         persistVariant(greenHat, "SKU-HAT-40", "40", 10, true);
         greenHatId = greenHat.getId();
 
-        // p4/p5: 화이트리스트 제외 status
+        // p4/p5: 화이트리스트 제외 status (ownerA)
         hiddenItemId = persistProduct("Hidden Item", "300", ProductStatus.HIDDEN, catA).getId();
         draftItemId = persistProduct("Draft Item", "10", ProductStatus.DRAFT, catB).getId();
+
+        // p6: ownerB 상품 — IDOR 검증(ownerA 조회 시 0건 단언).
+        // DRAFT 상태를 사용해 기존 공개 목록 화이트리스트(ON_SALE/SOLD_OUT) 단언에 영향을 주지 않는다.
+        ownerBProductId = persistProductForOwner("Owner B Product", "500", ProductStatus.DRAFT, catA, ownerBId).getId();
 
         em.flush();
         em.clear();
@@ -298,6 +312,91 @@ class ProductRepositoryIntegrationTest {
     }
 
     // =============================================================
+    // findByOwnerIdOrderByCreatedAtDescIdDesc — 판매자 본인 상품 목록
+    // =============================================================
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — ownerA 조회 시 ownerA 상품만 반환 (IDOR: ownerB 상품 0건)")
+    void findByOwnerId_returns_only_owner_a_products_and_excludes_owner_b_idor() {
+        Page<Product> pageA = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerId, PageRequest.of(0, 20));
+
+        List<Long> ids = pageA.getContent().stream().map(Product::getId).collect(Collectors.toList());
+
+        // ownerA 상품(5개): blueShirt, redShoes, greenHat, hiddenItem, draftItem
+        assertThat(ids).contains(blueShirtId, redShoesId, greenHatId, hiddenItemId, draftItemId);
+        // ownerB 상품은 결과에 포함되지 않는다 — 핵심 IDOR 단언
+        assertThat(ids).doesNotContain(ownerBProductId);
+    }
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — ownerB 조회 시 ownerB 상품 1건만 (ownerA 상품 0건)")
+    void findByOwnerId_returns_only_owner_b_products_when_queried_by_owner_b() {
+        Page<Product> pageB = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerBId, PageRequest.of(0, 20));
+
+        List<Long> ids = pageB.getContent().stream().map(Product::getId).collect(Collectors.toList());
+
+        assertThat(ids).containsExactly(ownerBProductId);
+        // ownerA 상품은 결과에 미포함
+        assertThat(ids).doesNotContain(blueShirtId, redShoesId, greenHatId, hiddenItemId, draftItemId);
+    }
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — DRAFT/HIDDEN 포함 모든 status 반환 (본인 전체 노출)")
+    void findByOwnerId_includes_all_status_including_draft_and_hidden() {
+        Page<Product> page = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerId, PageRequest.of(0, 20));
+
+        Set<String> statuses = page.getContent().stream()
+                .map(p -> p.getStatus().name())
+                .collect(Collectors.toSet());
+
+        // 본인 상품은 DRAFT·HIDDEN 포함 전체 상태가 반환된다
+        assertThat(statuses).contains("DRAFT", "HIDDEN", "ON_SALE", "SOLD_OUT");
+    }
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — 동일 trx에서 insert 시 id DESC 보조정렬 적용")
+    void findByOwnerId_orders_by_created_at_desc_then_id_desc() {
+        // @BeforeEach에서 동일 트랜잭션 내 insert → createdAt 동일 → id DESC 타이브레이크 적용
+        Page<Product> page = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerId, PageRequest.of(0, 20));
+
+        List<Long> ids = page.getContent().stream().map(Product::getId).collect(Collectors.toList());
+
+        // insert 순서: blueShirt, redShoes, greenHat, hiddenItem, draftItem
+        // createdAt 동일 시 id DESC: draftItemId > hiddenItemId > greenHatId > redShoesId > blueShirtId
+        assertThat(ids).containsExactly(draftItemId, hiddenItemId, greenHatId, redShoesId, blueShirtId);
+    }
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — 페이지 경계(첫/마지막 페이지 totalElements·content 크기)")
+    void findByOwnerId_pagination_boundary_first_and_last_page() {
+        // ownerA: 5개 상품, size=2
+        Page<Product> first = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerId, PageRequest.of(0, 2));
+        assertThat(first.getContent()).hasSize(2);
+        assertThat(first.getTotalElements()).isEqualTo(5);
+        assertThat(first.getTotalPages()).isEqualTo(3);
+
+        Page<Product> last = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                ownerId, PageRequest.of(2, 2));
+        assertThat(last.getContent()).hasSize(1);
+        assertThat(last.isLast()).isTrue();
+    }
+
+    @Test
+    @DisplayName("findByOwnerIdOrderByCreatedAtDescIdDesc — 존재하지 않는 ownerId는 빈 Page 반환")
+    void findByOwnerId_returns_empty_page_for_non_existent_owner() {
+        Page<Product> page = productRepository.findByOwnerIdOrderByCreatedAtDescIdDesc(
+                99999L, PageRequest.of(0, 10));
+
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+    }
+
+    // =============================================================
     // 헬퍼
     // =============================================================
 
@@ -314,8 +413,13 @@ class ProductRepositoryIntegrationTest {
     }
 
     private Product persistProduct(String name, String basePrice, ProductStatus status, Category category) {
+        return persistProductForOwner(name, basePrice, status, category, ownerId);
+    }
+
+    private Product persistProductForOwner(String name, String basePrice, ProductStatus status,
+                                            Category category, Long ownerIdForProduct) {
         BigDecimal price = new BigDecimal(basePrice);
-        Product product = Product.create(ownerId, category, name, null, price);
+        Product product = Product.create(ownerIdForProduct, category, name, null, price);
         // create()는 status를 DRAFT로 강제하므로 의도한 status로 교체
         product.update(category, name, null, price, status);
         em.persist(product);

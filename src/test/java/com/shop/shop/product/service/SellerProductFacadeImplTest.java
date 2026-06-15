@@ -5,6 +5,7 @@ import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductSummaryView;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.product.spi.UserDirectory;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -62,6 +67,85 @@ class SellerProductFacadeImplTest {
         facade = new SellerProductFacadeImpl(productService, categoryService, userDirectory);
         // userDirectory stub은 actorEmail을 사용하는 테스트에서만 개별 설정
         // (listCategories/productStatusNames는 userDirectory를 호출하지 않으므로 공통 설정 제외)
+    }
+
+    // ============================================================
+    // getMyProducts
+    // ============================================================
+
+    @Test
+    @DisplayName("(c) getMyProducts — UserDirectory.findUserIdByEmail로 actorId를 획득한다")
+    void getMyProducts_resolves_actor_id_from_email_via_user_directory() {
+        when(userDirectory.findUserIdByEmail(ACTOR_EMAIL)).thenReturn(ACTOR_ID);
+        Pageable pageable = PageRequest.of(0, 10);
+        when(productService.getMyProducts(ACTOR_ID, pageable)).thenReturn(Page.empty(pageable));
+
+        facade.getMyProducts(ACTOR_EMAIL, pageable);
+
+        verify(userDirectory).findUserIdByEmail(ACTOR_EMAIL);
+    }
+
+    @Test
+    @DisplayName("(a) getMyProducts — 획득한 ownerId로 ProductService.getMyProducts에 위임한다 (IDOR)")
+    void getMyProducts_delegates_to_product_service_with_resolved_owner_id() {
+        when(userDirectory.findUserIdByEmail(ACTOR_EMAIL)).thenReturn(ACTOR_ID);
+        Pageable pageable = PageRequest.of(0, 10);
+        when(productService.getMyProducts(eq(ACTOR_ID), eq(pageable))).thenReturn(Page.empty(pageable));
+
+        facade.getMyProducts(ACTOR_EMAIL, pageable);
+
+        ArgumentCaptor<Long> ownerCaptor = ArgumentCaptor.forClass(Long.class);
+        verify(productService).getMyProducts(ownerCaptor.capture(), eq(pageable));
+        assertThat(ownerCaptor.getValue()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("(d) getMyProducts — Page<Product>가 Page<SellerProductSummaryView>로 매핑된다 (Entity 미노출)")
+    void getMyProducts_maps_product_page_to_dto_page_without_entity_leak() {
+        when(userDirectory.findUserIdByEmail(ACTOR_EMAIL)).thenReturn(ACTOR_ID);
+        Pageable pageable = PageRequest.of(0, 10);
+        Product product = sampleProduct(ACTOR_ID, PRODUCT_ID);
+        Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
+        when(productService.getMyProducts(ACTOR_ID, pageable)).thenReturn(productPage);
+
+        Page<SellerProductSummaryView> result = facade.getMyProducts(ACTOR_EMAIL, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        SellerProductSummaryView view = result.getContent().get(0);
+        // Entity 미노출: 반환 원소 타입이 SellerProductSummaryView여야 함
+        assertThat(view).isInstanceOf(SellerProductSummaryView.class);
+    }
+
+    @Test
+    @DisplayName("(d) getMyProducts — DTO 필드 매핑(productId·name·status(name())·basePrice·createdAt) 검증")
+    void getMyProducts_maps_dto_fields_correctly() {
+        when(userDirectory.findUserIdByEmail(ACTOR_EMAIL)).thenReturn(ACTOR_ID);
+        Pageable pageable = PageRequest.of(0, 10);
+        Product product = sampleProduct(ACTOR_ID, PRODUCT_ID);
+        Page<Product> productPage = new PageImpl<>(List.of(product), pageable, 1);
+        when(productService.getMyProducts(ACTOR_ID, pageable)).thenReturn(productPage);
+
+        Page<SellerProductSummaryView> result = facade.getMyProducts(ACTOR_EMAIL, pageable);
+
+        SellerProductSummaryView view = result.getContent().get(0);
+        assertThat(view.productId()).isEqualTo(PRODUCT_ID);
+        assertThat(view.name()).isEqualTo("상품");
+        assertThat(view.status()).isEqualTo("DRAFT");              // ProductStatus.name() — String
+        assertThat(view.status()).isInstanceOf(String.class);      // enum 타입 아님
+        assertThat(view.basePrice()).isEqualByComparingTo(new BigDecimal("10000"));
+    }
+
+    @Test
+    @DisplayName("(d) getMyProducts — 빈 Page를 그대로 반환한다 (예외 없음)")
+    void getMyProducts_returns_empty_page_when_no_products() {
+        when(userDirectory.findUserIdByEmail(ACTOR_EMAIL)).thenReturn(ACTOR_ID);
+        Pageable pageable = PageRequest.of(0, 10);
+        when(productService.getMyProducts(ACTOR_ID, pageable)).thenReturn(Page.empty(pageable));
+
+        Page<SellerProductSummaryView> result = facade.getMyProducts(ACTOR_EMAIL, pageable);
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isZero();
     }
 
     // ============================================================

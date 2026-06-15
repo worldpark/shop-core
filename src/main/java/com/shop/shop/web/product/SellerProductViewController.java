@@ -3,12 +3,17 @@ package com.shop.shop.web.product;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductForm;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductSummaryView;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.web.support.CurrentActor;
 import com.shop.shop.web.support.CurrentActorResolver;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -56,9 +61,37 @@ import java.util.List;
 public class SellerProductViewController {
 
     private static final String PRODUCT_FORM_VIEW = "seller/product-form";
+    private static final String SELLER_PRODUCT_LIST_VIEW = "seller/product-list";
 
     private final SellerProductFacade sellerProductFacade;
     private final CurrentActorResolver currentActorResolver;
+
+    /**
+     * 판매자 본인 상품 목록 화면.
+     * GET /seller/products
+     *
+     * <p>본인(ownerId) 상품만 최신순 페이지네이션으로 렌더한다.
+     * IDOR 방지: facade가 actorEmail → ownerId 해석 후 본인 ownerId로만 조회(ADMIN 특례 없음).
+     * 모델 키 {@code sellerProducts} — Thymeleaf 예약어(application/session/param/request) 회피.
+     *
+     * @param auth     SecurityContext 인증 객체
+     * @param pageable 페이지 정보 (기본 size=10, createdAt DESC 고정)
+     * @param model    Spring MVC 모델
+     * @return view name "seller/product-list"
+     */
+    @GetMapping
+    public String list(
+            Authentication auth,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable,
+            Model model) {
+
+        CurrentActor actor = currentActorResolver.resolve(auth);
+        Page<SellerProductSummaryView> sellerProducts =
+                sellerProductFacade.getMyProducts(actor.email(), pageable);
+
+        model.addAttribute("sellerProducts", sellerProducts);
+        return SELLER_PRODUCT_LIST_VIEW;
+    }
 
     /**
      * 상품 등록 화면.

@@ -21,6 +21,16 @@
                class="nav-link"
                th:classappend="${active == 'admin-members'} ? ' nav-link-active' : ''">회원 관리</a>
         </li>
+        <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+            <a th:href="@{/admin/seller-applications}"
+               class="nav-link"
+               th:classappend="${active == 'admin-seller-applications'} ? ' nav-link-active' : ''">판매자 신청 심사</a>
+        </li>
+        <li class="nav-item" sec:authorize="hasRole('SELLER')">
+            <a th:href="@{/seller/products}"
+               class="nav-link"
+               th:classappend="${active == 'seller-products'} ? ' nav-link-active' : ''">내 상품</a>
+        </li>
         <li class="nav-item" sec:authorize="hasRole('SELLER')">
             <a th:href="@{/seller/products/new}"
                class="nav-link"
@@ -36,7 +46,7 @@
                class="nav-link"
                th:classappend="${active == 'orders'} ? ' nav-link-active' : ''">주문 내역</a>
         </li>
-        <li class="nav-item" sec:authorize="hasRole('CONSUMER')">
+        <li class="nav-item" sec:authorize="hasRole('CONSUMER') and !hasRole('SELLER')">
             <a th:href="@{/seller-applications/apply}"
                class="nav-link"
                th:classappend="${active == 'seller-apply'} ? ' nav-link-active' : ''">판매자 신청</a>

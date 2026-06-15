@@ -2,6 +2,9 @@ package com.shop.shop.product.spi;
 
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductSummaryView;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,6 +24,21 @@ import java.util.List;
  * <p>의존 방향: web → product.spi (단방향). product는 web을 참조하지 않는다.
  */
 public interface SellerProductFacade {
+
+    /**
+     * 판매자 본인 상품 목록 (최신순 페이지네이션).
+     *
+     * <p>actorEmail → ownerId 해석 후 본인 ownerId로만 조회(IDOR 방지).
+     * <b>ADMIN 특례 없음</b> — 항상 본인 ownerId 필터. 타 판매자 상품 비노출.
+     * 빈 결과는 정상(예외 없음).
+     *
+     * <p>반환 Page 원소 타입은 {@link SellerProductSummaryView} DTO — Entity 모듈 경계 누출 금지.
+     *
+     * @param actorEmail 행위자 이메일 (principal — facade 내부에서 ownerId로 해석)
+     * @param pageable   페이지 정보 (size/page 사용; 정렬은 쿼리에 고정)
+     * @return 판매자 본인 상품 목록 Page (DTO)
+     */
+    Page<SellerProductSummaryView> getMyProducts(String actorEmail, Pageable pageable);
 
     /**
      * 전체 카테고리 목록 조회.

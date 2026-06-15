@@ -633,9 +633,10 @@ input[type="email"]:focus {
     padding: 24px;
 }
 
-/* ── 주문 목록 / 주문서 테이블 (동일 스타일 공유) ── */
+/* ── 주문 목록 / 주문서 / 판매자 상품 목록 테이블 (동일 스타일 공유) ── */
 .order-list-container .table-wrapper,
-.checkout-container .table-wrapper {
+.checkout-container .table-wrapper,
+.seller-product-list-container .table-wrapper {
     border: 1px solid #e8e8e8;
     border-radius: 8px;
     overflow: hidden;
@@ -726,6 +727,23 @@ input[type="email"]:focus {
 .badge-delivered  { background: #c8e6c9; color: #1b5e20; }
 .badge-cancelled  { background: #f8d7da; color: #a02834; }
 .badge-refunded   { background: #e9ecef; color: #6c757d; }
+
+/* 상품 상태 배지 (판매자 목록 전용) */
+.badge-product-status {
+    display: inline-block;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    background: #eef0f3;
+    color: #555;
+}
+.badge-product-on_sale  { background: #d4edda; color: #1e7e34; }
+.badge-product-draft    { background: #fff3cd; color: #8a6d3b; }
+.badge-product-sold_out { background: #f8d7da; color: #a02834; }
+.badge-product-hidden   { background: #e9ecef; color: #6c757d; }
 
 /* ── 주문서(checkout) 레이아웃 ── */
 .checkout-container {
@@ -2060,4 +2078,48 @@ textarea.review-content-input:focus {
     gap: 10px;
     margin-top: 8px;
     flex-wrap: wrap;
+}
+
+/* ── 판매자 상품 목록 화면 ── */
+.seller-product-list-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.seller-product-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.seller-product-list-header .page-title {
+    margin-bottom: 0;
+}
+
+.seller-product-list-footer {
+    margin-top: 16px;
+    text-align: right;
+}
+
+.seller-product-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.seller-product-price {
+    text-align: right;
+    font-weight: 700;
+    color: #222;
+    white-space: nowrap;
+}
+
+.seller-product-actions {
+    text-align: center;
+    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+    justify-content: center;
 }

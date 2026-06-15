@@ -6,6 +6,7 @@ import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductSummaryView;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductImageRepository;
@@ -22,6 +23,9 @@ import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -145,6 +150,69 @@ class SellerProductViewControllerTest {
     void setUp() {
         when(sellerProductFacade.listCategories()).thenReturn(List.of());
         when(sellerProductFacade.productStatusNames()).thenReturn(List.of("DRAFT", "ON_SALE", "SOLD_OUT", "HIDDEN"));
+        when(sellerProductFacade.getMyProducts(anyString(), any(Pageable.class))).thenReturn(Page.empty());
+    }
+
+    // ============================================================
+    // GET /seller/products — 목록
+    // ============================================================
+
+    @Test
+    @DisplayName("GET /seller/products — SELLER → 200, view seller/product-list")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void list_seller_returns_200_with_product_list_view() throws Exception {
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("seller/product-list"));
+    }
+
+    @Test
+    @DisplayName("GET /seller/products — SELLER → model에 sellerProducts 존재")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void list_seller_model_contains_seller_products() throws Exception {
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("sellerProducts"));
+    }
+
+    @Test
+    @DisplayName("GET /seller/products — ADMIN → 200(RoleHierarchy 함의)")
+    @WithMockUser(username = "admin@example.com", roles = "ADMIN")
+    void list_admin_returns_200() throws Exception {
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("seller/product-list"));
+    }
+
+    @Test
+    @DisplayName("GET /seller/products — CONSUMER → 403")
+    @WithMockUser(username = "consumer@example.com", roles = "CONSUMER")
+    void list_consumer_returns_403() throws Exception {
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET /seller/products — 비인증 → /login redirect(302)")
+    void list_unauthenticated_redirects_to_login() throws Exception {
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login**"));
+    }
+
+    @Test
+    @DisplayName("GET /seller/products — facade.getMyProducts(actorEmail, pageable) 호출 — 소유 한정 인자 전달 검증")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void list_calls_facade_with_seller_email() throws Exception {
+        SellerProductSummaryView view = new SellerProductSummaryView(
+                PRODUCT_ID, "상품A", "ON_SALE", new BigDecimal("10000"), Instant.now());
+        when(sellerProductFacade.getMyProducts(eq(SELLER_EMAIL), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(view)));
+
+        mockMvc.perform(get("/seller/products"))
+                .andExpect(status().isOk());
+
+        verify(sellerProductFacade).getMyProducts(eq(SELLER_EMAIL), any(Pageable.class));
     }
 
     // ============================================================
