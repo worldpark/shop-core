@@ -44,16 +44,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByIdAndUserId(long id, long userId);
 
     /**
-     * 소유권 검증 포함 주문 상세 조회 — items·optionValues N+1 회피.
+     * 소유권 검증 포함 주문 상세 조회 — items N+1 회피.
      *
-     * <p>@EntityGraph로 items·items.optionValues를 즉시 로딩한다.
-     * 상세 조회 시 사용.
+     * <p>@EntityGraph로 items(단일 bag)만 즉시 로딩한다. items·optionValues 두 bag을 동시에
+     * fetch하면 {@code MultipleBagFetchException}이 발생하므로, optionValues는 그래프에서 제외하고
+     * {@code OrderItem.optionValues}의 {@code @BatchSize}로 트랜잭션 내에서 IN 배치 로딩한다
+     * (상세 매핑 {@code OrderService.toOrderDetail}이 @Transactional 범위에서 접근 — LazyInit 무위험).
      *
      * @param id     주문 ID
      * @param userId 소유자 userId
-     * @return 주문 (items·optionValues 즉시 로딩, 없으면 empty)
+     * @return 주문 (items 즉시 로딩 + optionValues 배치 로딩, 없으면 empty)
      */
-    @EntityGraph(attributePaths = {"items", "items.optionValues"})
+    @EntityGraph(attributePaths = {"items"})
     Optional<Order> findWithItemsByIdAndUserId(long id, long userId);
 
     /**

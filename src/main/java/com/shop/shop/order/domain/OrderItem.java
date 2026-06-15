@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -65,7 +66,10 @@ public class OrderItem {
     @Column(name = "line_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineAmount;
 
+    // @BatchSize: 주문 조회 시 items만 fetch join하고(다중 bag fetch 회피 — MultipleBagFetchException),
+    // optionValues는 트랜잭션 내에서 IN 배치로 일괄 로딩(N+1 회피). (OrderRepository.findWithItemsByIdAndUserId 참조)
     @OneToMany(mappedBy = "orderItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     private List<OrderItemOptionValue> optionValues = new ArrayList<>();
 
     /**
