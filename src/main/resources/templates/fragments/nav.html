@@ -36,6 +36,11 @@
                class="nav-link"
                th:classappend="${active == 'orders'} ? ' nav-link-active' : ''">주문 내역</a>
         </li>
+        <li class="nav-item" sec:authorize="hasRole('CONSUMER')">
+            <a th:href="@{/seller-applications/apply}"
+               class="nav-link"
+               th:classappend="${active == 'seller-apply'} ? ' nav-link-active' : ''">판매자 신청</a>
+        </li>
     </ul>
 </nav>
 </body>

@@ -26,6 +26,9 @@ public class NavActiveControllerAdvice {
         if (uri.startsWith("/orders") || uri.startsWith("/checkout")) {
             return "orders";
         }
+        if (uri.startsWith("/seller-applications")) {
+            return "seller-apply";
+        }
         if (uri.startsWith("/cart")) {
             return "cart";
         }
