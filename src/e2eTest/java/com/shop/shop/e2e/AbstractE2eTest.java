@@ -88,7 +88,11 @@ abstract class AbstractE2eTest implements PlaywrightPageHolder {
         assertThat(page.getByRole(AriaRole.HEADING,
                 new Page.GetByRoleOptions().setName("회원가입"))).isVisible();
 
-        page.getByLabel("이메일").fill(email);
+        // 이메일 입력은 아이디 + 도메인(select/직접입력) 합성 UI(signup.html). 로컬파트/도메인으로 분해해 입력.
+        int at = email.lastIndexOf('@');
+        page.locator("#email-local").fill(email.substring(0, at));
+        page.locator("#email-domain").selectOption("");           // "직접입력" 옵션(value="")
+        page.locator("#email-domain-custom").fill(email.substring(at + 1));
         page.getByLabel("비밀번호", new Page.GetByLabelOptions().setExact(true)).fill(password);
         page.getByLabel("비밀번호 확인").fill(password);
         page.getByLabel("이름").fill("E2E 사용자");
