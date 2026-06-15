@@ -21,6 +21,7 @@ import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakePasswordResetTokenStore;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.support.MockSharedRepositories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +73,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import({FakeRefreshTokenStore.class, FakePasswordResetTokenStore.class})
+@MockSharedRepositories
 class PasswordResetViewControllerTest {
 
     private static final String VALID_TOKEN = "validtoken1234567890abcdef";

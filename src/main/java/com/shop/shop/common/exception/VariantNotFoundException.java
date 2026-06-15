@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
  */
 public class VariantNotFoundException extends BusinessException {
 
-    public VariantNotFoundException(long id) {
+    public VariantNotFoundException() {
         super("variant를 찾을 수 없습니다.", HttpStatus.NOT_FOUND);
     }
 }

@@ -25,6 +25,7 @@ import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.support.MockSharedRepositories;
 import com.shop.shop.web.member.AdminSellerApplicationViewController;
 import com.shop.shop.web.member.SellerApplicationViewController;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(FakeRefreshTokenStore.class)
+@MockSharedRepositories
 class SellerApplicationWiringTest {
 
     @Autowired

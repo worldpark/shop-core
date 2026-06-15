@@ -31,8 +31,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -158,8 +157,8 @@ class OrderCancellationExpiryTest {
 
         // then — variantId 오름차순(3→10)
         InOrder inOrder = inOrder(inventoryStockPort);
-        inOrder.verify(inventoryStockPort).increase(3L, 1);
-        inOrder.verify(inventoryStockPort).increase(10L, 2);
+        inOrder.verify(inventoryStockPort).increase(eq(3L), eq(1), any());
+        inOrder.verify(inventoryStockPort).increase(eq(10L), eq(2), any());
     }
 
     // ============================================================
@@ -183,8 +182,8 @@ class OrderCancellationExpiryTest {
 
         // then
         assertThat(result.outcome()).isEqualTo(OrderCancellation.Outcome.CANCELLED);
-        verify(inventoryStockPort, never()).increase(eq(0L), anyInt());
-        verify(inventoryStockPort).increase(5L, 3);
+        verify(inventoryStockPort, never()).increase(eq(0L), anyInt(), any());
+        verify(inventoryStockPort).increase(eq(5L), eq(3), any());
     }
 
     // ============================================================
@@ -242,7 +241,7 @@ class OrderCancellationExpiryTest {
         // then — 동일 코어: CANCELLED + 재고 복원 + 이벤트 발행
         assertThat(result.outcome()).isEqualTo(OrderCancellation.Outcome.CANCELLED);
         assertThat(order.getStatus()).isEqualTo("cancelled");
-        verify(inventoryStockPort).increase(7L, 2);
+        verify(inventoryStockPort).increase(eq(7L), eq(2), any());
 
         ArgumentCaptor<OrderCancelledEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelledEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());

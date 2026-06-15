@@ -30,6 +30,7 @@ import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.support.MockSharedRepositories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -86,6 +87,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(FakeRefreshTokenStore.class)
+@MockSharedRepositories
 class OrderViewControllerTest {
 
     @Autowired

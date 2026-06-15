@@ -124,7 +124,7 @@ class OrderServiceTest {
         InOrder ordered = inOrder(cartCheckoutReader, productOrderCatalog, inventoryStockPort, orderRepository);
         ordered.verify(cartCheckoutReader).getCheckoutCart(USER_ID);
         ordered.verify(productOrderCatalog).getOrderableSnapshots(any()); // 2단계 사전검증
-        ordered.verify(inventoryStockPort).decrease(eq(VARIANT_ID_1), anyInt()); // 3단계 락+차감
+        ordered.verify(inventoryStockPort).decrease(eq(VARIANT_ID_1), anyInt(), any()); // 3단계 락+차감
         ordered.verify(productOrderCatalog).getOrderableSnapshots(any()); // 4단계 락 후 재조회
         ordered.verify(orderRepository).save(any(Order.class)); // 6단계 저장
         ordered.verify(cartCheckoutReader).clearCart(USER_ID); // 7단계 장바구니 비우기
@@ -184,8 +184,8 @@ class OrderServiceTest {
 
         // then: decrease 호출 순서 — variantId 10 먼저, 20 나중
         InOrder decreaseOrder = inOrder(inventoryStockPort);
-        decreaseOrder.verify(inventoryStockPort).decrease(eq(VARIANT_ID_1), anyInt());
-        decreaseOrder.verify(inventoryStockPort).decrease(eq(VARIANT_ID_2), anyInt());
+        decreaseOrder.verify(inventoryStockPort).decrease(eq(VARIANT_ID_1), anyInt(), any());
+        decreaseOrder.verify(inventoryStockPort).decrease(eq(VARIANT_ID_2), anyInt(), any());
     }
 
     // =========================================================
@@ -201,7 +201,7 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrderTx(USER_ID, VALID_REQUEST, "ORD-TEST"))
                 .isInstanceOf(EmptyCartException.class);
 
-        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt());
+        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt(), any());
         verify(orderRepository, never()).save(any());
     }
 
@@ -222,7 +222,7 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrderTx(USER_ID, VALID_REQUEST, "ORD-TEST"))
                 .isInstanceOf(ProductNotPurchasableForOrderException.class);
 
-        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt());
+        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt(), any());
         verify(orderRepository, never()).save(any());
     }
 
@@ -257,7 +257,7 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrderTx(USER_ID, VALID_REQUEST, "ORD-TEST"))
                 .isInstanceOf(InsufficientStockException.class);
 
-        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt());
+        verify(inventoryStockPort, never()).decrease(anyLong(), anyInt(), any());
     }
 
     // =========================================================
@@ -274,7 +274,7 @@ class OrderServiceTest {
         OrderableVariantSnapshot snap = makeSnapshot(VARIANT_ID_1, "상품A", new BigDecimal("1000"), true, 5);
         when(productOrderCatalog.getOrderableSnapshots(any())).thenReturn(List.of(snap));
 
-        doThrow(new InsufficientStockException()).when(inventoryStockPort).decrease(anyLong(), anyInt());
+        doThrow(new InsufficientStockException()).when(inventoryStockPort).decrease(anyLong(), anyInt(), any());
 
         assertThatThrownBy(() -> orderService.createOrderTx(USER_ID, VALID_REQUEST, "ORD-TEST"))
                 .isInstanceOf(InsufficientStockException.class);

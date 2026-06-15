@@ -140,8 +140,8 @@ class OrderCancellationImplTest {
 
         // then — variantId 오름차순(3→5)
         InOrder inOrder = inOrder(inventoryStockPort);
-        inOrder.verify(inventoryStockPort).increase(3L, 1);
-        inOrder.verify(inventoryStockPort).increase(5L, 2);
+        inOrder.verify(inventoryStockPort).increase(eq(3L), eq(1), any());
+        inOrder.verify(inventoryStockPort).increase(eq(5L), eq(2), any());
     }
 
     @Test
@@ -164,8 +164,8 @@ class OrderCancellationImplTest {
 
         // then
         assertThat(result.outcome()).isEqualTo(OrderCancellation.Outcome.CANCELLED);
-        verify(inventoryStockPort, never()).increase(eq(0L), anyInt()); // null → skip
-        verify(inventoryStockPort).increase(10L, 3); // 정상 항목은 복원
+        verify(inventoryStockPort, never()).increase(eq(0L), anyInt(), any()); // null → skip
+        verify(inventoryStockPort).increase(eq(10L), eq(3), any()); // 정상 항목은 복원
 
         // 이벤트 items에 null variant 항목 제외
         ArgumentCaptor<OrderCancelledEvent> eventCaptor = ArgumentCaptor.forClass(OrderCancelledEvent.class);

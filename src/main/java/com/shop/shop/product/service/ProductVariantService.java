@@ -106,7 +106,7 @@ public class ProductVariantService {
 
         ProductVariant variant = productVariantRepository.findById(variantId)
                 .filter(v -> v.getProduct().getId().equals(productId))
-                .orElseThrow(() -> new VariantNotFoundException(variantId));
+                .orElseThrow(VariantNotFoundException::new);
 
         validateSku(sku, variantId);
         validatePrice(price);

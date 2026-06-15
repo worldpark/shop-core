@@ -1,7 +1,9 @@
 package com.shop.shop.order.service;
 
 import com.shop.shop.common.exception.OrderNotFoundException;
+import com.shop.shop.inventory.spi.StockChangeReason;
 import com.shop.shop.inventory.spi.InventoryStockPort;
+import com.shop.shop.inventory.spi.InventoryStockPort.StockChangeContext;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.order.domain.Order;
@@ -82,8 +84,8 @@ class OrderCancellationImpl implements OrderCancellation {
             throw new OrderNotFoundException();
         }
 
-        // 3. 코어 위임
-        return doCancel(order, refundInfo);
+        // 3. 코어 위임 (사용자 취소 → CANCEL_RESTORE)
+        return doCancel(order, refundInfo, StockChangeReason.CANCEL_RESTORE);
     }
 
     /**
@@ -100,8 +102,8 @@ class OrderCancellationImpl implements OrderCancellation {
 
         // 2. 소유권 검증 없음 (시스템 주도 — userId 없음)
 
-        // 3. 코어 위임 (refunded=false, refundedAmount=0, currency=KRW 고정)
-        return doCancel(order, new RefundInfo(false, 0L, CURRENCY_KRW));
+        // 3. 코어 위임 (refunded=false, refundedAmount=0, currency=KRW 고정; 만료 → EXPIRY_RESTORE)
+        return doCancel(order, new RefundInfo(false, 0L, CURRENCY_KRW), StockChangeReason.EXPIRY_RESTORE);
     }
 
     /**
@@ -120,12 +122,14 @@ class OrderCancellationImpl implements OrderCancellation {
      * production 정상 흐름({@link com.shop.shop.payment.service.PaymentService#cancel} 경유)은
      * 항상 락 아래에서 올바른 refundInfo를 도출하므로 무영향.
      *
-     * @param lockedOrder 락 획득·(필요 시)소유권 검증 완료된 주문
-     * @param refundInfo  환불 정보 (락 재조회 상태와 정합 필수)
+     * @param lockedOrder   락 획득·(필요 시)소유권 검증 완료된 주문
+     * @param refundInfo    환불 정보 (락 재조회 상태와 정합 필수)
+     * @param restoreReason 재고 복원 사유 (CANCEL_RESTORE 또는 EXPIRY_RESTORE)
      * @return 취소 결과
      * @throws IllegalStateException 락 재조회 상태와 refundInfo 모순 시 (500, 트랜잭션 롤백)
      */
-    private OrderCancellationResult doCancel(Order lockedOrder, RefundInfo refundInfo) {
+    private OrderCancellationResult doCancel(Order lockedOrder, RefundInfo refundInfo,
+                                              StockChangeReason restoreReason) {
         long orderId = lockedOrder.getId();
         String currentStatus = lockedOrder.getStatus();
 
@@ -202,7 +206,8 @@ class OrderCancellationImpl implements OrderCancellation {
                 .toList();
 
         for (OrderItem item : sortedItems) {
-            inventoryStockPort.increase(item.getVariantId(), item.getQuantity());
+            inventoryStockPort.increase(item.getVariantId(), item.getQuantity(),
+                    StockChangeContext.system(restoreReason));
         }
 
         // [신규] 쿠폰 복원 (재고 복원 직후, 이벤트 발행 전 — 멱등)

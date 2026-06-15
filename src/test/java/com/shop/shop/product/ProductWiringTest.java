@@ -28,6 +28,7 @@ import com.shop.shop.product.service.ProductService;
 import com.shop.shop.product.service.ProductServiceResponse;
 import com.shop.shop.product.spi.UserDirectory;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.support.MockSharedRepositories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +61,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Import(FakeRefreshTokenStore.class)
+@MockSharedRepositories
 class ProductWiringTest {
 
     @Autowired

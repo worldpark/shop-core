@@ -8,7 +8,9 @@ import com.shop.shop.common.exception.InsufficientStockException;
 import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.common.exception.OrderNumberGenerationException;
 import com.shop.shop.common.exception.ProductNotPurchasableForOrderException;
+import com.shop.shop.inventory.spi.StockChangeReason;
 import com.shop.shop.inventory.spi.InventoryStockPort;
+import com.shop.shop.inventory.spi.InventoryStockPort.StockChangeContext;
 import com.shop.shop.order.domain.Order;
 import com.shop.shop.order.domain.OrderItem;
 import com.shop.shop.order.domain.OrderItemOptionValue;
@@ -165,8 +167,9 @@ public class OrderService {
                 .toList();
 
         for (CartCheckoutItem cartItem : sortedCartItems) {
-            // InventoryStockPort.decrease 내부에서: 락 획득 → isActive/stock 검증 → 차감
-            inventoryStockPort.decrease(cartItem.variantId(), cartItem.quantity());
+            // InventoryStockPort.decrease 내부에서: 락 획득 → isActive/stock 검증 → 차감 → 원장 적재
+            inventoryStockPort.decrease(cartItem.variantId(), cartItem.quantity(),
+                    StockChangeContext.system(StockChangeReason.ORDER_DECREASE));
         }
 
         // 4. 저장용 스냅샷 락 후 재조회 (2단계 advisory와 분리 — price=락 후 권위값)

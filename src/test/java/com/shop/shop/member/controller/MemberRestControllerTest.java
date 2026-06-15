@@ -22,6 +22,7 @@ import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.support.MockSharedRepositories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(FakeRefreshTokenStore.class)
+@MockSharedRepositories
 class MemberRestControllerTest {
 
     private static final String EMAIL = "newuser@example.com";
