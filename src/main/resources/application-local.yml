@@ -26,3 +26,18 @@ shop:
   storage:
     root: ${SHOP_STORAGE_ROOT:./build/local-uploads}
     asset-base-url: ${SHOP_STORAGE_ASSET_BASE_URL:http://localhost:8080}
+
+  domains:
+    member:
+      separated: ${SHOP_DOMAIN_MEMBER_SEPARATED:false}
+    product:
+      separated: ${SHOP_DOMAIN_PRODUCT_SEPARATED:false}
+    cart:
+      separated: ${SHOP_DOMAIN_CART_SEPARATED:false}
+    inventory:
+      separated: ${SHOP_DOMAIN_INVENTORY_SEPARATED:false}
+    order:
+      separated: ${SHOP_DOMAIN_ORDER_SEPARATED:false}
+    payment:
+      separated: ${SHOP_DOMAIN_PAYMENT_SEPARATED:false}
+
