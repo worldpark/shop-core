@@ -16,6 +16,11 @@
       - 비인증: 로그인 안내 표시 (sec:authorize)
       - available=false variant: 선택 불가/비활성 표시
       - soldOut/variants empty: 폼 숨김
+      - 리뷰 영역 (Task 032):
+        - 모델 키: reviewSummary(ProductReviewSummaryResponse), productReviews(List<ReviewResponse>)
+        - review/_review-section :: reviewSection 프래그먼트로 분리
+        - 0건이면 빈 상태(평점 null 안전 표기) — 기존 상세 흐름 무변경(회귀 0)
+        - authorDisplayName: 마스킹 완료 문자열 그대로 출력 (email 등 추가 노출 금지)
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
@@ -206,6 +211,13 @@
                 </div>
             </div>
         </div>
+        <!-- ====================================================
+             리뷰 섹션 (Task 032)
+             모델 키: reviewSummary / productReviews
+             fragment: review/_review-section :: reviewSection
+             ==================================================== -->
+        <div th:replace="~{review/_review-section :: reviewSection}"></div>
+
     </div>
 </main>
 </body>

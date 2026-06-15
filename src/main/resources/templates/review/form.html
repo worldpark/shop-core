@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<!--
+    리뷰 작성/수정 화면.
+    view name: review/form
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 폼 백킹 객체: reviewForm (ReviewForm)
+        - orderItemId (Long): 작성 시 주문 항목 ID (히든 필드)
+        - reviewId    (Long): 수정 시 리뷰 ID (존재 여부로 신규/수정 분기)
+        - rating      (Integer, 1~5): 평점 — @NotNull, @Min(1), @Max(5)
+        - content     (String, max 1000): 내용 — @Size(max=1000), 선택
+      - 신규 작성 (reviewId==null): POST /reviews
+      - 수정     (reviewId!=null):  POST /reviews/{reviewId}/edit
+      - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
+      - 검증 실패 재렌더: th:field로 입력값 보존, th:errors로 필드 에러 표시
+      - 도메인 예외 재렌더: errorMessage 모델 키로 표시
+      - 성공 flash: successMessage (layout/base → fragments/messages에서는 flashSuccess 키 사용)
+        — 이 폼 뷰에서는 PRG redirect 후 flash가 상품 상세 페이지에서 표시됨
+      - 인가: SecurityConfig View 체인 /reviews/** → hasRole("CONSUMER") (컨트롤러 도달 전 처리됨)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title th:text="${reviewForm.reviewId != null} ? '리뷰 수정' : '리뷰 작성'">리뷰 작성</title>
+</head>
+<body>
+<main>
+    <div class="review-form-container">
+        <h1 class="page-title"
+            th:text="${reviewForm.reviewId != null} ? '리뷰 수정' : '리뷰 작성'">리뷰 작성</h1>
+
+        <!-- ====================================================
+             도메인 예외 메시지 (BusinessException — 예: 미구매·중복·권한 없음)
+             ==================================================== -->
+        <div class="alert alert-error"
+             th:if="${errorMessage != null}"
+             th:text="${errorMessage}"></div>
+
+        <!-- ====================================================
+             리뷰 작성/수정 폼
+             신규 (reviewId 없음): POST /reviews
+             수정 (reviewId 있음): POST /reviews/{reviewId}/edit
+             th:action 사용 시 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
+             수동으로 _csrf 히든 필드를 추가하지 않는다.
+             ==================================================== -->
+        <form method="post"
+              th:action="${reviewForm.reviewId != null}
+                  ? @{/reviews/{id}/edit(id=${reviewForm.reviewId})}
+                  : @{/reviews}"
+              th:object="${reviewForm}">
+
+            <!-- 주문 항목 ID (작성 시 히든 필드 — 수정 시 불필요하나 무해) -->
+            <input type="hidden"
+                   th:field="*{orderItemId}">
+
+            <!-- 리뷰 ID (수정 시 히든 필드 — 작성 시 null이므로 렌더 안 됨) -->
+            <input type="hidden"
+                   th:if="${reviewForm.reviewId != null}"
+                   th:field="*{reviewId}">
+
+            <!-- ====================================================
+                 평점 선택 (라디오 버튼 1~5)
+                 ==================================================== -->
+            <div class="form-group">
+                <label class="form-label">
+                    평점 <span class="required">*</span>
+                </label>
+                <div class="rating-group">
+                    <label th:each="star : ${#numbers.sequence(1, 5)}"
+                           th:for="'rating-' + ${star}"
+                           class="rating-radio-label">
+                        <input type="radio"
+                               th:id="'rating-' + ${star}"
+                               th:field="*{rating}"
+                               th:value="${star}">
+                        <span class="rating-star-char">★</span>
+                        <span th:text="${star} + '점'">1점</span>
+                    </label>
+                </div>
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('rating')}"
+                      th:errors="*{rating}"></span>
+            </div>
+
+            <!-- ====================================================
+                 리뷰 내용 (textarea, 선택, max 1000자)
+                 ==================================================== -->
+            <div class="form-group">
+                <label for="content" class="form-label">
+                    내용 <span class="optional">(선택, 최대 1000자)</span>
+                </label>
+                <textarea id="content"
+                          th:field="*{content}"
+                          class="review-content-input"
+                          placeholder="구매한 상품에 대한 솔직한 리뷰를 남겨주세요."
+                          maxlength="1000"
+                          rows="5"></textarea>
+                <div class="char-count">
+                    <span id="content-count">0</span>/1000자
+                </div>
+                <span class="field-error"
+                      th:if="${#fields.hasErrors('content')}"
+                      th:errors="*{content}"></span>
+            </div>
+
+            <!-- ====================================================
+                 제출/취소 버튼
+                 ==================================================== -->
+            <div class="review-form-actions">
+                <button type="submit" class="btn btn-primary"
+                        th:text="${reviewForm.reviewId != null} ? '수정 완료' : '리뷰 작성'">리뷰 작성</button>
+                <a th:href="@{/products}"
+                   class="btn btn-outline">취소</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- 리뷰 폼 전용 스크립트: 글자 수 카운터 (main 슬롯 하단 — layout/base head 슬롯 없음) -->
+    <script th:src="@{/js/review-form.js}"></script>
+</main>
+</body>
+</html>

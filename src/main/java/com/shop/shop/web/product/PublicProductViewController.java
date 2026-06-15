@@ -1,8 +1,10 @@
 package com.shop.shop.web.product;
 
 import com.shop.shop.product.dto.CategoryResponse;
+import com.shop.shop.product.dto.ProductReviewSummaryResponse;
 import com.shop.shop.product.dto.PublicProductDetailResponse;
 import com.shop.shop.product.spi.PublicProductFacade;
+import com.shop.shop.product.spi.ReviewFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -43,6 +45,7 @@ public class PublicProductViewController {
     private static final String DETAIL_VIEW = "product/detail";
 
     private final PublicProductFacade publicProductFacade;
+    private final ReviewFacade reviewFacade;
 
     /**
      * 공개 상품 목록 화면.
@@ -105,10 +108,19 @@ public class PublicProductViewController {
     @GetMapping("/{productId}")
     public String getProductDetail(
             @PathVariable long productId,
+            @RequestParam(defaultValue = "0") int reviewPage,
+            @RequestParam(defaultValue = "10") int reviewSize,
             Model model) {
 
         PublicProductDetailResponse product = publicProductFacade.getProductDetail(productId);
         model.addAttribute("product", product);
+
+        // 리뷰 목록 + 집계 (공개 조회 — 비로그인 가능)
+        // 모델 키: productReviews/reviewSummary (Thymeleaf 예약어 request/param/application/session 회피 — MEMORY)
+        ProductReviewSummaryResponse reviewSummary =
+                reviewFacade.getProductReviews(productId, reviewPage, reviewSize);
+        model.addAttribute("reviewSummary", reviewSummary);
+        model.addAttribute("productReviews", reviewSummary.reviews());
 
         return DETAIL_VIEW;
     }

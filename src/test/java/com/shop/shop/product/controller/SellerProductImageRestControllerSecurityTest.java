@@ -132,6 +132,12 @@ class SellerProductImageRestControllerSecurityTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private com.shop.shop.product.repository.ReviewRepository reviewRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.adapter.OrderItemQueryRepository orderItemQueryRepository;
+
 
     @Autowired
     private AssetUrlResolver assetUrlResolver;

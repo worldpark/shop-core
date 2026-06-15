@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!--
+    리뷰 섹션 프래그먼트.
+    fragment name: reviewSection
+
+    사용 위치: templates/product/detail.html
+    삽입 방법: th:replace="~{review/_review-section :: reviewSection}"
+
+    필요 모델 키:
+      - reviewSummary (ProductReviewSummaryResponse):
+          averageRating(Double, 0건=null), reviewCount(long),
+          page, size, totalElements, totalPages,
+          reviews(List<ReviewResponse>)
+      - productReviews (List<ReviewResponse>):
+          reviewId, productId, authorDisplayName(마스킹됨),
+          rating(1~5), content(nullable), createdAt(Instant), updatedAt(Instant)
+
+    보안:
+      - authorDisplayName: 마스킹 완료 문자열 그대로 출력 (email·전화 추가 노출 금지)
+      - 삭제 폼은 POST /reviews/{id}/delete (CSRF: th:action 자동 주입)
+      - 수정/삭제 링크는 로그인 사용자에게만 표시 (sec:authorize="isAuthenticated()")
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko">
+<body>
+<section th:fragment="reviewSection" class="product-review-section">
+    <h2 class="section-title">상품 리뷰</h2>
+
+    <!-- ====================================================
+         평점 요약 영역
+         ==================================================== -->
+    <div class="review-summary">
+        <!-- 리뷰가 있는 경우 -->
+        <div th:if="${reviewSummary != null and reviewSummary.reviewCount() > 0}">
+            <div class="review-avg-rating"
+                 th:text="${reviewSummary.averageRating() != null ? reviewSummary.averageRating() : '0.0'}">0.0</div>
+            <div class="review-avg-stars"
+                 th:with="avg=${reviewSummary.averageRating() != null ? reviewSummary.averageRating().intValue() : 0}">
+                <span th:each="i : ${#numbers.sequence(1, 5)}"
+                      th:text="${i <= avg} ? '★' : '☆'">★</span>
+            </div>
+            <div class="review-count-label"
+                 th:text="'총 ' + ${reviewSummary.reviewCount()} + '개의 리뷰'">총 0개의 리뷰</div>
+        </div>
+        <!-- 리뷰가 없는 경우 -->
+        <div th:if="${reviewSummary == null or reviewSummary.reviewCount() == 0}"
+             class="review-no-rating">
+            아직 작성된 리뷰가 없습니다.
+        </div>
+    </div>
+
+    <!-- ====================================================
+         리뷰 목록
+         ==================================================== -->
+    <div th:if="${productReviews != null and !productReviews.isEmpty()}"
+         class="review-list">
+        <article th:each="review : ${productReviews}" class="review-item">
+
+            <!-- 리뷰 헤더: 작성자(마스킹) · 별점 · 날짜 -->
+            <div class="review-item-header">
+                <span class="review-author"
+                      th:text="${review.authorDisplayName()}">작성자</span>
+                <span class="review-stars"
+                      th:with="r=${review.rating()}">
+                    <span th:each="i : ${#numbers.sequence(1, 5)}"
+                          th:text="${i <= r} ? '★' : '☆'">★</span>
+                </span>
+                <span class="review-date"
+                      th:text="${#temporals.format(
+                          review.createdAt().atZone(T(java.time.ZoneId).of('Asia/Seoul')),
+                          'yyyy-MM-dd')}">2026-01-01</span>
+            </div>
+
+            <!-- 리뷰 내용 -->
+            <div th:if="${review.content() != null and !review.content().isBlank()}"
+                 class="review-content"
+                 th:text="${review.content()}">내용</div>
+            <div th:if="${review.content() == null or review.content().isBlank()}"
+                 class="review-no-content">(내용 없음)</div>
+
+            <!-- 삭제 버튼: 로그인 사용자에게만 노출 (plan §2.7 — 진입 링크 최소)
+                 삭제: POST /reviews/{id}/delete — CSRF th:action 자동 주입
+                 본인 리뷰인지 소유 검증은 서비스 계층에서 수행 (404 존재 은닉) -->
+            <div class="review-actions" sec:authorize="isAuthenticated()">
+                <form th:action="@{/reviews/{id}/delete(id=${review.reviewId()})}"
+                      method="post"
+                      style="display:inline;"
+                      onsubmit="return confirm('리뷰를 삭제하시겠습니까?');">
+                    <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+                </form>
+            </div>
+        </article>
+    </div>
+
+    <!-- 리뷰 없는 경우 -->
+    <div th:if="${productReviews == null or productReviews.isEmpty()}"
+         class="review-empty">
+        이 상품에 작성된 리뷰가 없습니다.
+    </div>
+
+    <!-- ====================================================
+         페이지네이션 (리뷰 수 > size인 경우)
+         product.productId() 사용 — product 모델 키는 상품 상세에서 반드시 존재
+         ==================================================== -->
+    <div th:if="${reviewSummary != null and reviewSummary.totalPages() > 1}"
+         class="pagination" style="margin-top: 16px;">
+        <div class="page-info"
+             th:text="'페이지 ' + (${reviewSummary.page()} + 1) + ' / ' + ${reviewSummary.totalPages()}">페이지 1 / 1</div>
+        <div class="page-nav">
+            <!-- 이전 페이지 -->
+            <a th:if="${reviewSummary.page() > 0}"
+               th:href="@{/products/{pid}(pid=${product.productId()},
+                   reviewPage=${reviewSummary.page() - 1},
+                   reviewSize=${reviewSummary.size()})}"
+               class="btn btn-outline btn-sm">이전</a>
+            <span th:if="${reviewSummary.page() == 0}"
+                  class="btn btn-outline btn-sm disabled">이전</span>
+            <!-- 다음 페이지 -->
+            <a th:if="${reviewSummary.page() + 1 < reviewSummary.totalPages()}"
+               th:href="@{/products/{pid}(pid=${product.productId()},
+                   reviewPage=${reviewSummary.page() + 1},
+                   reviewSize=${reviewSummary.size()})}"
+               class="btn btn-outline btn-sm">다음</a>
+            <span th:if="${reviewSummary.page() + 1 >= reviewSummary.totalPages()}"
+                  class="btn btn-outline btn-sm disabled">다음</span>
+        </div>
+    </div>
+
+    <!-- ====================================================
+         리뷰 작성 진입 안내 (비로그인 사용자)
+         ==================================================== -->
+    <div sec:authorize="!isAuthenticated()" style="margin-top: 16px;">
+        <p style="font-size: 13px; color: #888;">
+            <a th:href="@{/login}" style="color: #337ab7;">로그인</a> 후 구매한 상품에 리뷰를 남길 수 있습니다.
+        </p>
+    </div>
+</section>
+</body>
+</html>

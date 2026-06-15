@@ -6,9 +6,11 @@ import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.spi.CartFacade;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
+import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.order.spi.OrderFacade;
 import com.shop.shop.common.exception.CartItemNotFoundException;
 import com.shop.shop.member.repository.MemberRepository;
@@ -143,6 +145,11 @@ class CartViewControllerTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private OrderItemQueryRepository orderItemQueryRepository;
+
+    @MockitoBean
+    private ReviewRepository reviewRepository;
 
     private static final String USER_EMAIL = "user@example.com";
 

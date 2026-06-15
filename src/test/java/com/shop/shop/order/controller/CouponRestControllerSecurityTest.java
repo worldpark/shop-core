@@ -115,6 +115,12 @@ class CouponRestControllerSecurityTest {
     @MockitoBean
     private UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private com.shop.shop.product.repository.ReviewRepository reviewRepository;
+
+    @MockitoBean
+    private com.shop.shop.order.adapter.OrderItemQueryRepository orderItemQueryRepository;
+
     private String adminToken;
     private String sellerToken;
     private String consumerToken;

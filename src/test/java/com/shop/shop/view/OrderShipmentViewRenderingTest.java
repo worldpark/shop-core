@@ -12,6 +12,7 @@ import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.dto.ShippingAddressResponse;
+import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.order.spi.OrderFacade;
@@ -24,6 +25,7 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +133,11 @@ class OrderShipmentViewRenderingTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private OrderItemQueryRepository orderItemQueryRepository;
+
+    @MockitoBean
+    private ReviewRepository reviewRepository;
 
     @BeforeEach
     void setUp() {

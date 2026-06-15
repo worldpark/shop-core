@@ -3,6 +3,7 @@ package com.shop.shop.view;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
@@ -20,7 +21,9 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.product.dto.ProductReviewSummaryResponse;
 import com.shop.shop.product.spi.PublicProductFacade;
+import com.shop.shop.product.spi.ReviewFacade;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +41,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -122,6 +127,14 @@ class ProductDetailAddToCartRenderingTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private OrderItemQueryRepository orderItemQueryRepository;
+
+    @MockitoBean
+    private com.shop.shop.product.repository.ReviewRepository reviewRepository;
+
+    @MockitoBean
+    private ReviewFacade reviewFacade;
 
     private static final long PRODUCT_ID = 1L;
 
@@ -129,6 +142,8 @@ class ProductDetailAddToCartRenderingTest {
     void setUp() {
         when(publicProductFacade.getProductDetail(PRODUCT_ID))
                 .thenReturn(sampleDetailResponse(PRODUCT_ID, false));
+        when(reviewFacade.getProductReviews(anyLong(), anyInt(), anyInt()))
+                .thenReturn(new ProductReviewSummaryResponse(null, 0L, 0, 10, 0L, 0, java.util.List.of()));
     }
 
     // ============================================================

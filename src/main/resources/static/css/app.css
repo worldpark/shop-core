@@ -1474,3 +1474,196 @@ input[type="email"]:focus {
     white-space: nowrap;
     border: 0;
 }
+
+/* ── 리뷰 영역 (상품 상세 + 작성/수정 폼) ── */
+
+/* 상품 상세 리뷰 섹션 */
+.product-review-section {
+    margin-top: 40px;
+    border-top: 2px solid #e0e0e0;
+    padding-top: 32px;
+}
+
+.review-summary {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.review-avg-rating {
+    font-size: 36px;
+    font-weight: 700;
+    color: #f0ad4e;
+    line-height: 1;
+}
+
+.review-avg-stars {
+    font-size: 20px;
+    color: #f0ad4e;
+    letter-spacing: 2px;
+}
+
+.review-count-label {
+    font-size: 14px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.review-no-rating {
+    font-size: 14px;
+    color: #aaa;
+}
+
+/* 리뷰 목록 */
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.review-item {
+    padding: 16px 20px;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.review-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.review-author {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.review-stars {
+    font-size: 15px;
+    color: #f0ad4e;
+    letter-spacing: 1px;
+}
+
+.review-date {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.review-content {
+    font-size: 14px;
+    color: #444;
+    line-height: 1.7;
+    white-space: pre-line;
+    margin-bottom: 10px;
+}
+
+.review-no-content {
+    font-size: 13px;
+    color: #aaa;
+    font-style: italic;
+}
+
+.review-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.review-empty {
+    text-align: center;
+    padding: 32px;
+    color: #aaa;
+    font-size: 14px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px dashed #ddd;
+}
+
+/* 리뷰 폼 컨테이너 */
+.review-form-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    max-width: 600px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* 별점 선택 (라디오) */
+.rating-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.rating-radio-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.rating-radio-label:hover {
+    background-color: #fff8e8;
+    border-color: #f0ad4e;
+}
+
+.rating-radio-label input[type="radio"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.rating-star-char {
+    font-size: 16px;
+    color: #f0ad4e;
+}
+
+/* textarea (content) */
+textarea.review-content-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 120px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+textarea.review-content-input:focus {
+    border-color: #337ab7;
+}
+
+.char-count {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+    margin-top: 4px;
+}
+
+.review-form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}

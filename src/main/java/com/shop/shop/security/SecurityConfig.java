@@ -77,6 +77,11 @@ public class SecurityConfig {
                     // 공개 상품 목록/상세 API (인증 불필요) — anyRequest 앞에 배치
                     .requestMatchers(HttpMethod.GET, "/api/v1/products").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/products/*").permitAll()
+                    // 상품 리뷰 목록 공개 조회 — /api/v1/products/*/reviews (2세그먼트, * 단일 매칭 불가하여 별도 추가)
+                    // plan §3.7: 기존 GET /api/v1/products/* 는 한 세그먼트 와일드카드라 /products/{id}/reviews 매칭 불가
+                    .requestMatchers(HttpMethod.GET, "/api/v1/products/*/reviews").permitAll()
+                    // 리뷰 쓰기 REST API — 최소 ROLE_CONSUMER (SELLER/ADMIN은 역할 계층 함의)
+                    .requestMatchers("/api/v1/reviews/**").hasRole("CONSUMER")
                     // 관리자 전용 REST API (anyRequest 앞에 배치)
                     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                     // 판매자 신청 REST API — 보안 floor authenticated (자격은 서비스 409 — Task 027 §1.1)
@@ -135,6 +140,9 @@ public class SecurityConfig {
                     // 공개 상품 목록/상세 View (인증 불필요) — anyRequest 앞에 배치
                     .requestMatchers(HttpMethod.GET, "/products").permitAll()
                     .requestMatchers(HttpMethod.GET, "/products/*").permitAll()
+                    // 리뷰 View 경로 — 최소 ROLE_CONSUMER (미인증 → 302 /login)
+                    // GET /reviews/new, POST /reviews, POST /reviews/{id}/edit|delete 모두 포함
+                    .requestMatchers("/reviews/**").hasRole("CONSUMER")
                     // 계정 self-service View 경로 (anyRequest 앞에 배치)
                     // /account, /account/** — authenticated (CONSUMER/SELLER/ADMIN 모두 본인 계정 관리)
                     // REST /api/v1/members/me/**는 anyRequest authenticated가 이미 커버 (별 matcher 불요)

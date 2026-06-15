@@ -13,9 +13,11 @@ import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
+import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -112,6 +114,11 @@ class SignupRenderingTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private OrderItemQueryRepository orderItemQueryRepository;
+
+    @MockitoBean
+    private ReviewRepository reviewRepository;
 
     /** footer 프래그먼트 식별 마커 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";

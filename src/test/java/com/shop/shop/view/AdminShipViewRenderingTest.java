@@ -11,10 +11,12 @@ import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
+import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.order.spi.AdminOrderFulfillmentFacade;
 import com.shop.shop.payment.repository.PaymentRepository;
+import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductImageRepository;
@@ -135,6 +137,11 @@ class AdminShipViewRenderingTest {
     @MockitoBean
     private com.shop.shop.order.repository.UserCouponRepository userCouponRepository;
 
+    @MockitoBean
+    private OrderItemQueryRepository orderItemQueryRepository;
+
+    @MockitoBean
+    private ReviewRepository reviewRepository;
 
     // ============================================================
     // 헬퍼 데이터
