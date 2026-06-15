@@ -110,9 +110,20 @@ class OrderCancellationImpl implements OrderCancellation {
      * <p>소유권 검증은 호출자({@link #cancel} / {@link #cancelByExpiry})가 담당한다.
      * 이미 락·(사용자 경로)소유권을 통과한 {@link Order}를 받는다.
      *
+     * <p><b>호출 계약(3-F, 033)</b>: 호출자는 락 재조회 상태({@code lockedOrder.getStatus()})와
+     * 정합하는 {@code refundInfo}를 전달해야 한다:
+     * <ul>
+     *   <li>상태가 {@code "paid"} → {@code refundInfo.refunded()==true} (PG 환불 동반)</li>
+     *   <li>상태가 {@code "pending"} → {@code refundInfo.refunded()==false} (환불 없음)</li>
+     * </ul>
+     * 모순 시 {@link IllegalStateException}(500)을 던지고 트랜잭션을 롤백한다.
+     * production 정상 흐름({@link com.shop.shop.payment.service.PaymentService#cancel} 경유)은
+     * 항상 락 아래에서 올바른 refundInfo를 도출하므로 무영향.
+     *
      * @param lockedOrder 락 획득·(필요 시)소유권 검증 완료된 주문
-     * @param refundInfo  환불 정보
+     * @param refundInfo  환불 정보 (락 재조회 상태와 정합 필수)
      * @return 취소 결과
+     * @throws IllegalStateException 락 재조회 상태와 refundInfo 모순 시 (500, 트랜잭션 롤백)
      */
     private OrderCancellationResult doCancel(Order lockedOrder, RefundInfo refundInfo) {
         long orderId = lockedOrder.getId();
@@ -145,6 +156,26 @@ class OrderCancellationImpl implements OrderCancellation {
                     null,
                     "주문 상태(" + currentStatus + ")에서 취소할 수 없습니다."
             );
+        }
+
+        // 3-F(033): 락 재조회 상태 ↔ refundInfo 모순 방어 가드 (종결 전이 직전)
+        // ALREADY_CANCELLED·REJECTED 분기를 통과한 시점이므로 currentStatus는 pending 또는 paid만 가능.
+        // 호출자(PaymentService.cancel)는 항상 락 아래 올바른 refundInfo를 도출하므로 정상 흐름 무영향.
+        // 모순(상태↔refunded 플래그 불일치)은 stale 읽기·오호출 등 시스템 불변식 위반을 의미하므로
+        // Outcome.REJECTED 대신 IllegalStateException(500)으로 트랜잭션 롤백 — PaymentService.cancel의
+        // "락 불변식 위반(#3)" 의미와 구분하기 위해 예외로 통일(plan §1.5, §2.2).
+        boolean isPaid = "paid".equals(currentStatus);
+        if (isPaid && !refundInfo.refunded()) {
+            // paid 주문인데 환불 없이 cancelled 처리 시도 — refundInfo 모순(stale 읽기 또는 오호출)
+            throw new IllegalStateException(
+                    "doCancel 불변식 위반: paid 상태인데 refundInfo.refunded()==false. " +
+                    "호출자는 락 재조회 상태와 정합하는 refundInfo를 전달해야 합니다. orderId=" + orderId);
+        }
+        if (!isPaid && refundInfo.refunded()) {
+            // pending 주문인데 환불 표기 — refundInfo 모순(미결제 주문에 환불 시도)
+            throw new IllegalStateException(
+                    "doCancel 불변식 위반: paid가 아닌 상태(" + currentStatus + ")인데 refundInfo.refunded()==true. " +
+                    "호출자는 락 재조회 상태와 정합하는 refundInfo를 전달해야 합니다. orderId=" + orderId);
         }
 
         Instant cancelledAt = Instant.now();

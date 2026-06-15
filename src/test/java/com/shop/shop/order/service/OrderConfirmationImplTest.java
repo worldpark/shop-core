@@ -12,6 +12,7 @@ import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.order.spi.OrderConfirmation.OrderConfirmationResult;
 import com.shop.shop.product.spi.ProductOrderCatalog;
 import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -61,6 +63,7 @@ class OrderConfirmationImplTest {
     @Mock private MemberDirectory memberDirectory;
     @Mock private ProductOrderCatalog productOrderCatalog;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private EntityManager entityManager;
 
     private OrderConfirmation orderConfirmation;
 
@@ -73,8 +76,13 @@ class OrderConfirmationImplTest {
 
     @BeforeEach
     void setUp() {
-        orderConfirmation = new OrderConfirmationImpl(
+        OrderConfirmationImpl impl = new OrderConfirmationImpl(
                 orderRepository, memberDirectory, productOrderCatalog, eventPublisher);
+        // @Autowired @Lazy EntityManager은 Spring이 주입하므로 단위테스트에서는 리플렉션으로 설정.
+        // refresh()는 1-A(033) 핵심 기능이지만 단위테스트에서는 DB가 없으므로 no-op 스텁.
+        doNothing().when(entityManager).refresh(any());
+        setField(impl, "entityManager", entityManager);
+        orderConfirmation = impl;
     }
 
     @Test

@@ -11,9 +11,12 @@ import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.spi.OrderConfirmation;
 import com.shop.shop.product.spi.ProductOrderCatalog;
 import com.shop.shop.product.spi.ProductOrderCatalog.OrderableVariantSnapshot;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,13 +55,38 @@ class OrderConfirmationImpl implements OrderConfirmation {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
+     * 락 후 fresh 재적재를 위한 EntityManager.
+     *
+     * <p>@RequiredArgsConstructor 생성자에서 제외하기 위해 final 미부여 + @Autowired @Lazy 필드 주입 사용.
+     * @Lazy: test/resources/application.yml에서 JPA 자동설정이 제외된 슬라이스 테스트(CartRestControllerSecurityTest 등)가
+     * 컨텍스트 로드 시 즉시 EntityManagerFactory를 조회하지 않도록 지연 초기화한다.
+     * 실제 confirmPaid 호출 시 트랜잭션 범위 내에서 Spring이 EntityManager 프록시를 제공한다.
+     *
+     * <p>getPayableOrder가 OrderPaymentReaderImpl에서 managed Order(pending)를 pay 트랜잭션 영속성 컨텍스트에
+     * 적재한 뒤 confirmPaid의 findByIdForUpdate가 PESSIMISTIC_WRITE 락을 잡아도 Hibernate가 1차 캐시의
+     * stale 인스턴스를 그대로 반환하므로, 락 직후 refresh로 DB 최신 상태를 강제 재적재한다(033).
+     */
+    @Autowired
+    @Lazy
+    private EntityManager entityManager;
+
+    /**
      * {@inheritDoc}
      */
     @Override
     public OrderConfirmationResult confirmPaid(long orderId, long requesterUserId, BigDecimal paidAmount) {
-        // 1. orders row 비관락
+        // 1. orders row 비관락 (SELECT ... FOR UPDATE)
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(OrderNotFoundException::new);
+
+        // 1-A(033): 락 직후 DB 최신 상태 강제 재적재 — stale 캐시 엔티티 덮어쓰기 방지
+        // 원인: PaymentService.pay가 getPayableOrder로 Order(pending)를 영속성 컨텍스트에 먼저 적재하면
+        // 이후 findByIdForUpdate가 PESSIMISTIC_WRITE 락은 잡지만 Hibernate 1차 캐시에 이미 존재하는
+        // 동일 인스턴스(stale pending)를 반환한다(JPQL 결과가 managed 엔티티 상태를 덮어쓰지 않는 동작).
+        // 취소 스레드가 먼저 커밋(pending→cancelled)해도 결제 스레드의 confirmPaid는 stale pending으로
+        // status 판정해 markPaid로 덮어쓴다 → 락 후 refresh로 경쟁 트랜잭션의 최신 커밋 상태를 읽는다.
+        // 순서 불변식: 락(SELECT FOR UPDATE) → refresh → 판정 (refresh를 락 전에 두면 재-race).
+        entityManager.refresh(order);
 
         // 2. 소유권 재검증 (락 후 권위)
         if (!order.getUserId().equals(requesterUserId)) {
