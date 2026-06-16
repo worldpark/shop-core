@@ -255,6 +255,14 @@ footer {
     color: #1a4971;
 }
 
+/* ── 상품 등록/수정 폼 컨테이너 (장바구니 카드 스타일 적용) ── */
+.product-form-container {
+    background: #fff;
+    border-radius: 8px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
 /* ── 폼 공통 ── */
 .form-group {
     margin-bottom: 16px;
