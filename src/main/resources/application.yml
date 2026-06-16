@@ -137,6 +137,9 @@ shop:
       - gif
       - webp
     max-images-per-product: ${SHOP_STORAGE_MAX_IMAGES_PER_PRODUCT:10}
+  threads:
+    virtual:
+      enabled: false
 
 management:
   endpoints:
