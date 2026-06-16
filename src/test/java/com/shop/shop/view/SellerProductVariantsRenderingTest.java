@@ -154,7 +154,7 @@ class SellerProductVariantsRenderingTest {
 
     @BeforeEach
     void setUp() {
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         List<ProductOptionResponse> options = List.of(
                 new ProductOptionResponse(OPTION_ID, "색상",
                         List.of(new OptionValueResponse(100L, OPTION_ID, "빨강"),
@@ -390,5 +390,23 @@ class SellerProductVariantsRenderingTest {
         assertThat(body).as("variants 화면에 이미지 관리 링크가 있어야 함")
                 .contains("/seller/products/" + PRODUCT_ID + "/images");
         assertThat(body).as("variants 화면에 '이미지 관리' 텍스트가 있어야 함").contains("이미지 관리");
+    }
+
+    // ============================================================
+    // (R14) GET prefill — variantPrice 입력값에 basePrice 반영
+    // ============================================================
+
+    @Test
+    @DisplayName("(R14) GET /variants — variant 가격 입력칸(variantPrice)에 basePrice(10000.00) prefill")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void variants_prefills_variant_price_with_base_price() throws Exception {
+        String body = mockMvc.perform(get(BASE_URL))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // th:field="*{price}" 는 id=variantPrice 인 input에 value="10000.00"으로 렌더링
+        assertThat(body)
+                .as("variantPrice 필드 value에 basePrice(10000.00)가 prefill되어야 함")
+                .contains("10000.00");
     }
 }

@@ -120,6 +120,28 @@ public class ProductVariantService {
     }
 
     /**
+     * variant 삭제.
+     *
+     * <p>처리 순서: V12/V13 → V11 → 삭제.
+     * order_items.variant_id는 ON DELETE SET NULL이므로 주문 스냅샷 보존.
+     * VariantStock은 product_variants와 동일 물리 테이블로 함께 삭제됨.
+     *
+     * @param actorId      행위자 userId
+     * @param actorIsAdmin 행위자 ADMIN 여부
+     * @param productId    대상 상품 ID
+     * @param variantId    삭제할 variant ID
+     */
+    public void deleteVariant(long actorId, boolean actorIsAdmin, long productId, long variantId) {
+        productService.getOwnedProduct(actorId, actorIsAdmin, productId);
+
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .filter(v -> v.getProduct().getId().equals(productId))
+                .orElseThrow(VariantNotFoundException::new);
+
+        productVariantRepository.delete(variant);
+    }
+
+    /**
      * 상품 variant 목록 조회.
      *
      * @param actorId      행위자 userId

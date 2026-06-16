@@ -9,8 +9,10 @@
       - 폼 객체: optionForm / optionValueForm / variantForm
       - 옵션 생성 action: POST /seller/products/{productId}/options
       - 옵션값 생성 action: POST /seller/products/{productId}/options/{optionId}/values
+      - 옵션 삭제 action: POST /seller/products/{productId}/options/{optionId}/delete
       - Variant 생성 action: POST /seller/products/{productId}/variants
       - Variant 수정 action: POST /seller/products/{productId}/variants/{variantId}
+      - Variant 삭제 action: POST /seller/products/{productId}/variants/{variantId}/delete
       - CSRF: th:action 자동 주입 (_csrf 수동 추가 금지)
       - 검증 실패: th:errors로 필드별 메시지 echo
       - Entity 직접 노출 금지 (DTO만 모델에 담김)
@@ -48,6 +50,13 @@
                                 <span class="option-value-badge" th:text="${val.value}">옵션값</span>
                             </span>
                         </span>
+                        <!-- 옵션 삭제 버튼 (2.1) -->
+                        <form method="post"
+                              th:action="@{/seller/products/{productId}/options/{optionId}/delete(productId=${product.productId}, optionId=${option.optionId})}"
+                              onsubmit="return confirm('이 옵션을 삭제하면 옵션값·관련 조합도 삭제됩니다. 계속할까요?')"
+                              style="display:inline;margin-left:auto;">
+                            <button type="submit" class="btn btn-danger btn-sm">옵션 삭제</button>
+                        </form>
                     </div>
 
                     <!-- 옵션값 생성 폼 (각 옵션마다) -->
@@ -109,7 +118,7 @@
                             <th>재고</th>
                             <th>활성</th>
                             <th>옵션 조합</th>
-                            <th>수정</th>
+                            <th>작업</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -125,25 +134,21 @@
                                 </span>
                             </td>
                             <td>
-                                <!-- Variant 수정 폼 (인라인) -->
+                                <!-- Variant 수정 버튼 (2.3) — <a href> 대신 <button type="button">으로 교체, data-option-value-ids 추가 -->
+                                <button type="button"
+                                        class="btn btn-outline btn-sm variant-edit-btn"
+                                        th:attr="data-variant-id=${variant.variantId},
+                                                 data-sku=${variant.sku},
+                                                 data-price=${variant.price},
+                                                 data-stock=${variant.stock},
+                                                 data-active=${variant.active},
+                                                 data-option-value-ids=${#strings.listJoin(variant.optionValueIds, ',')}">수정</button>
+                                <!-- Variant 삭제 폼 (2.2) -->
                                 <form method="post"
-                                      th:action="@{/seller/products/{productId}/variants/{variantId}(productId=${product.productId}, variantId=${variant.variantId})}"
-                                      th:object="${variantForm}"
-                                      class="variant-update-form">
-                                    <input type="hidden" name="sku"
-                                           th:value="${variant.sku}">
-                                    <input type="hidden" name="price"
-                                           th:value="${variant.price}">
-                                    <input type="hidden" name="stock"
-                                           th:value="${variant.stock}">
-                                    <input type="hidden" name="active"
-                                           th:value="${variant.active}">
-                                    <input type="hidden" name="optionValueIds"
-                                           th:each="id : ${variant.optionValueIds}"
-                                           th:value="${id}">
-                                    <a th:href="@{/seller/products/{productId}/variants(productId=${product.productId})}"
-                                       class="btn btn-outline btn-sm"
-                                       th:attr="data-variant-id=${variant.variantId},data-sku=${variant.sku},data-price=${variant.price},data-stock=${variant.stock},data-active=${variant.active}">수정</a>
+                                      th:action="@{/seller/products/{productId}/variants/{variantId}/delete(productId=${product.productId}, variantId=${variant.variantId})}"
+                                      onsubmit="return confirm('이 variant를 삭제할까요?')"
+                                      style="display:inline;">
+                                    <button type="submit" class="btn btn-danger btn-sm">삭제</button>
                                 </form>
                             </td>
                         </tr>
@@ -152,10 +157,11 @@
             </div>
             <p class="empty-msg" th:if="${#lists.isEmpty(variants)}">등록된 variant가 없습니다.</p>
 
-            <!-- Variant 생성 폼 -->
+            <!-- Variant 생성/수정 폼 (2.3) -->
             <div class="variant-create-form" id="variant-edit-form">
-                <h3 class="subsection-title">새 Variant 추가</h3>
+                <h3 class="subsection-title" id="variant-form-title">새 Variant 추가</h3>
                 <form method="post"
+                      id="variant-form"
                       th:action="@{/seller/products/{productId}/variants(productId=${product.productId})}"
                       th:object="${variantForm}">
 
@@ -183,6 +189,7 @@
                         <span class="field-error"
                               th:if="${#fields.hasErrors('price')}"
                               th:errors="*{price}"></span>
+                        <small class="field-hint">이 가격으로 실제 결제됩니다.</small>
                     </div>
 
                     <!-- 재고 -->
@@ -226,7 +233,11 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Variant 추가</button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button type="submit" id="variant-form-submit" class="btn btn-primary">Variant 추가</button>
+                        <!-- 수정 모드에서만 표시되는 취소 버튼 -->
+                        <button type="button" id="variant-form-cancel" class="btn btn-outline" style="display:none;">취소</button>
+                    </div>
                 </form>
             </div>
         </section>
@@ -241,6 +252,107 @@
             </a>
         </div>
     </div>
+
+    <!-- 인라인 스크립트는 반드시 <main> 내부에 둔다 — 레이아웃이 content=~{::main}로 main 내용만 렌더하므로 main 밖 스크립트는 드롭됨 -->
+    <script th:inline="javascript">
+(function () {
+    'use strict';
+
+    /* 서버가 렌더한 상품 ID (Thymeleaf inline) */
+    var productId = /*[[${product.productId}]]*/ 0;
+
+    /* 서버가 렌더한 기본 가격 (취소 복귀 시 가격칸 복원에 사용) */
+    var basePrice = /*[[${product.basePrice}]]*/ '';
+    if (basePrice === null) { basePrice = ''; }
+
+    /* 생성 모드 기본 action (서버 렌더 값 보존) */
+    var createAction = '/seller/products/' + productId + '/variants';
+
+    var form        = document.getElementById('variant-form');
+    var formTitle   = document.getElementById('variant-form-title');
+    var submitBtn   = document.getElementById('variant-form-submit');
+    var cancelBtn   = document.getElementById('variant-form-cancel');
+    var editSection = document.getElementById('variant-edit-form');
+
+    var skuInput    = document.getElementById('variantSku');
+    var priceInput  = document.getElementById('variantPrice');
+    var stockInput  = document.getElementById('variantStock');
+    var activeInput = document.getElementById('variantActive');
+
+    /** 체크박스 전체 해제 */
+    function clearOptionCheckboxes() {
+        var boxes = form.querySelectorAll('input[type="checkbox"][name="optionValueIds"]');
+        boxes.forEach(function (cb) { cb.checked = false; });
+    }
+
+    /** 생성 모드로 복귀 */
+    function resetToCreateMode() {
+        formTitle.textContent  = '새 Variant 추가';
+        submitBtn.textContent  = 'Variant 추가';
+        cancelBtn.style.display = 'none';
+
+        form.action = createAction;
+
+        skuInput.value    = '';
+        priceInput.value  = (basePrice !== '' ? basePrice : '');
+        stockInput.value  = '';
+        activeInput.checked = false;
+
+        clearOptionCheckboxes();
+    }
+
+    /** 수정 모드로 전환 */
+    function switchToEditMode(btn) {
+        var variantId     = btn.getAttribute('data-variant-id');
+        var sku           = btn.getAttribute('data-sku');
+        var price         = btn.getAttribute('data-price');
+        var stock         = btn.getAttribute('data-stock');
+        var activeVal     = btn.getAttribute('data-active');
+        var optionIdsRaw  = btn.getAttribute('data-option-value-ids') || '';
+
+        /* 폼 필드 채우기 */
+        skuInput.value    = sku || '';
+        priceInput.value  = price || '';
+        stockInput.value  = stock || '';
+        activeInput.checked = (activeVal === 'true');
+
+        /* 체크박스: 전체 해제 후 해당 id만 체크 */
+        clearOptionCheckboxes();
+        if (optionIdsRaw.trim() !== '') {
+            var selectedIds = optionIdsRaw.split(',').map(function (s) { return s.trim(); });
+            selectedIds.forEach(function (id) {
+                var cb = form.querySelector('input[type="checkbox"][name="optionValueIds"][value="' + id + '"]');
+                if (cb) { cb.checked = true; }
+            });
+        }
+
+        /* 폼 action 을 update 엔드포인트로 교체 */
+        form.action = '/seller/products/' + productId + '/variants/' + variantId;
+
+        /* 라벨·버튼 교체 */
+        formTitle.textContent  = 'Variant 수정';
+        submitBtn.textContent  = 'Variant 수정';
+        cancelBtn.style.display = 'inline-block';
+
+        /* 폼으로 스크롤 */
+        editSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* "수정" 버튼 이벤트 위임 */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.variant-edit-btn');
+        if (!btn) { return; }
+        switchToEditMode(btn);
+    });
+
+    /* "취소" 버튼 */
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+            resetToCreateMode();
+        });
+    }
+}());
+    </script>
 </main>
 </body>
 </html>

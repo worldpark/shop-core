@@ -81,4 +81,28 @@ public interface SellerProductVariantFacade {
      */
     void updateVariant(String actorEmail, boolean actorIsAdmin, long productId, long variantId,
                        String sku, BigDecimal price, int stock, boolean active, List<Long> optionValueIds);
+
+    /**
+     * 옵션 삭제.
+     *
+     * <p>DB ON DELETE CASCADE로 option_values·variant_values 자동 정리.
+     *
+     * @param actorEmail   행위자 이메일
+     * @param actorIsAdmin 행위자 ADMIN 여부
+     * @param productId    대상 상품 ID
+     * @param optionId     삭제할 옵션 ID
+     */
+    void deleteOption(String actorEmail, boolean actorIsAdmin, long productId, long optionId);
+
+    /**
+     * variant 삭제.
+     *
+     * <p>order_items.variant_id는 ON DELETE SET NULL이므로 주문 스냅샷 보존.
+     *
+     * @param actorEmail   행위자 이메일
+     * @param actorIsAdmin 행위자 ADMIN 여부
+     * @param productId    대상 상품 ID
+     * @param variantId    삭제할 variant ID
+     */
+    void deleteVariant(String actorEmail, boolean actorIsAdmin, long productId, long variantId);
 }

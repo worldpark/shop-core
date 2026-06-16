@@ -47,6 +47,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -360,6 +361,80 @@ class SellerProductOptionRestControllerSecurityTest {
                         .header("Authorization", "Bearer " + sellerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new OptionValueCreateRequest("빨강"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    // ============================================================
+    // DELETE /api/v1/seller/products/{id}/options/{optionId}
+    // ============================================================
+
+    @Test
+    @DisplayName("DELETE option — SELLER(소유자) → 204")
+    void deleteOption_seller_returns_204() throws Exception {
+        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
+        ProductOption option = sampleOption(OPTION_ID, product);
+
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productOptionRepository.findById(OPTION_ID)).thenReturn(Optional.of(option));
+
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/" + OPTION_ID)
+                        .header("Authorization", "Bearer " + sellerToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("DELETE option — ADMIN → 204 (RoleHierarchy 함의)")
+    void deleteOption_admin_returns_204() throws Exception {
+        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
+        ProductOption option = sampleOption(OPTION_ID, product);
+
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productOptionRepository.findById(OPTION_ID)).thenReturn(Optional.of(option));
+
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/" + OPTION_ID)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("DELETE option — CONSUMER → 403")
+    void deleteOption_consumer_returns_403() throws Exception {
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/" + OPTION_ID)
+                        .header("Authorization", "Bearer " + consumerToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    @DisplayName("DELETE option — 비인증 → 401")
+    void deleteOption_unauthenticated_returns_401() throws Exception {
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/" + OPTION_ID))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
+    @DisplayName("DELETE option — 타 판매자 → 404 (존재 은닉)")
+    void deleteOption_other_seller_returns_404() throws Exception {
+        Product product = sampleProduct(SELLER_ID, PRODUCT_ID); // 소유자는 SELLER_ID
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/" + OPTION_ID)
+                        .header("Authorization", "Bearer " + sellerToken2))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    @DisplayName("DELETE option — 존재하지 않는 옵션 → 404")
+    void deleteOption_not_found_returns_404() throws Exception {
+        Product product = sampleProduct(SELLER_ID, PRODUCT_ID);
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productOptionRepository.findById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(delete("/api/v1/seller/products/" + PRODUCT_ID + "/options/999")
+                        .header("Authorization", "Bearer " + sellerToken))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404));
     }

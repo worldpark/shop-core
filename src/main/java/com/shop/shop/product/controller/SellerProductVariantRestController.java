@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -79,5 +80,26 @@ public class SellerProductVariantRestController {
             @Valid @RequestBody ProductVariantUpdateRequest req,
             Authentication auth) {
         return ResponseEntity.ok(productVariantServiceResponse.updateVariant(auth, productId, variantId, req));
+    }
+
+    /**
+     * variant 삭제 (SELLER 이상, 소유권 검사 포함).
+     *
+     * <p>order_items.variant_id는 ON DELETE SET NULL이므로 주문 스냅샷 보존.
+     * 인가: /api/v1/seller/** → hasRole("SELLER"), ADMIN 함의.
+     * 소유권: ProductService.getOwnedProduct — 타인 상품 → 404.
+     *
+     * @param productId 대상 상품 ID
+     * @param variantId 삭제할 variant ID
+     * @param auth      JWT 인증 객체
+     * @return 204 No Content
+     */
+    @DeleteMapping("/{variantId}")
+    public ResponseEntity<Void> deleteVariant(
+            @PathVariable long productId,
+            @PathVariable long variantId,
+            Authentication auth) {
+        productVariantServiceResponse.deleteVariant(auth, productId, variantId);
+        return ResponseEntity.noContent().build();
     }
 }

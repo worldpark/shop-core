@@ -39,6 +39,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -167,7 +168,7 @@ class SellerProductImageViewControllerTest {
 
     @BeforeEach
     void setUp() {
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         List<ProductImageResponse> images = List.of(
                 new ProductImageResponse(IMAGE_ID, PRODUCT_ID, "products/10/abc.jpg",
                         "http://localhost/assets/products/10/abc.jpg", 0, true)

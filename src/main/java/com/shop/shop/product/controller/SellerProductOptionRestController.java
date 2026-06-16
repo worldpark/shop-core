@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -79,5 +80,26 @@ public class SellerProductOptionRestController {
             @Valid @RequestBody OptionValueCreateRequest req,
             Authentication auth) {
         return ResponseEntity.ok(productOptionServiceResponse.createOptionValue(auth, productId, optionId, req));
+    }
+
+    /**
+     * 옵션 삭제 (SELLER 이상, 소유권 검사 포함).
+     *
+     * <p>DB ON DELETE CASCADE로 option_values·variant_values 자동 정리.
+     * 인가: /api/v1/seller/** → hasRole("SELLER"), ADMIN 함의.
+     * 소유권: ProductService.getOwnedProduct — 타인 상품 → 404.
+     *
+     * @param productId 대상 상품 ID
+     * @param optionId  삭제할 옵션 ID
+     * @param auth      JWT 인증 객체
+     * @return 204 No Content
+     */
+    @DeleteMapping("/{optionId}")
+    public ResponseEntity<Void> deleteOption(
+            @PathVariable long productId,
+            @PathVariable long optionId,
+            Authentication auth) {
+        productOptionServiceResponse.deleteOption(auth, productId, optionId);
+        return ResponseEntity.noContent().build();
     }
 }

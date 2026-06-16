@@ -32,6 +32,19 @@ public class ProductOptionServiceResponse {
     private final OptionValueRepository optionValueRepository;
 
     /**
+     * 옵션 삭제 — REST 전용.
+     *
+     * @param auth      JWT 인증 객체
+     * @param productId 대상 상품 ID
+     * @param optionId  삭제할 옵션 ID
+     */
+    public void deleteOption(Authentication auth, long productId, long optionId) {
+        long actorId = (long) auth.getPrincipal();
+        boolean actorIsAdmin = isAdmin(auth);
+        productOptionService.deleteOption(actorId, actorIsAdmin, productId, optionId);
+    }
+
+    /**
      * 옵션 목록 조회 — REST 전용.
      *
      * @param auth      JWT 인증 객체

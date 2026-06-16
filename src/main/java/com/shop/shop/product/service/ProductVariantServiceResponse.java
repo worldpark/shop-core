@@ -29,6 +29,19 @@ public class ProductVariantServiceResponse {
     private final ProductVariantService productVariantService;
 
     /**
+     * variant 삭제 — REST 전용.
+     *
+     * @param auth      JWT 인증 객체
+     * @param productId 대상 상품 ID
+     * @param variantId 삭제할 variant ID
+     */
+    public void deleteVariant(Authentication auth, long productId, long variantId) {
+        long actorId = (long) auth.getPrincipal();
+        boolean actorIsAdmin = isAdmin(auth);
+        productVariantService.deleteVariant(actorId, actorIsAdmin, productId, variantId);
+    }
+
+    /**
      * variant 목록 조회 — REST 전용.
      *
      * @param auth      JWT 인증 객체

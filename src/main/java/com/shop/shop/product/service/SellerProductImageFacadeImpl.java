@@ -44,7 +44,7 @@ class SellerProductImageFacadeImpl implements SellerProductImageFacade {
         long actorId = userDirectory.findUserIdByEmail(actorEmail);
 
         Product product = productService.getOwnedProduct(actorId, actorIsAdmin, productId);
-        SellerProductRef productRef = new SellerProductRef(product.getId(), product.getName());
+        SellerProductRef productRef = new SellerProductRef(product.getId(), product.getName(), product.getBasePrice());
 
         List<ProductImage> images = productImageService.listImages(actorId, actorIsAdmin, productId);
         List<ProductImageResponse> imageResponses = images.stream()

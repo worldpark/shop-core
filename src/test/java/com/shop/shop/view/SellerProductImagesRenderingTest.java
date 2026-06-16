@@ -36,6 +36,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -152,7 +153,7 @@ class SellerProductImagesRenderingTest {
 
     @BeforeEach
     void setUp() {
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         List<ProductImageResponse> images = List.of(
                 new ProductImageResponse(IMAGE_ID, PRODUCT_ID, "products/10/abc.jpg",
                         IMAGE_URL, 0, true)
@@ -226,7 +227,7 @@ class SellerProductImagesRenderingTest {
     void images_renders_primary_form_with_csrf() throws Exception {
         // stub 이미지는 primary=true이므로 대표 지정 폼은 미노출 (th:unless 조건)
         // primary=false인 이미지를 추가해서 테스트
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         List<ProductImageResponse> images = List.of(
                 new ProductImageResponse(IMAGE_ID, PRODUCT_ID, "products/10/abc.jpg",
                         IMAGE_URL, 0, false)  // primary=false
@@ -339,7 +340,7 @@ class SellerProductImagesRenderingTest {
     @DisplayName("(I10) GET /images — 이미지 없을 때 '등록된 이미지가 없습니다.' 문구 렌더링")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void images_renders_empty_message_when_no_images() throws Exception {
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         when(sellerProductImageFacade.getManagementView(anyString(), anyBoolean(), anyLong()))
                 .thenReturn(new ProductImageManagementView(productRef, List.of()));
 

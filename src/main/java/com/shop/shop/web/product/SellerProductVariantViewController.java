@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.math.BigDecimal;
 import java.util.Collections;
 
 /**
@@ -62,6 +63,7 @@ public class SellerProductVariantViewController {
      * GET /seller/products/{productId}/variants
      *
      * <p>facade.getManagementView → product/options/variants 모델 키 분해 + 빈 폼 3종 추가.
+     * variantForm.price는 상품 기본가(basePrice)로 prefill하여 판매자가 기준가를 즉시 확인할 수 있게 한다.
      *
      * @param productId 대상 상품 ID
      * @param auth      SecurityContext 인증 객체
@@ -74,10 +76,10 @@ public class SellerProductVariantViewController {
             Authentication auth,
             Model model) {
 
-        populateManagementModel(model, productId, auth);
+        VariantManagementView view = populateManagementModel(model, productId, auth);
         model.addAttribute("optionForm", new OptionForm());
         model.addAttribute("optionValueForm", new OptionValueForm());
-        model.addAttribute("variantForm", new VariantForm());
+        model.addAttribute("variantForm", newPrefilledVariantForm(view.product().basePrice()));
         return PRODUCT_VARIANTS_VIEW;
     }
 
@@ -107,9 +109,9 @@ public class SellerProductVariantViewController {
             RedirectAttributes ra) {
 
         if (bindingResult.hasErrors()) {
-            populateManagementModel(model, productId, auth);
+            VariantManagementView view = populateManagementModel(model, productId, auth);
             model.addAttribute("optionValueForm", new OptionValueForm());
-            model.addAttribute("variantForm", new VariantForm());
+            model.addAttribute("variantForm", newPrefilledVariantForm(view.product().basePrice()));
             return PRODUCT_VARIANTS_VIEW;
         }
 
@@ -154,9 +156,9 @@ public class SellerProductVariantViewController {
             RedirectAttributes ra) {
 
         if (bindingResult.hasErrors()) {
-            populateManagementModel(model, productId, auth);
+            VariantManagementView view = populateManagementModel(model, productId, auth);
             model.addAttribute("optionForm", new OptionForm());
-            model.addAttribute("variantForm", new VariantForm());
+            model.addAttribute("variantForm", newPrefilledVariantForm(view.product().basePrice()));
             model.addAttribute("failedOptionValueOptionId", optionId);
             return PRODUCT_VARIANTS_VIEW;
         }
@@ -273,16 +275,101 @@ public class SellerProductVariantViewController {
     }
 
     /**
+     * 옵션 삭제 처리.
+     * POST /seller/products/{productId}/options/{optionId}/delete
+     *
+     * <p>성공 → flashSuccess + PRG redirect.
+     * BusinessException → flashError + redirect.
+     *
+     * @param productId 대상 상품 ID
+     * @param optionId  삭제할 옵션 ID
+     * @param auth      SecurityContext 인증 객체
+     * @param ra        RedirectAttributes
+     * @return redirect:/seller/products/{productId}/variants
+     */
+    @PostMapping("/seller/products/{productId}/options/{optionId}/delete")
+    public String deleteOption(
+            @PathVariable long productId,
+            @PathVariable long optionId,
+            Authentication auth,
+            RedirectAttributes ra) {
+
+        try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
+            sellerProductVariantFacade.deleteOption(actor.email(), actor.admin(), productId, optionId);
+            ra.addFlashAttribute("flashSuccess", "옵션이 삭제되었습니다.");
+        } catch (BusinessException e) {
+            log.warn("옵션 삭제 실패: actorEmail={}, productId={}, optionId={}, reason={}",
+                    auth.getName(), productId, optionId, e.getMessage());
+            ra.addFlashAttribute("flashError", e.getMessage());
+        }
+
+        return "redirect:/seller/products/" + productId + "/variants";
+    }
+
+    /**
+     * Variant 삭제 처리.
+     * POST /seller/products/{productId}/variants/{variantId}/delete
+     *
+     * <p>성공 → flashSuccess + PRG redirect.
+     * BusinessException → flashError + redirect.
+     *
+     * @param productId 대상 상품 ID
+     * @param variantId 삭제할 variant ID
+     * @param auth      SecurityContext 인증 객체
+     * @param ra        RedirectAttributes
+     * @return redirect:/seller/products/{productId}/variants
+     */
+    @PostMapping("/seller/products/{productId}/variants/{variantId}/delete")
+    public String deleteVariant(
+            @PathVariable long productId,
+            @PathVariable long variantId,
+            Authentication auth,
+            RedirectAttributes ra) {
+
+        try {
+            CurrentActor actor = currentActorResolver.resolve(auth);
+            sellerProductVariantFacade.deleteVariant(actor.email(), actor.admin(), productId, variantId);
+            ra.addFlashAttribute("flashSuccess", "Variant가 삭제되었습니다.");
+        } catch (BusinessException e) {
+            log.warn("Variant 삭제 실패: actorEmail={}, productId={}, variantId={}, reason={}",
+                    auth.getName(), productId, variantId, e.getMessage());
+            ra.addFlashAttribute("flashError", e.getMessage());
+        }
+
+        return "redirect:/seller/products/" + productId + "/variants";
+    }
+
+    /**
      * 관리 화면 공통 모델 데이터 주입.
      * product / options / variants 키를 facade.getManagementView 결과에서 분해해 주입한다.
      * 재렌더 시 세 폼이 모두 모델에 존재해야 하므로 호출 측이 나머지 폼을 추가해야 한다.
+     *
+     * @return 호출 측이 basePrice prefill에 활용할 수 있도록 view 반환
      */
-    private void populateManagementModel(Model model, long productId, Authentication auth) {
+    private VariantManagementView populateManagementModel(Model model, long productId, Authentication auth) {
         CurrentActor actor = currentActorResolver.resolve(auth);
         VariantManagementView view = sellerProductVariantFacade.getManagementView(
                 actor.email(), actor.admin(), productId);
         model.addAttribute("product", view.product());
         model.addAttribute("options", view.options());
         model.addAttribute("variants", view.variants());
+        return view;
+    }
+
+    /**
+     * 기본가(basePrice)로 price를 prefill한 새 VariantForm을 반환한다.
+     *
+     * <p>초기 GET 및 옵션/옵션값 검증 실패 재렌더 경로에서만 사용한다.
+     * variant POST 검증 실패 경로(createVariant/updateVariant)는 제출된 폼을 그대로 echo해야 하므로
+     * 이 헬퍼를 사용하지 않는다.
+     *
+     * @param basePrice 상품 기본가 (null이면 price 미설정)
+     * @return price가 basePrice로 설정된 VariantForm
+     */
+    private VariantForm newPrefilledVariantForm(BigDecimal basePrice) {
+        VariantForm vf = new VariantForm();
+        vf.setPrice(basePrice);
+        return vf;
     }
 }

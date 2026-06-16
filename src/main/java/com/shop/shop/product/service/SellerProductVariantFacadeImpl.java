@@ -46,7 +46,7 @@ class SellerProductVariantFacadeImpl implements SellerProductVariantFacade {
         long actorId = userDirectory.findUserIdByEmail(actorEmail);
 
         var product = productService.getOwnedProduct(actorId, actorIsAdmin, productId);
-        SellerProductRef productRef = new SellerProductRef(product.getId(), product.getName());
+        SellerProductRef productRef = new SellerProductRef(product.getId(), product.getName(), product.getBasePrice());
 
         List<ProductOption> options = productOptionService.listOptions(actorId, actorIsAdmin, productId);
         List<ProductOptionResponse> optionResponses = options.stream()
@@ -105,5 +105,23 @@ class SellerProductVariantFacadeImpl implements SellerProductVariantFacade {
         long actorId = userDirectory.findUserIdByEmail(actorEmail);
         productVariantService.updateVariant(actorId, actorIsAdmin, productId, variantId, sku, price, stock,
                 active, optionValueIds);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void deleteOption(String actorEmail, boolean actorIsAdmin, long productId, long optionId) {
+        long actorId = userDirectory.findUserIdByEmail(actorEmail);
+        productOptionService.deleteOption(actorId, actorIsAdmin, productId, optionId);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void deleteVariant(String actorEmail, boolean actorIsAdmin, long productId, long variantId) {
+        long actorId = userDirectory.findUserIdByEmail(actorEmail);
+        productVariantService.deleteVariant(actorId, actorIsAdmin, productId, variantId);
     }
 }

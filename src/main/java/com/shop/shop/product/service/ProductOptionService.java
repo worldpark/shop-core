@@ -101,6 +101,31 @@ public class ProductOptionService {
     }
 
     /**
+     * 옵션 삭제.
+     *
+     * <p>처리 순서:
+     * <ol>
+     *   <li>소유권 검사 (V12/V13) — getOwnedProduct 위임</li>
+     *   <li>optionId가 productId 하위 리소스 검사 (V10)</li>
+     *   <li>삭제 — DB ON DELETE CASCADE로 option_values·variant_values 자동 정리</li>
+     * </ol>
+     *
+     * @param actorId      행위자 userId
+     * @param actorIsAdmin 행위자 ADMIN 여부
+     * @param productId    대상 상품 ID
+     * @param optionId     삭제할 옵션 ID
+     */
+    public void deleteOption(long actorId, boolean actorIsAdmin, long productId, long optionId) {
+        productService.getOwnedProduct(actorId, actorIsAdmin, productId);
+
+        ProductOption option = productOptionRepository.findById(optionId)
+                .filter(o -> o.getProduct().getId().equals(productId))
+                .orElseThrow(() -> new OptionNotFoundException(optionId));
+
+        productOptionRepository.delete(option);
+    }
+
+    /**
      * 상품 옵션 목록 조회 (옵션값 포함).
      *
      * @param actorId      행위자 userId

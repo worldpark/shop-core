@@ -165,7 +165,7 @@ class SellerProductVariantViewControllerTest {
 
     @BeforeEach
     void setUp() {
-        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품");
+        SellerProductRef productRef = new SellerProductRef(PRODUCT_ID, "테스트 상품", new BigDecimal("10000.00"));
         List<ProductOptionResponse> options = List.of(
                 new ProductOptionResponse(OPTION_ID, "색상",
                         List.of(new OptionValueResponse(100L, OPTION_ID, "빨강"),
@@ -492,5 +492,85 @@ class SellerProductVariantViewControllerTest {
 
         mockMvc.perform(get(BASE_URL))
                 .andExpect(status().isNotFound());
+    }
+
+    // ============================================================
+    // POST /options/{optionId}/delete — 옵션 삭제
+    // ============================================================
+
+    @Test
+    @DisplayName("POST /options/{optionId}/delete — 성공 → 302 redirect:/seller/products/{productId}/variants")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteOption_success_redirects() throws Exception {
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(BASE_URL));
+    }
+
+    @Test
+    @DisplayName("POST /options/{optionId}/delete — 성공 → facade.deleteOption 호출 검증")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteOption_success_calls_facade() throws Exception {
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        verify(sellerProductVariantFacade).deleteOption(
+                eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID), eq(OPTION_ID));
+    }
+
+    @Test
+    @DisplayName("POST /options/{optionId}/delete — BusinessException → flashError redirect")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteOption_businessException_redirects_with_error() throws Exception {
+        doThrow(new BusinessException("옵션을 찾을 수 없습니다."))
+                .when(sellerProductVariantFacade)
+                .deleteOption(anyString(), anyBoolean(), anyLong(), anyLong());
+
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(BASE_URL));
+    }
+
+    // ============================================================
+    // POST /variants/{variantId}/delete — Variant 삭제
+    // ============================================================
+
+    @Test
+    @DisplayName("POST /variants/{variantId}/delete — 성공 → 302 redirect:/seller/products/{productId}/variants")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteVariant_success_redirects() throws Exception {
+        mockMvc.perform(post(BASE_URL + "/" + VARIANT_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(BASE_URL));
+    }
+
+    @Test
+    @DisplayName("POST /variants/{variantId}/delete — 성공 → facade.deleteVariant 호출 검증")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteVariant_success_calls_facade() throws Exception {
+        mockMvc.perform(post(BASE_URL + "/" + VARIANT_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection());
+
+        verify(sellerProductVariantFacade).deleteVariant(
+                eq(SELLER_EMAIL), eq(false), eq(PRODUCT_ID), eq(VARIANT_ID));
+    }
+
+    @Test
+    @DisplayName("POST /variants/{variantId}/delete — BusinessException → flashError redirect")
+    @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
+    void deleteVariant_businessException_redirects_with_error() throws Exception {
+        doThrow(new BusinessException("variant를 찾을 수 없습니다."))
+                .when(sellerProductVariantFacade)
+                .deleteVariant(anyString(), anyBoolean(), anyLong(), anyLong());
+
+        mockMvc.perform(post(BASE_URL + "/" + VARIANT_ID + "/delete")
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(BASE_URL));
     }
 }
