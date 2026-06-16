@@ -59,6 +59,10 @@ dependencies {
     // Messaging
     implementation 'org.springframework.kafka:spring-kafka'
 
+    // Observability (ADR-010) — Actuator + Micrometer Prometheus. 버전은 Spring Boot BOM 관리.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
     // Redis (JWT 로그인 상태 저장 + 분산락 기반 — 버전 Spring Boot BOM 위임)
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 

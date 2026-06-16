@@ -1,5 +1,6 @@
 package com.shop.shop.security;
 
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +52,33 @@ import java.util.Set;
 public class SecurityConfig {
 
     private static final String LOGIN_PAGE = "/login";
+
+    /**
+     * Actuator 관리 엔드포인트 전용 보안 체인 (@Order(0) — REST/View 체인보다 먼저 매칭).
+     *
+     * <p>{@code EndpointRequest.toAnyEndpoint()}로 관리 base-path(/actuator/**)에만 적용한다
+     * (다른 경로의 인가에 영향 없음). 도입 전에는 /actuator/**가 어디에도 매핑되지 않아
+     * View 체인(@Order(2))의 formLogin이 /login으로 302 리다이렉트했다(ADR-010 / Task 036).
+     *
+     * <p>health는 헬스 체크·k6 사전 점검용으로 공개(permitAll). 나머지(prometheus·info)는
+     * 로컬/개발 정책상 permitAll — 운영 인가 제한은 환경별 설정·후속으로 좁힌다.
+     * 관리 엔드포인트는 브라우저 폼 대상이 아니므로 CSRF disable + STATELESS.
+     */
+    @Bean
+    @Order(0)
+    public SecurityFilterChain actuatorChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(EndpointRequest.toAnyEndpoint())
+            .authorizeHttpRequests(auth -> auth
+                    .requestMatchers(EndpointRequest.to("health")).permitAll()
+                    .anyRequest().permitAll()
+            )
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        return http.build();
+    }
 
     /**
      * REST API 보안 체인.

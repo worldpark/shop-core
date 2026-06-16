@@ -133,5 +133,23 @@ shop:
       - webp
     max-images-per-product: ${SHOP_STORAGE_MAX_IMAGES_PER_PRODUCT:10}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${SHOP_CORE_MGMT_ENDPOINTS:health,info,prometheus}   # 와일드카드 금지(최소 노출)
+  endpoint:
+    health:
+      show-details: when_authorized        # 미인증엔 UP/DOWN만, 상세는 인증 시
+      probes:
+        enabled: true                      # liveness/readiness (단일 노드 단계 선택, 켜둬도 무해)
+  metrics:
+    tags:
+      application: shop-core               # 037(notification)과 구분되는 공통 태그
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 server:
   port: 8080
