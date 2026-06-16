@@ -4,31 +4,35 @@
 >           `docs/tasks/performance/002-performance-shop-core-k6-order-create-load-profile.md` (Task 002)
 >           `docs/tasks/performance/003-performance-shop-core-k6-order-create-stress-profile.md` (Task 003)
 >           `docs/tasks/performance/004-performance-shop-core-k6-payment-confirm-scenario.md` (Task 004)
+>           `docs/tasks/performance/005-performance-shop-core-k6-coupon-apply-scenario.md` (Task 005)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
 >       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
 >       `docs/plans/performance/004-shop-core-k6-payment-confirm-scenario-plan.md`
+>       `docs/plans/performance/005-shop-core-k6-coupon-apply-scenario-plan.md`
 
 ## 디렉토리 구조
 
 ```
 shop-core/perf/k6/
   lib/
-    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress 분리)·시드 상수 (공통)
+    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress/coupon 분리)·시드 상수 (공통)
     auth.js          # 로그인·회원가입·Bearer 헤더 헬퍼·토큰 갱신(getValidToken)
-    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 (refreshToken 포함)
+    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 + setupCouponSeed (coupon-apply용)
   scenarios/
-    order-create.js  # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
+    order-create.js   # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
     payment-confirm.js # 종단: cart→order→결제 확정(빈 바디) + payment_confirm_duration (Task 004)
+    coupon-apply.js   # 쿠폰 사용 동시성: cart→쿠폰적용 주문 + 충돌(409) 직렬화 검증 (Task 005)
   profiles/
     smoke.js         # 5 VU × 30s options export (closed 모델)
     load.js          # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
     stress.js        # 50→200 rps ramping options export (open: ramping-arrival-rate) — Task 003
   baselines/
-    order-create-smoke.json   # smoke 베이스라인 (Task 001, 2026-06-16)
-    order-create-load.json    # load 베이스라인 (Task 002, 2026-06-16)
-    order-create-stress.json  # stress 베이스라인 (Task 003, 2026-06-16)
-    payment-confirm-load.json # payment-confirm load 베이스라인 (Task 004, 2026-06-16)
+    order-create-smoke.json    # smoke 베이스라인 (Task 001, 2026-06-16)
+    order-create-load.json     # load 베이스라인 (Task 002, 2026-06-16)
+    order-create-stress.json   # stress 베이스라인 (Task 003, 2026-06-16)
+    payment-confirm-load.json  # payment-confirm load 베이스라인 (Task 004, 2026-06-16)
+    coupon-apply-load.json     # coupon-apply load 베이스라인 (Task 005, 측정 후 추가)
   README.md          # 이 문서
 ```
 
@@ -487,9 +491,148 @@ mkdir -p build/k6
 
 ---
 
-## 12. 비범위 (후속 Task 예정)
+---
 
-- `scenarios/coupon-apply.js` — Task 005
+## 12. coupon-apply 시나리오 (Task 005)
+
+> Plan: `docs/plans/performance/005-shop-core-k6-coupon-apply-scenario-plan.md`
+>
+> 쿠폰 사용 동시성(중복 사용 방지) 경로 가압 — cart add → 쿠폰 적용 주문 생성.
+> 단일사용 직렬화(`markUsedIfUnused` 조건부 UPDATE)가 경합에서 올바르게 직렬화되는가(붕괴 아님)를 블랙박스로 확인한다.
+
+### ★ 운영 안전 게이트 (실행 전 필수)
+
+> **notification이 smtp 모드인 채로 실행하면 실 Gmail 메일이 대량 발송된다.**
+> 시드 signup(buyer) → 환영 메일, PENDING 주문 만료 자동취소 → 취소 메일이 발생한다.
+> 반드시 아래 조건을 확인한 후 실행할 것.
+
+| 항목 | 조건 | 확인 방법 |
+|---|---|---|
+| **notification 안전** | log 모드이거나 프로세스 정지 | notification 로그 확인 또는 `MAIL_MODE=log` 환경 확인 |
+| **Kafka up** | Outbox → 이벤트 발행 필수 | `docker compose ps` → kafka healthy |
+| **깨끗한 DB** | 베이스라인 측정 전 TRUNCATE 권장 | 메인이 perf DB TRUNCATE 후 실행 |
+
+### 시나리오 설계
+
+**소비성 전제**: setup에서 buyer마다 쿠폰을 1회 발급(1인1매). VU 본문에서 같은 buyer의 쿠폰을 반복 사용 시도한다.
+- 첫 사용 → 201 + discountAmount>0 → `coupon_applied++`
+- 이후(이미 사용) → 409 → `coupon_conflict++` (정상 — 중복 사용 차단됨)
+
+**이중사용 0 신호**: `coupon_applied` 총합이 `buyerCount`를 넘지 않으면 이중 차감 없음(블랙박스 no-double-spend).
+
+**409 오탐 방지**: `http.setResponseCallback(http.expectedStatuses(200, 201, 409))` 적용 → 409가 `http_req_failed`에서 제외됨.
+
+### REST 계약 (plan §2)
+
+| 단계 | 메서드·경로 | 요청 바디 | 응답 | status |
+|---|---|---|---|---|
+| 쿠폰 생성(시드) | `POST /api/v1/admin/coupons` | `{code, name, discountType, value, minOrderAmount, startsAt, endsAt, usageLimit:null, isActive:true}` | `{...}` | 201 |
+| 쿠폰 발급(시드) | `POST /api/v1/coupons` | `{code}` | `{userCouponId, ...}` | 201 |
+| 쿠폰 적용 주문 | `POST /api/v1/orders` | `{recipient, phone, postcode, address1, userCouponId}` | `{orderId, discountAmount, ...}` | 201 (성공) / 409 (충돌) |
+
+### smoke 실행
+
+```bash
+# Windows (k6 전체 경로) — 운영 안전 게이트 확인 후 실행
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/coupon-apply-smoke.json `
+  shop-core/perf/k6/scenarios/coupon-apply.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=smoke \
+  -e SUMMARY_EXPORT_PATH=build/k6/coupon-apply-smoke.json \
+  shop-core/perf/k6/scenarios/coupon-apply.js
+```
+
+### load 실행 (베이스라인 측정)
+
+```bash
+# Windows
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=load `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/coupon-apply-load.json `
+  shop-core/perf/k6/scenarios/coupon-apply.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=load \
+  -e SUMMARY_EXPORT_PATH=build/k6/coupon-apply-load.json \
+  shop-core/perf/k6/scenarios/coupon-apply.js
+```
+
+> **참고**: `--summary-export` 대신 `-e SUMMARY_EXPORT_PATH`를 사용한다. `handleSummary` 구현으로 setup_data(JWT 토큰·userCouponId)가 제거된 메트릭 전용 JSON을 내보낸다.
+>
+> 베이스라인 확정 후 `baselines/coupon-apply-load.json`으로 복사해 커밋한다.
+
+### stress 실행 (한계 탐색)
+
+```bash
+# Windows
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=stress `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/coupon-apply-stress.json `
+  shop-core/perf/k6/scenarios/coupon-apply.js
+```
+
+### 소비성/충돌 결과 해석
+
+| 메트릭 | 정상 해석 | 비정상 |
+|---|---|---|
+| `coupon_applied` | 총합 <= buyerCount (각 쿠폰 정확히 1회). buyerCount 초과 시 이중사용 → 즉각 조사 | `coupon_applied > buyerCount` |
+| `coupon_conflict` | 409 카운트 증가 = 중복 사용 차단 정상 동작. 임계 없음 — 가시화만 | 없음 (가시화 전용) |
+| `coupon_5xx` | 반드시 0 (직렬화 붕괴=비정상, threshold: count==0) | > 0 이면 락/제약 붕괴 즉각 조사 |
+| `http_req_failed` | 409 제외 후 ~0% (진짜 오류만). rate<0.01 threshold | > 0.01 이면 진짜 에러 |
+| `coupon_order_duration` | 확정 p95<60/p99<300 (409 다수 + 성공경로 소수 꼬리 혼합) | 임계 초과 |
+
+### COUPON_THRESHOLDS (2026-06-16 확정)
+
+> 운영 안전 게이트(notification 정지) + Kafka up + 깨끗한 DB 조건에서 load 60rps×1m 2회 측정.
+> 관측: coupon_5xx=0, http_req_failed=0%(409 제외), coupon_applied ≤ buyerCount(이중사용 0),
+> coupon_order_duration p95=19~23ms, p99=52~138ms(성공경로 소표본 꼬리라 변동 큼).
+
+| metric | 값 | 상태 |
+|---|---|---|
+| `http_req_failed` | `rate<0.01` | 확정 (409 제외됨) |
+| `coupon_5xx` | `count==0` | 확정 |
+| `coupon_order_duration p95` | `p(95)<60` | 확정 — 베이스라인 p95≈23ms × ~2.6 |
+| `coupon_order_duration p99` | `p(99)<300` | 확정 — 베이스라인 p99≈138ms × ~2.2(소표본 꼬리 변동 흡수) |
+| `coupon_conflict` | 임계 없음 | 가시화만 (정상 비즈니스 흐름) |
+| `coupon_applied` | 임계 없음 | 이중사용 0 신호로 수동 해석 |
+
+> **coupon_applied 변동**: 런마다 활성 VU 수만큼만 "첫 사용 성공"(나머지는 같은 쿠폰 재시도 409)이라 coupon_applied가 런별로 다르다(소비성 특성). 핵심은 **buyerCount를 넘지 않음**(이중사용 0).
+
+### 재측정 절차 (메인)
+
+1. 운영 안전 게이트 확인 (notification 정지 + Kafka up)
+2. perf DB TRUNCATE (깨끗한 DB)
+3. `-e PROFILE=load -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/coupon-apply-load.json` 실행
+4. 관측값 × ~2.5~3 여유율로 `lib/config.js` `COUPON_THRESHOLDS.coupon_order_duration` 갱신
+
+### 커스텀 메트릭
+
+| 메트릭 | 종류 | 설명 |
+|---|---|---|
+| `coupon_applied` | Counter | 201 & discountAmount>0 (쿠폰 적용 주문 성공) |
+| `coupon_conflict` | Counter | 409 (이미 사용된 쿠폰 — 중복 사용 차단 정상 흐름) |
+| `coupon_5xx` | Counter | >=500 (직렬화 붕괴 징후) — threshold: count==0 |
+| `coupon_order_duration` | Trend | 쿠폰 적용 주문 POST 자체 지연 (ms) |
+
+---
+
+## 13. 비범위 (후속 Task 예정)
+
+- 한도형(B) 경계 경합 단독 시나리오 — coupon-apply 후속 옵션
+- 지속 성공-경로 throughput (쿠폰 풀 대량 시드) — 소비성 한계로 후속 옵션
 - Grafana/InfluxDB 시계열 파이프라인, 분산 부하(k6 Cloud) — 보류(YAGNI)
 - teardown() self-clean — 후속 Task
 - 순수 결제 고립(풀 시드 방식 (b)) — 후속 옵션 (plan §8)

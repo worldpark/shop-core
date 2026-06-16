@@ -46,6 +46,22 @@ export const SEED = {
   BUYER_EMAIL_DOMAIN: '@perf.local',
   /** 공통 테스트 비밀번호 (8자 이상, @Size(min=8) + @PasswordMatches 충족) */
   DEFAULT_PASSWORD: 'Perf1234!',
+
+  // ---- 쿠폰 시드 상수 (coupon-apply.js 전용) ----------------------
+  /** 쿠폰 코드 prefix. 런별 유니크 prefix와 조합해 충돌 방지. */
+  COUPON_CODE_PREFIX: 'PERF-COUP',
+  /** 할인 유형 — 고정 금액 */
+  COUPON_DISCOUNT_TYPE: 'fixed',
+  /** 할인 금액 (BigDecimal → 문자열) */
+  COUPON_VALUE: '1000',
+  /** 최소 주문 금액 — 0이면 제한 없음 */
+  COUPON_MIN_ORDER_AMOUNT: '0',
+  /** 쿠폰 사용 횟수 제한 — null=무제한 (단일사용 직렬화 경합 시나리오) */
+  COUPON_USAGE_LIMIT: null,
+  /** 쿠폰 유효 시작 (과거 고정값 → now 항상 포함) */
+  COUPON_STARTS_AT: '2000-01-01T00:00:00Z',
+  /** 쿠폰 유효 종료 (미래 고정값) */
+  COUPON_ENDS_AT: '2099-12-31T23:59:59Z',
 };
 
 // ---------------------------------------------------------------
@@ -155,6 +171,35 @@ export const PAYMENT_THRESHOLDS = {
 
   // payment_conflict(409)은 임계로 죽이지 않음.
   // 상태 충돌(취소 등)은 정상 비즈니스 흐름이므로 Counter로 가시화만.
+};
+
+// ---------------------------------------------------------------
+// coupon thresholds — coupon-apply.js 전용
+//
+// 쿠폰 사용 동시성(중복 사용 방지) 경로 가압 시나리오 (Task 005).
+// 409(쿠폰 충돌)는 http.expectedStatuses(200,201,409)로 http_req_failed에서 제외.
+// 베이스라인 2026-06-16 확정(깨끗한 DB, notification 정지, load 60rps×1m 2회):
+//   coupon_5xx=0, http_req_failed=0%, coupon_applied ≤ buyerCount(이중사용 0),
+//   coupon_order_duration p95=19~23ms·p99=52~138ms(409 다수+성공경로 소표본 꼬리 혼합).
+// ---------------------------------------------------------------
+export const COUPON_THRESHOLDS = {
+  // HTTP 에러율 1% 미만 (409는 expectedStatuses로 제외됨 — 진짜 5xx/타임아웃만 잡힘)
+  http_req_failed: ['rate<0.01'],
+
+  // 쿠폰 5xx — 직렬화 붕괴(낙관 락/제약 위반이 500으로 새는) 징후. 반드시 0이어야 함.
+  coupon_5xx: ['count==0'],
+
+  // coupon_order_duration — 쿠폰 적용 주문 POST 자체 지연(ms).
+  // 베이스라인 2026-06-16(깨끗한 DB, notification 정지, load 60rps×1m): p95=23ms, p99=138ms.
+  //   대부분 409(이미 사용, fast ~11ms)에 소수 201(성공경로=order-create 변수 락 포함) 꼬리가 섞여
+  //   p99가 성공경로 소표본 꼬리를 반영(변동 큼) → p99는 여유를 크게 둔다.
+  coupon_order_duration: [
+    'p(95)<60',  // 베이스라인 p95≈23ms × ~2.6 여유 → 60ms
+    'p(99)<300', // 베이스라인 p99≈138ms × ~2.2 (성공경로 소표본 꼬리 변동 흡수)
+  ],
+
+  // coupon_conflict(409)은 임계 없음 — 중복 사용 차단의 정상 흐름이므로 가시화만.
+  // coupon_applied(201 & discountAmount>0)도 임계 없음 — 이중사용 0 신호로 해석.
 };
 
 // ---------------------------------------------------------------

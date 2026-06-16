@@ -230,3 +230,107 @@ export function setupSeed(buyerCount) {
 
   return { variantId, buyers };
 }
+
+// ---------------------------------------------------------------
+// 공개 API — setupCouponSeed() (coupon-apply.js 전용)
+// ---------------------------------------------------------------
+
+/**
+ * coupon-apply 시나리오 전용 시드 흐름.
+ *
+ * setupSeed()를 호출해 seller/상품/variant/buyer를 구성한 뒤,
+ * admin이 무제한 쿠폰 1개를 생성하고, 각 buyer가 그 쿠폰을 1회 발급받아
+ * userCouponId를 buyer 객체에 추가한다.
+ *
+ * ★ 기존 setupSeed() 반환값은 변경하지 않는다.
+ *   쿠폰 생성/발급은 이 함수에서만 호출되므로 order-create·payment-confirm 시드에 무영향.
+ *
+ * @param {number} buyerCount 생성할 buyer 수 (= 프로파일 최대 VU)
+ * @returns {{
+ *   variantId: number,
+ *   buyers: Array<{
+ *     token: string,
+ *     accessToken: string,
+ *     refreshToken: string,
+ *     issuedAt: number,
+ *     email: string,
+ *     userCouponId: number
+ *   }>
+ * }}
+ * @throws {Error} 어느 단계든 실패 시 즉시 throw → 런 중단
+ */
+export function setupCouponSeed(buyerCount) {
+  // 1~8단계: 기존 setupSeed 재사용 (seller/상품/variant/buyer 구성)
+  const seed = setupSeed(buyerCount);
+  const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
+
+  // 9. admin 로그인 (쿠폰 생성 권한)
+  const adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+  // 10. 무제한 쿠폰 1개 생성 (POST /api/v1/admin/coupons)
+  //   - usageLimit: null → 무제한 (단일사용 직렬화 경합 시나리오 — 한도형 아님)
+  //   - isActive: true → 즉시 활성
+  //   - startsAt/endsAt: 과거~미래 → now 항상 포함
+  //   - discountType: "fixed", value: "1000", minOrderAmount: "0"
+  // 런별 유니크 code: COUPON_CODE_PREFIX + prefix (RUN_TAG 또는 uuidv4)
+  const prefix = __ENV.RUN_TAG || uuidv4();
+  const couponCode = `${SEED.COUPON_CODE_PREFIX}-${prefix}`;
+  const couponName = `PERF-Coupon-${prefix}`;
+
+  const couponCreateRes = http.post(
+    `${baseUrl}/api/v1/admin/coupons`,
+    JSON.stringify({
+      code: couponCode,
+      name: couponName,
+      discountType: SEED.COUPON_DISCOUNT_TYPE,
+      value: SEED.COUPON_VALUE,
+      minOrderAmount: SEED.COUPON_MIN_ORDER_AMOUNT,
+      startsAt: SEED.COUPON_STARTS_AT,
+      endsAt: SEED.COUPON_ENDS_AT,
+      usageLimit: SEED.COUPON_USAGE_LIMIT,
+      isActive: true,
+    }),
+    authHeaders(adminToken),
+  );
+
+  if (couponCreateRes.status !== 201) {
+    throw new Error(
+      `[seed.setupCouponSeed] 쿠폰 생성 실패 — status=${couponCreateRes.status} body=${couponCreateRes.body}`,
+    );
+  }
+
+  // 11. 각 buyer가 쿠폰을 1회 발급 (POST /api/v1/coupons {code})
+  //   - UNIQUE(user_id, coupon_id) 제약: 같은 buyer가 같은 쿠폰 재발급 → 409
+  //   - 여기서는 buyer당 1회만 발급하므로 409 없음
+  const buyers = seed.buyers.map((buyer, i) => {
+    const issueRes = http.post(
+      `${baseUrl}/api/v1/coupons`,
+      JSON.stringify({ code: couponCode }),
+      authHeaders(buyer.token),
+    );
+
+    if (issueRes.status !== 201) {
+      throw new Error(
+        `[seed.setupCouponSeed] buyer[${i}] 쿠폰 발급 실패 — email=${buyer.email} status=${issueRes.status} body=${issueRes.body}`,
+      );
+    }
+
+    const issueBody = JSON.parse(issueRes.body);
+    if (!issueBody.userCouponId) {
+      throw new Error(
+        `[seed.setupCouponSeed] buyer[${i}] userCouponId 미존재 — email=${buyer.email} body=${issueRes.body}`,
+      );
+    }
+
+    // buyer 객체에 userCouponId 추가 (기존 필드 전부 유지)
+    return {
+      ...buyer,
+      userCouponId: issueBody.userCouponId,
+    };
+  });
+
+  return {
+    variantId: seed.variantId,
+    buyers,
+  };
+}
