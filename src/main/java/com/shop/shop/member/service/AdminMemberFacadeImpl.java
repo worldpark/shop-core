@@ -1,13 +1,18 @@
 package com.shop.shop.member.service;
 
+import com.shop.shop.member.domain.MemberStatus;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.dto.MemberSummaryResponse;
+import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.spi.AdminMemberFacade;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.time.Instant;
 
 /**
  * {@link AdminMemberFacade} 구현체.
@@ -27,6 +32,7 @@ import org.springframework.util.StringUtils;
 class AdminMemberFacadeImpl implements AdminMemberFacade {
 
     private final MemberService memberService;
+    private final MemberRepository memberRepository;
 
     /**
      * {@inheritDoc}
@@ -58,6 +64,28 @@ class AdminMemberFacadeImpl implements AdminMemberFacade {
         long adminUserId = memberService.getByEmail(adminEmail).getId();
         Role roleEnum = Role.valueOf(role);
         memberService.changeRole(adminUserId, targetMemberId, roleEnum);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>status=ACTIVE인 전체 회원 수를 MemberRepository에 직접 위임한다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public long countActiveMembers() {
+        return memberRepository.countByStatus(MemberStatus.ACTIVE);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>status=ACTIVE이고 lastLoginAt >= threshold인 회원 수를 MemberRepository에 직접 위임한다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public long countActiveMembersLoggedInSince(Instant threshold) {
+        return memberRepository.countByStatusAndLastLoginAtAfter(MemberStatus.ACTIVE, threshold);
     }
 
     /**

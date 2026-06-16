@@ -186,6 +186,55 @@ class UserTest {
         assertThat(user.getDeletedAt()).isNotNull();
     }
 
+    // ============================================================
+    // recordLogin()
+    // ============================================================
+
+    @Test
+    @DisplayName("recordLogin() — lastLoginAt이 전달된 시각으로 갱신된다")
+    void recordLogin_updates_last_login_at() {
+        User user = createActiveUser();
+        assertThat(user.getLastLoginAt()).isNull();
+
+        Instant loginTime = Instant.now();
+        user.recordLogin(loginTime);
+
+        assertThat(user.getLastLoginAt()).isEqualTo(loginTime);
+    }
+
+    @Test
+    @DisplayName("recordLogin() — 반복 호출 시 최신 시각으로 덮어쓴다")
+    void recordLogin_overwrites_with_latest_time() {
+        User user = createActiveUser();
+
+        Instant first = Instant.now().minusSeconds(60);
+        user.recordLogin(first);
+        assertThat(user.getLastLoginAt()).isEqualTo(first);
+
+        Instant second = Instant.now();
+        user.recordLogin(second);
+
+        assertThat(user.getLastLoginAt()).isEqualTo(second);
+    }
+
+    @Test
+    @DisplayName("recordLogin() — status/email/name/phone/role/deletedAt은 변경되지 않는다")
+    void recordLogin_does_not_affect_other_fields() {
+        User user = createActiveUser();
+        String originalEmail = user.getEmail();
+        String originalName = user.getName();
+        Role originalRole = user.getRole();
+        MemberStatus originalStatus = user.getStatus();
+
+        user.recordLogin(Instant.now());
+
+        assertThat(user.getEmail()).isEqualTo(originalEmail);
+        assertThat(user.getName()).isEqualTo(originalName);
+        assertThat(user.getRole()).isEqualTo(originalRole);
+        assertThat(user.getStatus()).isEqualTo(originalStatus);
+        assertThat(user.getDeletedAt()).isNull();
+    }
+
     // helper
     private void setId(User user, long id) {
         try {

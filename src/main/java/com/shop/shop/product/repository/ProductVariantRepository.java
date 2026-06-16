@@ -1,5 +1,6 @@
 package com.shop.shop.product.repository;
 
+import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.domain.ProductVariant;
 import com.shop.shop.product.dto.ProductStockSum;
 import com.shop.shop.product.dto.VariantProductMapping;
@@ -128,4 +129,26 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
             WHERE pv.product.id IN :productIds
             """)
     List<VariantProductMapping> findVariantProductMappingsByProductIdIn(@Param("productIds") Collection<Long> productIds);
+
+    /**
+     * 주어진 variantId 집합 중 게시 상태({@code publishedStatuses}) 상품에 속한 distinct 상품 수.
+     * 관리자 통계 대시보드 — 상품 판매율 분자(최근 30일 판매된 게시 상품 distinct 수) 계산에 사용.
+     *
+     * <p>variantIds가 비면 facade에서 가드해 이 메서드를 호출하지 않는다.
+     * 미게시 상품(DRAFT/HIDDEN)의 variant는 {@code publishedStatuses} 조건으로 자동 제외된다.
+     *
+     * @param variantIds        판매된 variant ID 컬렉션
+     * @param publishedStatuses 게시 허용 상태 컬렉션 (ON_SALE, SOLD_OUT)
+     * @return 조건에 맞는 DISTINCT 상품 수
+     */
+    @Query("""
+            SELECT COUNT(DISTINCT pv.product.id)
+            FROM ProductVariant pv
+            WHERE pv.id IN :variantIds
+              AND pv.product.status IN :publishedStatuses
+            """)
+    long countDistinctPublishedProductsByVariantIdIn(
+            @Param("variantIds") Collection<Long> variantIds,
+            @Param("publishedStatuses") Collection<ProductStatus> publishedStatuses
+    );
 }

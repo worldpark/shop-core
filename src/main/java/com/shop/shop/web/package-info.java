@@ -5,7 +5,7 @@
  * <ul>
  *   <li>Thymeleaf ViewController(@Controller) 보유: HomeViewController, LoginViewController,
  *       MemberSignupViewController, AdminMemberViewController, SellerProductViewController,
- *       SellerProductVariantViewController</li>
+ *       SellerProductVariantViewController, AdminDashboardViewController</li>
  *   <li>View ViewModel · Form · 화면 조립 전담</li>
  *   <li>Spring Security Authentication을 View facade 호출용 actor 컨텍스트로 변환하는
  *       support 컴포넌트 보유</li>
@@ -14,16 +14,20 @@
  *
  * <h2>허용 의존</h2>
  * <ul>
- *   <li>{@code member.spi} (named interface) — {@code MemberSignupFacade}, {@code AdminMemberFacade}</li>
+ *   <li>{@code member.spi} (named interface) — {@code MemberSignupFacade}, {@code AdminMemberFacade}
+ *       (Task 043: {@code countActiveMembers}, {@code countActiveMembersLoggedInSince})</li>
  *   <li>{@code member.dto} (named interface) — {@code SignupForm}, {@code MemberSearchCondition},
  *       {@code MemberSummaryResponse}</li>
- *   <li>{@code product.spi} (named interface) — {@code SellerProductFacade}, {@code SellerProductVariantFacade}</li>
+ *   <li>{@code product.spi} (named interface) — {@code SellerProductFacade}, {@code SellerProductVariantFacade},
+ *       {@code AdminProductStatsFacade}
+ *       (Task 043: {@code countPublishedProducts}, {@code countPublishedProductsWithSales})</li>
  *   <li>{@code product.dto} (named interface) — {@code ProductForm}, {@code CategoryResponse},
  *       {@code ProductFormView}, {@code VariantManagementView}, {@code SellerProductRef},
  *       {@code ProductOptionResponse}, {@code OptionValueResponse}, {@code ProductVariantResponse},
  *       {@code SellerProductStatsData}, {@code VariantProductMapping}</li>
  *   <li>{@code order.spi} (named interface) — {@code SellerSalesStatsPort}, {@code OrderFacade},
- *       {@code AdminOrderFulfillmentFacade}</li>
+ *       {@code AdminOrderFulfillmentFacade}, {@code AdminOrderStatsFacade}
+ *       (Task 043: {@code countOrdersSince}, {@code countRefundedSince}, {@code distinctSoldVariantIdsSince})</li>
  *   <li>{@code order.spi.dto} (named interface) — {@code VariantSalesAggregate}</li>
  *   <li>{@code common} (OPEN 모듈) — {@code DuplicateEmailException}, {@code BusinessException}</li>
  *   <li>Spring MVC / Spring Security / Thymeleaf 프레임워크 타입</li>

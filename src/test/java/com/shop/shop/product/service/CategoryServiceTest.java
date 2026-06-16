@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -163,6 +164,33 @@ class CategoryServiceTest {
 
         assertThatThrownBy(() -> categoryService.updateCategory(10L, "모바일", "mobile", null, 0))
                 .isInstanceOf(DuplicateSlugException.class);
+    }
+
+    // ============================================================
+    // deleteCategory
+    // ============================================================
+
+    @Test
+    @DisplayName("deleteCategory — 성공: findById → delete 1회 호출")
+    void deleteCategory_success_calls_repository_delete() {
+        Category existing = categoryWithId(10L, "전자", "electronics");
+        when(categoryRepository.findById(10L)).thenReturn(Optional.of(existing));
+
+        categoryService.deleteCategory(10L);
+
+        verify(categoryRepository).delete(existing);
+    }
+
+    @Test
+    @DisplayName("deleteCategory — 존재X → CategoryNotFoundException(404), delete 미호출")
+    void deleteCategory_not_found_throws_CategoryNotFoundException() {
+        when(categoryRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> categoryService.deleteCategory(999L))
+                .isInstanceOf(CategoryNotFoundException.class)
+                .satisfies(e -> assertThat(((CategoryNotFoundException) e).getStatus().value()).isEqualTo(404));
+
+        verify(categoryRepository, never()).delete(any());
     }
 
     // ============================================================

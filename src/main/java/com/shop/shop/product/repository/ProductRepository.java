@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -182,4 +183,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * @return 소유자 상품 Page
      */
     Page<Product> findByOwnerIdOrderByCreatedAtDescIdDesc(Long ownerId, Pageable pageable);
+
+    /**
+     * 게시 상태({@code statuses})에 해당하는 상품 수 조회.
+     * 관리자 통계 대시보드 — 상품 판매율 분모(게시 상품 수) 계산에 사용.
+     *
+     * <p>게시 상품 = ON_SALE + SOLD_OUT (DRAFT / HIDDEN 제외).
+     * 호출자가 {@code Set.of(ProductStatus.ON_SALE, ProductStatus.SOLD_OUT)}을 전달한다.
+     *
+     * @param statuses 집계 대상 상태 컬렉션
+     * @return 해당 상태의 상품 수
+     */
+    long countByStatusIn(Collection<ProductStatus> statuses);
 }

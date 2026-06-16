@@ -115,4 +115,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("select o.id from Order o where o.status = 'pending' and o.createdAt < :threshold " +
            "order by o.createdAt asc, o.id asc")
     List<Long> findExpiredPendingOrderIds(@Param("threshold") Instant threshold, Pageable pageable);
+
+    /**
+     * threshold 이후 생성된 전체 주문 수 (상태 무관).
+     * 관리자 통계 대시보드 — 환불율 분모(최근 30일 전체 주문 수) 계산에 사용.
+     *
+     * @param threshold 기준 시각 (이 시각 이후 생성된 주문만 집계)
+     * @return 해당 기간 전체 주문 수
+     */
+    long countByCreatedAtAfter(Instant threshold);
+
+    /**
+     * 특정 status이면서 threshold 이후 생성된 주문 수.
+     * 관리자 통계 대시보드 — 환불율 분자(최근 30일 refunded 주문 수) 계산에 사용.
+     *
+     * @param status    조회 대상 상태 (예: "refunded")
+     * @param threshold 기준 시각
+     * @return 해당 상태·기간 주문 수
+     */
+    long countByStatusAndCreatedAtAfter(String status, Instant threshold);
 }

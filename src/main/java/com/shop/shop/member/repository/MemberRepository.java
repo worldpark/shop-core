@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -75,4 +76,25 @@ public interface MemberRepository extends JpaRepository<User, Long> {
      * @return 존재하면 true
      */
     boolean existsByEmail(String email);
+
+    /**
+     * 특정 상태를 가진 회원 수 조회.
+     * 관리자 통계 대시보드 — 전체 활성 회원(분모) 계산에 사용.
+     *
+     * @param status 조회 대상 상태 (ACTIVE / WITHDRAWN)
+     * @return 해당 상태의 회원 수
+     */
+    long countByStatus(MemberStatus status);
+
+    /**
+     * 특정 상태이면서 마지막 로그인 시각이 threshold 이후인 회원 수 조회.
+     * 관리자 통계 대시보드 — 최근 30일 접속 활성 회원(분자) 계산에 사용.
+     *
+     * <p>lastLoginAt이 null인 회원은 자동 제외(SQL: col > threshold, NULL은 false).
+     *
+     * @param status    조회 대상 상태
+     * @param threshold 기준 시각 (이 시각 이후에 로그인한 회원만 포함, 이 시각 이전은 제외)
+     * @return 조건에 맞는 회원 수
+     */
+    long countByStatusAndLastLoginAtAfter(MemberStatus status, Instant threshold);
 }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
@@ -44,5 +45,28 @@ public interface OrderItemSalesRepository extends JpaRepository<OrderItem, Long>
     List<VariantSalesAggregate> aggregateSalesByVariantIds(
             @Param("variantIds") Collection<Long> variantIds,
             @Param("countedStatuses") Collection<String> countedStatuses
+    );
+
+    /**
+     * threshold 이후 생성된 완료 판매 주문의 DISTINCT variantId 목록.
+     *
+     * <p>관리자 통계 대시보드 — 상품 판매율 분자 산출을 위해 최근 30일 완료 판매 variantId를 수집한다.
+     * variantId NULL 행(삭제된 variant)은 IS NOT NULL 조건으로 자동 제외된다.
+     * 완료 판매 상태(statuses): paid/preparing/shipping/delivered (호출자가 주입).
+     *
+     * @param threshold 기준 시각 (이 시각 이후 생성된 주문만 집계)
+     * @param statuses  판매 인정 상태 집합 (paid/preparing/shipping/delivered)
+     * @return 조건에 맞는 DISTINCT variantId 목록 (NULL 제외)
+     */
+    @Query("""
+            SELECT DISTINCT oi.variantId
+            FROM OrderItem oi JOIN oi.order o
+            WHERE o.createdAt >= :threshold
+              AND o.status IN :statuses
+              AND oi.variantId IS NOT NULL
+            """)
+    List<Long> distinctSoldVariantIdsSince(
+            @Param("threshold") Instant threshold,
+            @Param("statuses") Collection<String> statuses
     );
 }

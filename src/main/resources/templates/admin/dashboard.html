@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<!--
+    관리자 통계 대시보드.
+    view name: admin/dashboard
+    레이아웃: layout/base :: layout(title, content)
+    모델 키: dashboard (AdminDashboardView)
+      - dashboard.periodLabel (String): 기준 기간 표기 ("최근 30일")
+      - dashboard.memberActivity (Metric): 유저 이용률
+      - dashboard.productSales   (Metric): 상품 판매율
+      - dashboard.refundRate     (Metric): 환불율
+      - Metric 필드: ratioPercent (BigDecimal, nullable), numerator (long), denominator (long)
+
+    보존 계약:
+      - ratioPercent null → "데이터 없음" 표시 (th:if/th:else 분기)
+      - 읽기 전용 화면 — 폼 없음, CSRF 불요
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>통계 대시보드</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <div class="dashboard-header">
+            <h1 class="page-title">통계 대시보드</h1>
+            <span class="dashboard-period-badge" th:text="${dashboard.periodLabel}">최근 30일</span>
+        </div>
+
+        <!-- 지표 카드 그리드 -->
+        <div class="stat-cards-grid">
+
+            <!-- ① 유저 이용률 -->
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">유저 이용률</span>
+                </div>
+                <div class="stat-card-body">
+                    <!-- 비율 -->
+                    <div class="stat-ratio">
+                        <span class="stat-ratio-value"
+                              th:if="${dashboard.memberActivity.ratioPercent != null}"
+                              th:text="${dashboard.memberActivity.ratioPercent} + '%'">0%</span>
+                        <span class="stat-ratio-na"
+                              th:unless="${dashboard.memberActivity.ratioPercent != null}">데이터 없음</span>
+                    </div>
+                    <!-- 원시 수치 -->
+                    <div class="stat-raw">
+                        <span th:text="${dashboard.memberActivity.numerator}">0</span>
+                        <span class="stat-raw-sep"> / </span>
+                        <span th:text="${dashboard.memberActivity.denominator}">0</span>
+                        <span class="stat-raw-unit">(접속 / 전체 활성 회원)</span>
+                    </div>
+                </div>
+                <!-- 정의·한계 주석 -->
+                <div class="stat-card-notice">
+                    최근 30일 접속 회원 / 전체 활성 회원.
+                    집계 시작(배포) 이후 접속분만 반영되어 점진적으로 정확해집니다.
+                </div>
+            </div>
+
+            <!-- ② 상품 판매율 -->
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">상품 판매율</span>
+                </div>
+                <div class="stat-card-body">
+                    <!-- 비율 -->
+                    <div class="stat-ratio">
+                        <span class="stat-ratio-value"
+                              th:if="${dashboard.productSales.ratioPercent != null}"
+                              th:text="${dashboard.productSales.ratioPercent} + '%'">0%</span>
+                        <span class="stat-ratio-na"
+                              th:unless="${dashboard.productSales.ratioPercent != null}">데이터 없음</span>
+                    </div>
+                    <!-- 원시 수치 -->
+                    <div class="stat-raw">
+                        <span th:text="${dashboard.productSales.numerator}">0</span>
+                        <span class="stat-raw-sep"> / </span>
+                        <span th:text="${dashboard.productSales.denominator}">0</span>
+                        <span class="stat-raw-unit">(판매된 게시 상품 / 전체 게시 상품)</span>
+                    </div>
+                </div>
+                <!-- 정의·한계 주석 -->
+                <div class="stat-card-notice">
+                    최근 30일 완료 판매 기준, 게시 상품(판매중·품절)만.
+                    삭제된 옵션의 과거 판매분은 제외.
+                </div>
+            </div>
+
+            <!-- ③ 환불율 -->
+            <div class="stat-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-title">환불율</span>
+                </div>
+                <div class="stat-card-body">
+                    <!-- 비율 -->
+                    <div class="stat-ratio">
+                        <span class="stat-ratio-value"
+                              th:if="${dashboard.refundRate.ratioPercent != null}"
+                              th:text="${dashboard.refundRate.ratioPercent} + '%'">0%</span>
+                        <span class="stat-ratio-na"
+                              th:unless="${dashboard.refundRate.ratioPercent != null}">데이터 없음</span>
+                    </div>
+                    <!-- 원시 수치 -->
+                    <div class="stat-raw">
+                        <span th:text="${dashboard.refundRate.numerator}">0</span>
+                        <span class="stat-raw-sep"> / </span>
+                        <span th:text="${dashboard.refundRate.denominator}">0</span>
+                        <span class="stat-raw-unit">(환불 주문 / 전체 주문)</span>
+                    </div>
+                </div>
+                <!-- 정의·한계 주석 -->
+                <div class="stat-card-notice">
+                    최근 30일 주문 건수 기준(전체 주문 분모).
+                    전체환불만 반영(부분환불 미집계).
+                </div>
+            </div>
+
+        </div><!-- /.stat-cards-grid -->
+    </div><!-- /.admin-members-container -->
+</main>
+</body>
+</html>

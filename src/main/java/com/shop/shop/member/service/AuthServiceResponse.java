@@ -34,7 +34,7 @@ public class AuthServiceResponse {
 
     /**
      * 로그인 처리.
-     * 자격증명 검증 → access/refresh 발급 → Redis에 refresh hash 저장 → TokenResponse 반환.
+     * 자격증명 검증 → access/refresh 발급 → Redis에 refresh hash 저장 → 로그인 시각 기록 → TokenResponse 반환.
      *
      * @param request 로그인 요청(email, password)
      * @return TokenResponse (access, refresh, "Bearer", expiresIn)
@@ -47,6 +47,9 @@ public class AuthServiceResponse {
         String refreshToken = jwtTokenProvider.createRefresh(user.getId());
 
         refreshTokenStore.storeRefresh(user.getId(), refreshToken, jwtProperties.refreshTtl());
+
+        // REST 로그인 성공 → last_login_at 기록 (formLogin은 LoginActivityRecorder 이벤트 리스너가 담당)
+        memberService.recordLoginByEmail(user.getEmail());
 
         long expiresIn = jwtProperties.accessTtl().toSeconds();
         return TokenResponse.of(accessToken, refreshToken, expiresIn);

@@ -4,6 +4,8 @@ import com.shop.shop.common.exception.BusinessException;
 import com.shop.shop.member.dto.MemberSummaryResponse;
 import org.springframework.data.domain.Page;
 
+import java.time.Instant;
+
 /**
  * 관리자 회원 관리 View 전용 facade (published port).
  *
@@ -43,4 +45,23 @@ public interface AdminMemberFacade {
      * @throws BusinessException 권한 변경 불변식 위반 (ADMIN 승격, 자기 강등, 마지막 ADMIN 강등 금지 등)
      */
     void changeRole(String adminEmail, long targetMemberId, String role);
+
+    /**
+     * 전체 활성 회원 수 조회.
+     * 관리자 통계 대시보드 — 유저 이용률 분모에 사용.
+     *
+     * @return status=ACTIVE인 회원 수
+     */
+    long countActiveMembers();
+
+    /**
+     * 최근 접속 활성 회원 수 조회.
+     * 관리자 통계 대시보드 — 유저 이용률 분자에 사용.
+     *
+     * <p>lastLoginAt이 null인 회원(한 번도 로그인하지 않은 계정)은 제외된다.
+     *
+     * @param threshold 기준 시각 (이 시각 이후에 로그인한 ACTIVE 회원만 집계)
+     * @return status=ACTIVE이고 lastLoginAt >= threshold인 회원 수
+     */
+    long countActiveMembersLoggedInSince(Instant threshold);
 }

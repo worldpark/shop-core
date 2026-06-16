@@ -60,4 +60,13 @@ public class CategoryServiceResponse {
                 categoryService.updateCategory(id, req.name(), req.slug(), req.parentId(), req.sortOrder())
         );
     }
+
+    /**
+     * 카테고리 삭제 — REST 전용.
+     *
+     * @param id 삭제할 카테고리 ID
+     */
+    public void delete(long id) {
+        categoryService.deleteCategory(id);
+    }
 }

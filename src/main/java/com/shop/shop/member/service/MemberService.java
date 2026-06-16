@@ -101,6 +101,24 @@ public class MemberService {
     }
 
     /**
+     * 로그인 성공 시각을 기록한다 (단일 진입점).
+     *
+     * <p>REST 로그인(AuthServiceResponse)과 formLogin(LoginActivityRecorder 이벤트 리스너)
+     * 두 경로에서 호출된다. authenticate가 readOnly 트랜잭션이라 별도 쓰기 메서드로 분리.
+     *
+     * <p>Clock 빈 의존 금지(plan §0 BLOCKER): payment 모듈의 Clock 빈은 ConditionalOnProperty로
+     * 조건부라 테스트 컨텍스트에 존재하지 않는다. Instant.now() 직접 사용(User.withdraw 선례).
+     *
+     * <p>미존재 또는 탈퇴 회원: 조용히 무시한다(로그인 성공 후 호출이므로 정상 케이스엔 항상 존재).
+     *
+     * @param email 로그인한 회원의 이메일
+     */
+    @Transactional
+    public void recordLoginByEmail(String email) {
+        memberRepository.findActiveByEmail(email).ifPresent(user -> user.recordLogin(Instant.now()));
+    }
+
+    /**
      * 일반 사용자 회원가입.
      *
      * <p>처리 순서:

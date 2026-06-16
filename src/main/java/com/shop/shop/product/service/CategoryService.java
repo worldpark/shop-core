@@ -104,6 +104,22 @@ public class CategoryService {
     }
 
     /**
+     * 카테고리 삭제.
+     *
+     * <p>존재 검증 후 {@link CategoryRepository#delete(Object)}로 1회 삭제한다.
+     * FK ON DELETE SET NULL(products.category_id, categories.parent_id)로 상품 미분류·자식 root 승격은
+     * DB에 위임한다. cascade/orphanRemoval 처리 불필요.
+     *
+     * @param categoryId 삭제할 카테고리 ID
+     * @throws CategoryNotFoundException 카테고리 미존재
+     */
+    public void deleteCategory(long categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new CategoryNotFoundException(categoryId));
+        categoryRepository.delete(category);
+    }
+
+    /**
      * parentId로 Category 조회 (null이면 null 반환 — root 카테고리).
      *
      * @param parentId 부모 카테고리 ID (null 허용)

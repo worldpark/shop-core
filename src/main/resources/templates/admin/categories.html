@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<!--
+    관리자 카테고리 관리 화면.
+    view name: admin/categories
+    레이아웃: layout/base :: layout(title, content)
+
+    모델 키:
+      - categories (List<CategoryResponse>): 카테고리 전체 목록 (flat)
+      - categoryNames (Map<Long,String>): categoryId → name (부모명 표기용)
+      - categoryForm (CategoryForm): 등록 폼 Backing Object
+
+    보존 계약:
+      - 등록 폼: method="post" th:action="@{/admin/categories}" th:object="${categoryForm}"
+      - 삭제 폼: method="post" th:action 자동 _csrf 주입 (th:action 사용), _csrf 수동 금지
+      - 식별자는 c.categoryId (c.id 또는 c.getId() 아님 — CategoryResponse record 계약)
+      - flash.flashSuccess / flash.flashError: layout/base 경유 자동 표시
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>카테고리 관리</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">카테고리 관리</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- 카테고리 목록 테이블 -->
+        <div class="table-wrapper">
+            <table class="members-table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>카테고리명</th>
+                    <th>슬러그</th>
+                    <th>정렬순서</th>
+                    <th>부모</th>
+                    <th>삭제</th>
+                </tr>
+                </thead>
+                <tbody>
+                <!-- 목록 없음 안내 -->
+                <tr th:if="${categories.isEmpty()}">
+                    <td colspan="6" class="empty-msg">등록된 카테고리가 없습니다.</td>
+                </tr>
+                <!-- 카테고리 행 반복 -->
+                <tr th:each="c : ${categories}">
+                    <td th:text="${c.categoryId}"></td>
+                    <td th:text="${c.name}"></td>
+                    <td th:text="${c.slug}"></td>
+                    <td th:text="${c.sortOrder}"></td>
+                    <td th:text="${c.parentId == null} ? '최상위' : ${categoryNames.get(c.parentId)}"></td>
+                    <td>
+                        <!--
+                            삭제 폼 (POST — th:action 사용 시 _csrf 자동 주입).
+                            confirm 메시지: 미분류 전환 및 자식 root 승격 안내.
+                        -->
+                        <form method="post"
+                              th:action="@{/admin/categories/{categoryId}/delete(categoryId=${c.categoryId})}"
+                              onsubmit="return confirm('이 카테고리를 삭제하면 해당 상품은 미분류로 전환되고, 하위 카테고리는 최상위로 올라갑니다. 계속할까요?')">
+                            <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 카테고리 등록 폼 -->
+        <div class="form-section" style="margin-top: 32px;">
+            <h2 class="section-title" style="font-size: 1.1rem; margin-bottom: 16px; color: #333;">카테고리 등록</h2>
+            <form method="post"
+                  th:action="@{/admin/categories}"
+                  th:object="${categoryForm}"
+                  class="category-form"
+                  style="display: flex; flex-direction: column; gap: 12px; max-width: 480px;">
+
+                <!-- 카테고리명 -->
+                <div class="form-group">
+                    <label for="name">카테고리명 <span style="color: #d00;">*</span></label>
+                    <input type="text"
+                           id="name"
+                           th:field="*{name}"
+                           placeholder="예: 전자제품"
+                           class="form-control">
+                    <span th:if="${#fields.hasErrors('name')}"
+                          th:errors="*{name}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 슬러그 -->
+                <div class="form-group">
+                    <label for="slug">슬러그 <span style="color: #d00;">*</span></label>
+                    <input type="text"
+                           id="slug"
+                           th:field="*{slug}"
+                           placeholder="예: electronics"
+                           class="form-control">
+                    <span th:if="${#fields.hasErrors('slug')}"
+                          th:errors="*{slug}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 정렬 순서 -->
+                <div class="form-group">
+                    <label for="sortOrder">정렬 순서</label>
+                    <input type="number"
+                           id="sortOrder"
+                           th:field="*{sortOrder}"
+                           min="0"
+                           value="0"
+                           class="form-control"
+                           style="width: 120px;">
+                    <span th:if="${#fields.hasErrors('sortOrder')}"
+                          th:errors="*{sortOrder}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 부모 카테고리 선택 -->
+                <div class="form-group">
+                    <label for="parentId">부모 카테고리</label>
+                    <select id="parentId"
+                            th:field="*{parentId}"
+                            class="form-control"
+                            style="max-width: 280px;">
+                        <option value="">최상위(없음)</option>
+                        <option th:each="cat : ${categories}"
+                                th:value="${cat.categoryId}"
+                                th:text="${cat.name}"></option>
+                    </select>
+                    <span th:if="${#fields.hasErrors('parentId')}"
+                          th:errors="*{parentId}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

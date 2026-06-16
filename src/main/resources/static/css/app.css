@@ -1377,6 +1377,100 @@ input[type="email"]:focus {
     border-radius: 3px;
 }
 
+/* ── 관리자 통계 대시보드 ── */
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.dashboard-header .page-title {
+    margin-bottom: 0;
+}
+
+.dashboard-period-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #e9f0f8;
+    color: #337ab7;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.stat-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+
+.stat-card-header {
+    background: #f8f8f8;
+    padding: 12px 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.stat-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #333;
+}
+
+.stat-card-body {
+    padding: 20px;
+}
+
+.stat-ratio {
+    margin-bottom: 10px;
+}
+
+.stat-ratio-value {
+    font-size: 32px;
+    font-weight: 800;
+    color: #337ab7;
+    line-height: 1.2;
+}
+
+.stat-ratio-na {
+    font-size: 18px;
+    font-weight: 600;
+    color: #aaa;
+}
+
+.stat-raw {
+    font-size: 14px;
+    color: #555;
+}
+
+.stat-raw-sep {
+    color: #bbb;
+}
+
+.stat-raw-unit {
+    display: block;
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+}
+
+.stat-card-notice {
+    padding: 10px 20px 14px;
+    font-size: 12px;
+    color: #888;
+    line-height: 1.6;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
+}
+
 .badge-on-sale {
     display: inline-block;
     background: #5cb85c;

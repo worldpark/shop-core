@@ -4,6 +4,7 @@ import com.shop.shop.common.exception.RoleChangeNotAllowedException;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.MemberSummaryResponse;
+import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.spi.AdminMemberFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,11 +46,14 @@ class AdminMemberFacadeImplTest {
     @Mock
     private MemberService memberService;
 
+    @Mock
+    private MemberRepository memberRepository;
+
     private AdminMemberFacade facade;
 
     @BeforeEach
     void setUp() {
-        facade = new AdminMemberFacadeImpl(memberService);
+        facade = new AdminMemberFacadeImpl(memberService, memberRepository);
     }
 
     // ============================================================

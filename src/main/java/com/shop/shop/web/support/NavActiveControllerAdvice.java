@@ -41,6 +41,12 @@ public class NavActiveControllerAdvice {
         if (uri.startsWith("/admin/members")) {
             return "admin-members";
         }
+        if (uri.startsWith("/admin/categories")) {
+            return "admin-categories";
+        }
+        if (uri.startsWith("/admin/dashboard")) {
+            return "admin-dashboard";
+        }
         if (uri.startsWith("/seller/products/new")) {
             // 등록 폼만 상품 등록 메뉴 활성 — 더 구체적인 경로를 먼저 검사(prefix 순서 의존 주의)
             return "seller-product-new";

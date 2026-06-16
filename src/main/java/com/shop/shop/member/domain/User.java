@@ -77,6 +77,14 @@ public class User extends BaseEntity {
     private Instant deletedAt;
 
     /**
+     * 마지막 로그인 시각 — 로그인 성공 시 갱신. 한 번도 로그인하지 않은 계정은 null.
+     * V9 마이그레이션으로 추가. nullable.
+     * timestamptz ↔ Instant 직접 매핑 (KST 표시는 프레젠테이션 레이어 책임).
+     */
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    /**
      * 정적 팩토리 — 신규 회원 생성.
      * status=ACTIVE 기본 세팅. deletedAt=null (가입 시 활성 상태).
      */
@@ -141,6 +149,19 @@ public class User extends BaseEntity {
     public void withdraw() {
         this.status = MemberStatus.WITHDRAWN;
         this.deletedAt = Instant.now();
+    }
+
+    /**
+     * 로그인 성공 시각 기록.
+     *
+     * <p>REST·formLogin 두 경로에서 로그인 성공 후 호출된다.
+     * Setter 금지 규칙에 따라 의미 있는 이름의 의도 메서드로 상태를 변경한다.
+     * JPA dirty checking으로 트랜잭션 커밋 시 UPDATE가 실행된다.
+     *
+     * @param now 로그인 시각 (호출자가 Instant.now()로 전달 — Clock 빈 의존 금지)
+     */
+    public void recordLogin(Instant now) {
+        this.lastLoginAt = now;
     }
 
     /**
