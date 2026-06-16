@@ -3,9 +3,11 @@
 > 대상 Task: `docs/tasks/performance/001-performance-shop-core-k6-order-create-smoke-baseline.md` (Task 001)
 >           `docs/tasks/performance/002-performance-shop-core-k6-order-create-load-profile.md` (Task 002)
 >           `docs/tasks/performance/003-performance-shop-core-k6-order-create-stress-profile.md` (Task 003)
+>           `docs/tasks/performance/004-performance-shop-core-k6-payment-confirm-scenario.md` (Task 004)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
 >       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
+>       `docs/plans/performance/004-shop-core-k6-payment-confirm-scenario-plan.md`
 
 ## 디렉토리 구조
 
@@ -17,6 +19,7 @@ shop-core/perf/k6/
     seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 (refreshToken 포함)
   scenarios/
     order-create.js  # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
+    payment-confirm.js # 종단: cart→order→결제 확정(빈 바디) + payment_confirm_duration (Task 004)
   profiles/
     smoke.js         # 5 VU × 30s options export (closed 모델)
     load.js          # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
@@ -25,6 +28,7 @@ shop-core/perf/k6/
     order-create-smoke.json   # smoke 베이스라인 (Task 001, 2026-06-16)
     order-create-load.json    # load 베이스라인 (Task 002, 2026-06-16)
     order-create-stress.json  # stress 베이스라인 (Task 003, 2026-06-16)
+    payment-confirm-load.json # payment-confirm load 베이스라인 (Task 004, 2026-06-16)
   README.md          # 이 문서
 ```
 
@@ -365,8 +369,127 @@ Kafka가 중단된 상태에서 실행하면:
 
 ---
 
-## 11. 비범위 (후속 Task 예정)
+## 11. payment-confirm 시나리오 (Task 004)
 
-- `scenarios/payment-confirm.js`, `scenarios/coupon-apply.js` — Task 004, 005
+> Plan: `docs/plans/performance/004-shop-core-k6-payment-confirm-scenario-plan.md`
+>
+> 결제 확정 핫패스(`POST /api/v1/orders/{orderId}/payment`) — cart add → order create → 결제 확정.
+> Outbox 발행(OrderCompletedEvent → order-completed 토픽) 포함.
+
+### ★ 운영 안전 게이트 (실행 전 필수)
+
+> **notification이 smtp 모드인 채로 실행하면 실 Gmail 주문확정 메일이 대량 발송된다.**
+> 반드시 아래 조건을 확인한 후 실행할 것.
+
+| 항목 | 조건 | 확인 방법 |
+|---|---|---|
+| **notification 안전** | log 모드이거나 프로세스 정지 | notification 로그 확인 또는 `MAIL_MODE=log` 환경 확인 |
+| **Kafka up** | Outbox → order-completed 발행 필수 | `docker compose ps` → kafka healthy |
+| **깨끗한 DB** | 베이스라인 측정 전 TRUNCATE 권장 | 메인이 perf DB TRUNCATE 후 실행 |
+
+Kafka가 중단된 상태에서 실행하면 결제 확정 후 Outbox 이벤트 발행이 실패하거나 타임아웃이 발생해 `payment_5xx`가 증가한다. 이 경우 성능 수치가 "정상 운영" 기준이 아니므로 베이스라인으로 사용하지 않는다.
+
+### 시나리오 설계 (방식 (a) — 종단 측정)
+
+각 VU 반복 = `cart add → order create → 결제 확정`으로 구성한다. 매 반복 신선한 PENDING 주문을 만들어 결제하므로 풀 소진 관리가 없다(자기 replenish).
+
+**한계 정직 표기**: 이 시나리오는 order-create 단계(단일 variant `PESSIMISTIC_WRITE`)를 거치므로 **"종단(order→pay) throughput"** 측정이다. 순수 결제 고립이 아니며 상한은 order-create(~90~100/s)와 동일하다. 결제 단계 자체 지연은 `payment_confirm_duration Trend`로 분리 계측한다. 순수 결제 고립(풀 시드 방식 (b))은 후속 옵션.
+
+### REST 계약 (plan §2 확정)
+
+| 단계 | 메서드·경로 | 요청 바디 | 응답 | status |
+|---|---|---|---|---|
+| 장바구니 담기 | `POST /api/v1/cart/items` | `{variantId, quantity:1}` | — | 200 |
+| 주문 생성 | `POST /api/v1/orders` | 수령인·주소 | `{orderId, ...}` | 201 |
+| **결제 확정** | `POST /api/v1/orders/{orderId}/payment` | `{}` (빈 바디) | `{status:"paid", paymentId, ...}` | **200** |
+
+**amount는 전송하지 않는다.** finalAmount와 불일치 시 400이 발생하므로, 서버 기본값(method="mock", amount=null → 주문 finalAmount 사용)을 사용한다. orderId는 order create 응답(201)에서 추출한다.
+
+### smoke 실행
+
+```bash
+# Windows (k6 전체 경로) — 운영 안전 게이트 확인 후 실행
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/payment-confirm-smoke.json `
+  shop-core/perf/k6/scenarios/payment-confirm.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=smoke \
+  -e SUMMARY_EXPORT_PATH=build/k6/payment-confirm-smoke.json \
+  shop-core/perf/k6/scenarios/payment-confirm.js
+```
+
+### load 실행 (베이스라인 측정)
+
+```bash
+# Windows
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=load `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/payment-confirm-load.json `
+  shop-core/perf/k6/scenarios/payment-confirm.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=load \
+  -e SUMMARY_EXPORT_PATH=build/k6/payment-confirm-load.json \
+  shop-core/perf/k6/scenarios/payment-confirm.js
+```
+
+> **참고**: `--summary-export` 대신 `-e SUMMARY_EXPORT_PATH`를 사용한다. `handleSummary` 구현으로 setup_data(JWT 토큰)가 제거된 메트릭 전용 JSON을 내보낸다.
+
+### stress 실행 (한계 탐색)
+
+```bash
+# Windows
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=stress `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/payment-confirm-stress.json `
+  shop-core/perf/k6/scenarios/payment-confirm.js
+```
+
+### PAYMENT_THRESHOLDS 확정 (2026-06-16 완료)
+
+`PAYMENT_THRESHOLDS.payment_confirm_duration`은 **실측 확정**됐다(운영 안전 게이트: notification 정지 + Kafka up + 깨끗한 DB, load 60rps×1m 2회).
+- 관측(2회 일관): payment_confirm_duration p95=18ms, p99=23~24ms, payment_5xx=0, http_req_failed=0%, ~56 결제/s.
+- 확정 임계: `p(95)<50`(18×~2.7), `p(99)<80`(24×~3.3). 산출물 `baselines/payment-confirm-load.json`(토큰 제외, p99 포함).
+- 결제 POST가 빠른 이유: Outbox 이벤트 외부화는 **커밋 후 비동기**라 POST 응답에 포함 안 됨(행 락+payment INSERT만). 서로 다른 주문을 결제하므로 결제 행 락은 경합 없음.
+- 재측정 절차: 안전 게이트 확인 → 깨끗한 DB → `-e PROFILE=load -e SUMMARY_EXPORT_PATH=...payment-confirm-load.json` → 관측×~2.5~3로 갱신.
+- 포화점 측정 금지(002 교훈): 종단 경로 상한이 order-create와 같은 ~90~100/s이므로 load=60rps(포화점 아래)에서 측정.
+
+### 커스텀 메트릭
+
+| 메트릭 | 종류 | 설명 |
+|---|---|---|
+| `payment_confirm_duration` | Trend | 결제 POST 자체 지연 (ms) — 결제 단계만 분리 계측 |
+| `payment_confirmed` | Counter | 200 & status=="paid" 성공 카운트 |
+| `payment_conflict` | Counter | 409 (상태 충돌) — 가시화용, threshold 없음 |
+| `payment_5xx` | Counter | >=500 — threshold: count==0 |
+
+### PAYMENT_THRESHOLDS
+
+| metric | 값 | 상태 |
+|---|---|---|
+| `http_req_failed` | `rate<0.01` | 확정 |
+| `payment_5xx` | `count==0` | 확정 |
+| `payment_confirm_duration p95` | `p(95)<50` | 확정 — 베이스라인 p95≈18ms × ~2.7 |
+| `payment_confirm_duration p99` | `p(99)<80` | 확정 — 베이스라인 p99≈24ms × ~3.3 |
+| `payment_conflict` | 임계 없음 | 가시화만 (정상 비즈니스 흐름) |
+
+---
+
+## 12. 비범위 (후속 Task 예정)
+
+- `scenarios/coupon-apply.js` — Task 005
 - Grafana/InfluxDB 시계열 파이프라인, 분산 부하(k6 Cloud) — 보류(YAGNI)
 - teardown() self-clean — 후속 Task
+- 순수 결제 고립(풀 시드 방식 (b)) — 후속 옵션 (plan §8)

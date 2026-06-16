@@ -128,6 +128,36 @@ export const STRESS_THRESHOLDS = {
 };
 
 // ---------------------------------------------------------------
+// payment thresholds — payment-confirm.js 전용
+//
+// 베이스라인: 2026-06-16 (깨끗한 DB, notification 정지, load 60rps×1m, payment-confirm.js).
+//   확정 출처 = baselines/payment-confirm-load.json. 관측: payment_confirm_duration p95=18ms,
+//   p99=24ms, payment_5xx=0, http_req_failed=0%, payment_confirmed ~56/s.
+//   결제 POST는 빠르다(Outbox 이벤트 외부화는 커밋 후 비동기라 POST 응답에 포함 안 됨 — 행 락+payment INSERT만).
+//   서로 다른 주문을 결제하므로 결제 행 락은 경합 없음 → 안정적. 임계 = 관측×~2.7/3.3(smoke/load 선례 일관).
+//
+//   주의: 본 시나리오(방식 a)는 cart→order→pay 종단이라 order-create의 단일 variant 락이 함께 걸린다.
+//   payment_confirm_duration은 결제 단계만 분리 계측한 값이다(종단 http_req_duration과 구분).
+// ---------------------------------------------------------------
+export const PAYMENT_THRESHOLDS = {
+  // HTTP 에러율 1% 미만 (4xx/5xx 포함)
+  http_req_failed: ['rate<0.01'],
+
+  // payment 5xx — 락/Outbox 발행 붕괴 징후. 반드시 0이어야 함.
+  payment_5xx: ['count==0'],
+
+  // payment_confirm_duration — 결제 POST 자체 지연(결제 단계 분리 계측).
+  // 베이스라인 p95=18ms·p99=24ms × 여유율.
+  payment_confirm_duration: [
+    'p(95)<50', // 베이스라인 p95≈18ms × ~2.7 여유 → 50ms
+    'p(99)<80', // 베이스라인 p99≈24ms × ~3.3 여유 → 80ms
+  ],
+
+  // payment_conflict(409)은 임계로 죽이지 않음.
+  // 상태 충돌(취소 등)은 정상 비즈니스 흐름이므로 Counter로 가시화만.
+};
+
+// ---------------------------------------------------------------
 // 하위 호환: 기존 THRESHOLDS 심볼 유지 (smoke.js 가 참조)
 // smoke.js 는 THRESHOLDS → SMOKE_THRESHOLDS 로 마이그레이션 권장
 // ---------------------------------------------------------------
