@@ -3,6 +3,7 @@ package com.shop.shop.common.web;
 import com.shop.shop.common.storage.StorageProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -18,9 +19,13 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *
  * <p>{@link StorageProperties} 빈이 존재할 때만 활성화된다. {@code @WebMvcTest} 슬라이스처럼
  * {@code @EnableConfigurationProperties}가 로드되지 않는 환경에서 컨텍스트 로드 실패를 방지한다.
+ *
+ * <p>type=r2일 때는 비활성화된다. R2 프로파일에서 {@code public-prefix=""}이면 {@code /**} ResourceHandler가
+ * 등록되어 전체 라우팅을 가로채는 문제를 방지한다. R2에서는 공개 URL이 R2 도메인에서 직접 서빙된다.
  */
 @Configuration
 @ConditionalOnBean(StorageProperties.class)
+@ConditionalOnProperty(prefix = "shop.storage", name = "type", havingValue = "local", matchIfMissing = true)
 @RequiredArgsConstructor
 public class StaticResourceConfig implements WebMvcConfigurer {
 

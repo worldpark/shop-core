@@ -127,6 +127,9 @@ shop:
       ttl: ${SHOP_REDIS_LOCK_TTL:PT10S}  # 10초 — 고정 lease 용도용 stub (리더 게이트 미사용)
 
   storage:
+    # 저장소 구현 토글: local(기본, 로컬 파일 시스템) | r2(Cloudflare R2 S3 호환)
+    # 운영 전환: SHOP_STORAGE_TYPE=r2 환경변수로 전환
+    type: ${SHOP_STORAGE_TYPE:local}
     root: ${SHOP_STORAGE_ROOT:./uploads}
     asset-base-url: ${SHOP_STORAGE_ASSET_BASE_URL:http://localhost:8080}
     public-prefix: ${SHOP_STORAGE_PUBLIC_PREFIX:/assets}
@@ -137,6 +140,14 @@ shop:
       - gif
       - webp
     max-images-per-product: ${SHOP_STORAGE_MAX_IMAGES_PER_PRODUCT:10}
+    # R2 연결 설정 (type=r2 전용)
+    # access-key/secret-key는 반드시 환경변수로만 주입 — 코드·yml에 평문 금지
+    r2:
+      endpoint: ${SHOP_STORAGE_R2_ENDPOINT:}
+      bucket: ${SHOP_STORAGE_R2_BUCKET:}
+      region: ${SHOP_STORAGE_R2_REGION:auto}
+      access-key: ${SHOP_STORAGE_R2_ACCESS_KEY:}
+      secret-key: ${SHOP_STORAGE_R2_SECRET_KEY:}
   threads:
     virtual:
       enabled: false

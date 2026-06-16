@@ -49,6 +49,29 @@ class AssetUrlResolverTest {
         assertThat(url1).isNotEqualTo(url2);
     }
 
+    @Test
+    @DisplayName("toUrl — R2 모드: publicPrefix=빈문자열이면 이중슬래시 없이 R2 공개 URL 합성")
+    void toUrl_r2Mode_emptyPublicPrefix_noDoubleSlash() {
+        StorageProperties props = propsOf("https://pub-x.r2.dev", "");
+        AssetUrlResolver resolver = new AssetUrlResolver(props);
+
+        String url = resolver.toUrl("products/10/u.jpg");
+
+        assertThat(url).isEqualTo("https://pub-x.r2.dev/products/10/u.jpg");
+        assertThat(url).doesNotContain("//products");
+    }
+
+    @Test
+    @DisplayName("toUrl — R2 모드: assetBaseUrl 끝 슬래시 + publicPrefix 빈 문자열 → 이중슬래시 없음")
+    void toUrl_r2Mode_trailingSlashInBase_emptyPrefix_noDoubleSlash() {
+        StorageProperties props = propsOf("https://pub-x.r2.dev/", "");
+        AssetUrlResolver resolver = new AssetUrlResolver(props);
+
+        String url = resolver.toUrl("products/10/u.jpg");
+
+        assertThat(url).isEqualTo("https://pub-x.r2.dev/products/10/u.jpg");
+    }
+
     private StorageProperties propsOf(String assetBaseUrl, String publicPrefix) {
         StorageProperties props = new StorageProperties();
         props.setRoot("/tmp/uploads");
