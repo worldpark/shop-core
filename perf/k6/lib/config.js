@@ -6,12 +6,14 @@
  *
  * 환경변수:
  *   BASE_URL                — 가압 대상 앱 루트 (기본: http://localhost:8080)
- *   PROFILE                 — 부하 프로파일 선택 smoke|load|stress (기본: smoke)
+ *   PROFILE                 — 부하 프로파일 선택 smoke|load|stress|conc (기본: smoke)
  *   ADMIN_EMAIL             — admin 계정 이메일 (기본: admin@example.com)
  *   ADMIN_PASSWORD          — admin 계정 비밀번호 (기본: Admin1234!)
  *   RUN_TAG                 — 런별 유니크 prefix (미지정 시 uuidv4 자동 생성)
  *   TOKEN_REFRESH_AFTER_SEC — 토큰 갱신 발화 임계(초). 기본 1500(25분). stress 런 중 갱신
  *                             기능 검증 시 5 등 짧게 지정. (auth.js getValidToken 참조)
+ *   CONC_VUS                — conc 프로파일 VU 수 (기본: 300). A/B 측정 시 100/300/500 스윕.
+ *   CONC_DURATION           — conc 프로파일 지속 시간 (기본: 40s).
  */
 
 // ---------------------------------------------------------------
@@ -46,6 +48,14 @@ export const SEED = {
   BUYER_EMAIL_DOMAIN: '@perf.local',
   /** 공통 테스트 비밀번호 (8자 이상, @Size(min=8) + @PasswordMatches 충족) */
   DEFAULT_PASSWORD: 'Perf1234!',
+
+  // ---- 카탈로그 읽기 시드 상수 (catalog-read.js 전용) ---------------
+  /** catalog-read 시드에서 등록할 공개 상품 수 (읽기 부하 다양성 확보). */
+  CATALOG_PRODUCT_COUNT: 50,
+  /** 카탈로그 상품명 prefix (setupCatalogSeed 전용 — setupSeed와 네임스페이스 분리). */
+  CATALOG_PRODUCT_NAME_PREFIX: 'PERF-Catalog',
+  /** 카탈로그 SKU prefix */
+  CATALOG_SKU_PREFIX: 'PERF-CSKU',
 
   // ---- 쿠폰 시드 상수 (coupon-apply.js 전용) ----------------------
   /** 쿠폰 코드 prefix. 런별 유니크 prefix와 조합해 충돌 방지. */
@@ -203,6 +213,28 @@ export const COUPON_THRESHOLDS = {
 };
 
 // ---------------------------------------------------------------
+// read thresholds — catalog-read.js (가상스레드 A/B 측정, Task 006)
+//
+// 목적: 플랫폼 스레드(200)를 초과하는 동시성(conc 프로파일 300VU)에서
+//   읽기 경로(GET /api/v1/products, GET /api/v1/products/{id})를 가압해
+//   VT vs 플랫폼 스레드 A/B 비교 곡선을 측정한다.
+// — "pass/fail SLA" 가 아니라 "진단용 곡선 측정" 이 목적이므로
+//   http_req_duration 임계는 없다. 비교는 JSON 아티팩트의 p95/p99 수치로 한다.
+// — 단, 에러율(5xx)과 read_5xx는 임계로 잡는다.
+//   공개 읽기는 락 없음 — 5xx가 나면 서버 오류로 즉시 조사.
+// ---------------------------------------------------------------
+export const READ_THRESHOLDS = {
+  // HTTP 에러율 1% 미만 (4xx/5xx 포함). 공개 GET은 401/403 없으므로 실질=5xx+타임아웃.
+  http_req_failed: ['rate<0.01'],
+
+  // 읽기 5xx — 서버 오류 징후. 반드시 0이어야 함.
+  read_5xx: ['count==0'],
+
+  // http_req_duration 임계 없음 — VT vs 플랫폼 스레드 곡선 측정이 목적.
+  // p95/p99는 JSON 아티팩트(SUMMARY_EXPORT_PATH)로 추출해 비교표에 기록한다.
+};
+
+// ---------------------------------------------------------------
 // 하위 호환: 기존 THRESHOLDS 심볼 유지 (smoke.js 가 참조)
 // smoke.js 는 THRESHOLDS → SMOKE_THRESHOLDS 로 마이그레이션 권장
 // ---------------------------------------------------------------
@@ -267,5 +299,25 @@ export const PROFILES = {
     preAllocatedVUs: 50,
     maxVUs: 200,
     thresholds: STRESS_THRESHOLDS,
+  },
+
+  conc: {
+    // closed 모델 — VU 수만큼 동시 요청을 항상 유지.
+    // open 모델(arrival-rate)은 빠른 읽기에서 200 동시를 만들려면 비현실적 높은 rate가 필요.
+    // closed 모델은 duration 내내 vus 개의 요청이 중단 없이 순환해 "진짜 동시성"을 만든다.
+    //
+    // 목표: 플랫폼 스레드(기본 200)를 넘겨 큐잉시키면 VT 이득이 가시화됨.
+    //   - CONC_VUS=100 : 플랫폼 스레드(200) 미포화 — 베이스라인
+    //   - CONC_VUS=300 : 플랫폼 스레드(200) 포화 → 큐잉 발생 — 핵심 측정점 (기본값)
+    //   - CONC_VUS=500 : 큐잉 심화 — 포화 곡선 측정
+    // CONC_VUS 환경변수로 런타임 조절 가능 (A/B 매트릭스 §3 측정 시 메인이 조정).
+    //
+    // duration: CONC_DURATION 환경변수로 오버라이드 가능 (기본 40s).
+    //   40s = 워밍업(~5s) + 안정 측정(~30s) + 쿨다운 여유.
+    //   읽기 경로는 Outbox/Kafka 없으므로 짧아도 충분한 샘플 확보 가능.
+    kind: 'closed',
+    vus: __ENV.CONC_VUS ? Number(__ENV.CONC_VUS) : 300,
+    duration: __ENV.CONC_DURATION || '40s',
+    thresholds: READ_THRESHOLDS,
   },
 };

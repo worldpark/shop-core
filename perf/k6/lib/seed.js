@@ -27,6 +27,7 @@ import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
+  BASE_URL,
   SEED,
 } from './config.js';
 import { login, loginFull, signup, authHeaders, jsonHeaders } from './auth.js';
@@ -229,6 +230,119 @@ export function setupSeed(buyerCount) {
   }
 
   return { variantId, buyers };
+}
+
+// ---------------------------------------------------------------
+// 공개 API — setupCatalogSeed() (catalog-read.js 전용)
+// ---------------------------------------------------------------
+
+/**
+ * catalog-read 시나리오 전용 시드 흐름.
+ *
+ * 읽기 부하 시나리오는 buyer/장바구니/주문이 불필요하므로 setupSeed()를 사용하지 않는다.
+ * 독립적으로 seller 생성 → 상품 N개 등록 → ON_SALE 게시 → variant 생성.
+ * 인증 헤더 없는 공개 GET 가압용이므로 buyer 계정은 생성하지 않는다.
+ *
+ * ★ 기존 setupSeed / setupCouponSeed 무영향 — 완전 독립 함수.
+ *
+ * @param {number} [productCount] 등록할 상품 수 (기본: SEED.CATALOG_PRODUCT_COUNT=50)
+ * @returns {{
+ *   productIds: number[],         — setup이 시드한 상품 ID 목록 (랜덤 상세 접근용)
+ *   sellerToken: string,          — 시드용 seller 토큰 (teardown 후속 Task용)
+ * }}
+ * @throws {Error} 어느 단계든 실패 시 즉시 throw → 런 중단
+ */
+export function setupCatalogSeed(productCount) {
+  const count  = productCount !== undefined ? productCount : SEED.CATALOG_PRODUCT_COUNT;
+  const prefix = __ENV.RUN_TAG || uuidv4();
+  const baseUrl = BASE_URL;
+
+  // 1. admin 로그인
+  const adminToken = login(ADMIN_EMAIL, ADMIN_PASSWORD);
+
+  // 2. seller 계정 signup
+  const sellerEmail    = `catalog-seller+${prefix}${SEED.SELLER_EMAIL_DOMAIN}`;
+  const sellerMemberId = signup(sellerEmail, SEED.DEFAULT_PASSWORD, `CatalogSeller-${prefix}`);
+
+  // 3. admin이 seller 승격
+  promoteToSeller(adminToken, sellerMemberId);
+
+  // 4. seller 재로그인 (SELLER 권한 토큰)
+  const sellerToken = login(sellerEmail, SEED.DEFAULT_PASSWORD);
+
+  // 5~7. 상품 N개 등록 → ON_SALE 게시 → variant 생성
+  const productIds = [];
+  for (let i = 0; i < count; i++) {
+    const productPrefix = `${prefix}-${i}`;
+
+    // 상품 등록 (DRAFT) — CATALOG_PRODUCT_NAME_PREFIX로 setupSeed 상품과 네임스페이스 분리
+    const registerRes = http.post(
+      `${baseUrl}/api/v1/seller/products`,
+      JSON.stringify({
+        categoryId: null,
+        name: `${SEED.CATALOG_PRODUCT_NAME_PREFIX}-${productPrefix}`,
+        description: `k6 catalog-read perf product [${productPrefix}]`,
+        basePrice: SEED.BASE_PRICE,
+      }),
+      authHeaders(sellerToken),
+    );
+
+    if (registerRes.status !== 200) {
+      throw new Error(
+        `[seed.setupCatalogSeed] 상품[${i}] 등록 실패 — status=${registerRes.status} body=${registerRes.body}`,
+      );
+    }
+
+    const registerBody = JSON.parse(registerRes.body);
+    if (!registerBody.productId) {
+      throw new Error(
+        `[seed.setupCatalogSeed] 상품[${i}] productId 미존재 — body=${registerRes.body}`,
+      );
+    }
+    const productId = registerBody.productId;
+
+    // 상품 게시 (ON_SALE) — 공개 목록에 노출되기 위해 필수
+    const publishRes = http.patch(
+      `${baseUrl}/api/v1/seller/products/${productId}`,
+      JSON.stringify({
+        categoryId: null,
+        name: `${SEED.CATALOG_PRODUCT_NAME_PREFIX}-${productPrefix}`,
+        description: `k6 catalog-read perf product [${productPrefix}]`,
+        basePrice: SEED.BASE_PRICE,
+        status: 'ON_SALE',
+      }),
+      authHeaders(sellerToken),
+    );
+
+    if (publishRes.status !== 200) {
+      throw new Error(
+        `[seed.setupCatalogSeed] 상품[${i}] 게시 실패 — productId=${productId} status=${publishRes.status} body=${publishRes.body}`,
+      );
+    }
+
+    // variant 생성 (active:true — 공개 상세에 표시되기 위해)
+    const variantRes = http.post(
+      `${baseUrl}/api/v1/seller/products/${productId}/variants`,
+      JSON.stringify({
+        sku: `${SEED.CATALOG_SKU_PREFIX}-${productPrefix}`,
+        price: SEED.VARIANT_PRICE,
+        stock: SEED.VARIANT_STOCK,
+        active: true,
+        optionValueIds: [],
+      }),
+      authHeaders(sellerToken),
+    );
+
+    if (variantRes.status !== 200) {
+      throw new Error(
+        `[seed.setupCatalogSeed] 상품[${i}] variant 생성 실패 — productId=${productId} status=${variantRes.status} body=${variantRes.body}`,
+      );
+    }
+
+    productIds.push(productId);
+  }
+
+  return { productIds, sellerToken };
 }
 
 // ---------------------------------------------------------------

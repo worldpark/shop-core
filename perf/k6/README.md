@@ -5,24 +5,27 @@
 >           `docs/tasks/performance/003-performance-shop-core-k6-order-create-stress-profile.md` (Task 003)
 >           `docs/tasks/performance/004-performance-shop-core-k6-payment-confirm-scenario.md` (Task 004)
 >           `docs/tasks/performance/005-performance-shop-core-k6-coupon-apply-scenario.md` (Task 005)
+>           `docs/tasks/performance/006-performance-shop-core-virtual-thread-ab-evaluation.md` (Task 006)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
 >       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
 >       `docs/plans/performance/004-shop-core-k6-payment-confirm-scenario-plan.md`
 >       `docs/plans/performance/005-shop-core-k6-coupon-apply-scenario-plan.md`
+>       `docs/plans/performance/006-shop-core-virtual-thread-ab-evaluation-plan.md`
 
 ## 디렉토리 구조
 
 ```
 shop-core/perf/k6/
   lib/
-    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress/coupon 분리)·시드 상수 (공통)
+    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress/coupon/read 분리)·시드 상수 (공통)
     auth.js          # 로그인·회원가입·Bearer 헤더 헬퍼·토큰 갱신(getValidToken)
-    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 + setupCouponSeed (coupon-apply용)
+    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 + setupCouponSeed + setupCatalogSeed
   scenarios/
     order-create.js   # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
     payment-confirm.js # 종단: cart→order→결제 확정(빈 바디) + payment_confirm_duration (Task 004)
     coupon-apply.js   # 쿠폰 사용 동시성: cart→쿠폰적용 주문 + 충돌(409) 직렬화 검증 (Task 005)
+    catalog-read.js   # 공개 읽기 가압 (VT A/B 측정 — Task 006): GET /products + GET /products/{id}
   profiles/
     smoke.js         # 5 VU × 30s options export (closed 모델)
     load.js          # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
@@ -629,7 +632,145 @@ mkdir -p build/k6
 
 ---
 
-## 13. 비범위 (후속 Task 예정)
+## 13. catalog-read 시나리오 — 가상스레드 A/B 측정 (Task 006)
+
+> Plan: `docs/plans/performance/006-shop-core-virtual-thread-ab-evaluation-plan.md`
+>
+> 공개 상품 목록/상세 GET 고동시성 가압 — VT vs 플랫폼 스레드 A/B 비교.
+> 락 없는 DB 읽기 경로로 "VT에 공정한 기회"를 주는 주 측정 경로(plan §2.3·§2.4·§3).
+
+### 읽기 경로가 VT 측정에 적합한 이유
+
+- 공개 GET은 락·트랜잭션 경합 없음 → throughput 상한이 HikariCP 풀이 아닌 **스레드·OS 스케줄러** 에 의해 결정.
+- 플랫폼 스레드(기본 200)를 초과하는 동시 요청(300/500 VU)을 투입하면 스레드 풀 큐잉이 발생 → VT는 1:1 요청-스레드로 큐잉 없이 처리 가능 → 이 차이가 VT 이득의 측정 대상.
+- 주문 쓰기(order-create)는 DB 커넥션 풀(≈80~90)이 스레드 수(200)보다 먼저 캡 → 풀이 병목이라 VT 전환 효과가 작을 수 있음. 읽기는 그 캡이 없어 더 넓은 동시성 구간 측정 가능.
+
+### ★ 운영 안전 (읽기 전용)
+
+- 이 시나리오는 **읽기 전용**이므로 주문/Outbox/Kafka 이벤트가 전혀 발생하지 않는다.
+- notification 서비스와 **완전 무관** — 메일 대량 발송 위험 없음(안전).
+- setup()에서 seller signup 1회가 발생하나 횟수가 적어 실용 무해. 그래도 일관성을 위해 notification log 모드 권장.
+
+### REST 계약 (SecurityConfig 확인)
+
+| 엔드포인트 | 인증 | 비고 |
+|---|---|---|
+| `GET /api/v1/products?page=0&size=20&sort=latest` | **permitAll** | 목록 (PageResponse) |
+| `GET /api/v1/products/{productId}` | **permitAll** | 상세 (PublicProductDetailResponse) |
+
+응답 구조:
+- 목록: `{ content: [{productId, name, displayPrice, ...}], page, size, totalElements, totalPages }`
+- 상세: `{ productId, name, description, displayPrice, soldOut, category, images, options, variants }`
+
+### conc 프로파일 (A/B 측정 주 프로파일)
+
+- **모델**: closed (VU 수만큼 항상 동시 요청 유지 — "진짜 동시성").
+- **VU**: `CONC_VUS` 환경변수로 조절 (기본 300). A/B 스윕: 100 / 300 / 500.
+- **duration**: `CONC_DURATION` 환경변수로 조절 (기본 40s).
+- **thresholds**: `READ_THRESHOLDS` (read_5xx count==0 + http_req_failed rate<0.01).
+  http_req_duration 임계 없음 — 곡선 측정이 목적.
+
+### 환경변수
+
+| 변수명 | 기본값 | 설명 |
+|---|---|---|
+| `BASE_URL` | `http://localhost:8080` | 가압 대상 앱 루트 |
+| `PROFILE` | `conc` | `conc` \| `smoke` \| `load` \| `stress` |
+| `CONC_VUS` | `300` | conc 프로파일 VU 수. A/B 스윕: 100/300/500 |
+| `CONC_DURATION` | `40s` | conc 프로파일 지속 시간 |
+| `ADMIN_EMAIL` | `admin@example.com` | admin 계정 이메일 |
+| `ADMIN_PASSWORD` | `Admin1234!` | admin 계정 비밀번호 |
+| `RUN_TAG` | uuidv4 자동 | 런별 유니크 prefix |
+| `SUMMARY_EXPORT_PATH` | (없음) | 메트릭 전용 JSON 출력 경로 (sellerToken 제외) |
+
+### A/B 측정 — 3단 풀 × (플랫폼/VT) 매트릭스 (plan §3)
+
+각 셀마다 앱을 재기동 후 k6 실행. notification은 측정 내내 정지/log 모드.
+
+| 풀 크기 | 앱 기동 플래그 | CONC_VUS | 커맨드 |
+|---|---|---|---|
+| 10 (현행 기본) | — | 300 | 아래 참조 |
+| 10 (현행 기본) | `-Dshop.threads.virtual.enabled=true` | 300 | 아래 참조 |
+| 50 | `SHOP_CORE_HIKARI_MAX_POOL=50` | 300 | 아래 참조 |
+| 50 | `SHOP_CORE_HIKARI_MAX_POOL=50 -Dshop.threads.virtual.enabled=true` | 300 | 아래 참조 |
+| 250 | `SHOP_CORE_HIKARI_MAX_POOL=250` + PG max_conn=300 | 300 | 아래 참조 |
+| 250 | 위 + `-Dshop.threads.virtual.enabled=true` | 300 | 아래 참조 |
+
+### smoke 실행 (동작 확인)
+
+```bash
+# Windows (k6 전체 경로)
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-smoke.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=smoke \
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-smoke.json \
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+### conc 실행 (A/B 측정 — VU 스윕)
+
+```bash
+# --- CONC_VUS=100 (플랫폼 스레드 미포화 — 베이스라인) ---
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=conc `
+  -e CONC_VUS=100 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-conc100.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+
+# --- CONC_VUS=300 (플랫폼 스레드 포화 → 큐잉 — 핵심 측정점) ---
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=conc `
+  -e CONC_VUS=300 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-conc300.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+
+# --- CONC_VUS=500 (큐잉 심화 — 포화 곡선) ---
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=conc `
+  -e CONC_VUS=500 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-conc500.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+> **참고**: `--summary-export` 대신 `-e SUMMARY_EXPORT_PATH`를 사용한다. `handleSummary` 구현으로 setup_data(sellerToken)가 제거된 메트릭 전용 JSON을 내보낸다.
+
+### READ_THRESHOLDS (진단용)
+
+| metric | 값 | 비고 |
+|---|---|---|
+| `http_req_failed` | `rate<0.01` | 공개 GET은 401/403 없음. 실질=5xx+타임아웃 |
+| `read_5xx` | `count==0` | 읽기 5xx=서버 오류. 반드시 0이어야 함 |
+| `http_req_duration` | 임계 없음 | VT vs 플랫폼 스레드 곡선 측정이 목적 |
+| `read_duration` | 임계 없음 | JSON 아티팩트로 p95/p99 추출해 비교표 기록 |
+
+### 커스텀 메트릭
+
+| 메트릭 | 종류 | 설명 |
+|---|---|---|
+| `read_duration` | Trend | GET 요청 지연 (목록·상세 통합, ms). A/B 비교 주 지표 |
+| `read_5xx` | Counter | >=500. threshold: count==0 |
+
+### 시드 설계 (setupCatalogSeed)
+
+- seller 1개 생성 → 상품 50개(CATALOG_PRODUCT_COUNT) ON_SALE 게시 + variant 생성.
+- buyer 생성 없음 (읽기는 인증 불필요).
+- 기존 `setupSeed` / `setupCouponSeed` 완전 독립 — 무영향.
+- 상품명 prefix `PERF-Catalog`로 `setupSeed` 상품(PERF-Product)과 네임스페이스 분리.
+
+---
+
+## 14. 비범위 (후속 Task 예정)
 
 - 한도형(B) 경계 경합 단독 시나리오 — coupon-apply 후속 옵션
 - 지속 성공-경로 throughput (쿠폰 풀 대량 시드) — 소비성 한계로 후속 옵션
