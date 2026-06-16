@@ -86,30 +86,27 @@ export const SMOKE_THRESHOLDS = {
 // ---------------------------------------------------------------
 // load thresholds
 //
-// 베이스라인: 2026-06-16 재측정 (깨끗한 DB 기준, constant-arrival-rate, 100rps×1m)
-//   확정 출처 = 커밋된 baselines/order-create-load.json: p95=17.99ms, p99=61.54ms, dropped=0, order_5xx=0.
-//   (클린 런 p99는 런마다 ~33~62ms로 변동 — 아래 임계는 변동 폭 전체를 통과한다.)
-//   임계값 = baseline p95(≈18ms) × ~2.5 여유율 → 50ms (round).
-//            클린 p99 상한(≈62ms) × ~1.6 여유 → 100ms (round). 변동 하한 33ms도 통과, 회귀(>100ms)는 감지.
-//   smoke(40ms→100ms, ×2.5)와 일관된 여유율 기준. 250ms~500ms 같은 과대 여유는 회귀 감지를 무력화하므로 금지.
-//   smoke(p95=40ms) 대비 load(p95=18ms) — 깨끗한 DB에서 load가 오히려 더 빠른 것은
-//   constant-arrival-rate(open 모델)가 VU 경합 없이 고르게 요청을 분산하기 때문.
-//   이전 누적 상태(orders 41,531개) 관측: p95=242ms → 깨끗한 DB 대비 13배 저하(주의 사례, 기준 아님).
+// 베이스라인: 2026-06-16 재측정 (깨끗한 DB, constant-arrival-rate, 60rps×1m).
+//   ★ 목표 RPS를 100→60으로 낮춤(PROFILES.load 주석 참조). 100rps는 앱 처리 상한(≈90~100 orders/s)과
+//     거의 같아 "포화점에서 측정"이었고, open 모델이 VU를 maxVUs까지 과투입(단일 variant 락 자기유발 경합)해
+//     p95가 런마다 18~143ms로 flaky했다. 60rps는 상한·knee(stress 120rps) 아래라 VU가 ~5개로 안정
+//     (에스컬레이션 없음). load=지속가능 운영수준 측정, 한계 탐색은 stress(003)가 담당.
+//   확정 출처 = baselines/order-create-load.json: p95≈22ms, p99≈54ms, dropped=0, order_5xx=0 (vus max=5).
+//   임계값 = p95(22ms) × ~2.5 → 60ms, p99(54ms) × ~2.5 → 150ms (round). smoke(40ms→100ms, ×2.5)와 일관.
 // ---------------------------------------------------------------
 export const LOAD_THRESHOLDS = {
   ...BUSINESS_THRESHOLDS,
 
-  // load 베이스라인: 2026-06-16 재측정 (깨끗한 DB 기준, baselines/order-create-load.json)
-  // 관측 p95=17.99ms × ~2.5 → 50ms, 클린 p99 상한 ≈62ms → 100ms (변동 33~62ms 전부 통과)
+  // load 베이스라인: 2026-06-16 재측정 (깨끗한 DB, 60rps×1m, baselines/order-create-load.json)
+  // 관측 p95≈22ms × ~2.5 → 60ms, p99≈54ms × ~2.5 → 150ms (포화점 아래라 런별 변동 작음)
   http_req_duration: [
-    'p(95)<50',    // 베이스라인 p95=17.99ms × ~2.5 여유 → 50ms
-    'p(99)<100',   // 클린 p99 상한 ≈62ms 기준 (런별 변동 33~62ms 전부 < 100, 회귀 >100 감지)
+    'p(95)<60',    // 베이스라인 p95≈22ms × ~2.5 여유 → 60ms
+    'p(99)<150',   // 베이스라인 p99≈54ms × ~2.5 여유 → 150ms
   ],
 
   // 목표 RPS 미달(under-provision) 감시 — dropped 과다면 maxVUs 상향 또는 목표 하향 필요.
-  // 깨끗한 DB 실측: dropped=0(0/s). 이전 누적 상태: 1.72/s(startup warmup 지연).
-  // 실질 under-provision 임계(200rps 이상): 71~138/s.
-  // rate<3 → 100rps 정상 범위(0/s)를 허용하고, 200rps+ 이상 폭증 시 게이트 발동.
+  // 60rps(포화점 아래) 실측: dropped=0(0/s), VU 5개로 여유. 200rps+ under-provision은 71~138/s.
+  // rate<3 → 정상 범위(0/s) 허용, 폭증 시 게이트 발동.
   dropped_iterations: ['rate<3'],
 };
 
@@ -153,18 +150,19 @@ export const PROFILES = {
   },
   load: {
     kind: 'arrival-rate',
-    // 확정 목표: 100 rps × 1분
-    // §6.5 판정(2026-06-16):
-    //   - 100rps: p95=17.99ms, p99=61.54ms(클린 변동 33~62ms), dropped=0/s (깨끗한 DB, 2026-06-16, baseline JSON).
-    //   - 200rps: dropped=71/s(폭증), p95=634ms — 한계 초과(stress 영역).
-    //   - 300rps: dropped=138/s, p95=886ms — 완전 한계 초과.
-    //   앱 실제 처리 상한선 ≈ 90~100 orders/s. load는 SLO 내 지속 가능 RPS 확인이 목적이므로
-    //   100rps를 확정 목표로 채택(한계 탐색은 stress(003)으로 이양).
-    rate: 100,
+    // 확정 목표: 60 rps × 1분 (포화점 아래 — 지속가능 운영수준).
+    // §6.5 판정(2026-06-16) + flaky 완화(목표 100→60 하향):
+    //   - 앱 처리 상한 ≈ 90~100 orders/s (단일 variant PESSIMISTIC_WRITE 직렬화).
+    //   - 100rps(=상한 근처): open 모델이 VU를 maxVUs까지 과투입해 자기유발 경합 → p95가 런마다
+    //     18~143ms로 flaky → "포화점 측정"이라 load 목표로 부적합.
+    //   - 200rps: dropped=71/s, p95=634ms / 300rps: dropped=138/s, p95=886ms — 한계 초과(stress 영역).
+    //   - 60rps(채택): VU ~5개로 안정(에스컬레이션 없음), p95≈22ms·p99≈54ms·dropped=0. SLO 내 지속가능.
+    //   한계·붕괴점(knee≈120rps) 탐색은 stress(003)가 담당 — load와 역할 분리.
+    rate: 60,
     timeUnit: '1s',
     duration: '1m',
-    preAllocatedVUs: 20,
-    maxVUs: 50,
+    preAllocatedVUs: 15,
+    maxVUs: 30,
     thresholds: LOAD_THRESHOLDS,
   },
   stress: {

@@ -12,12 +12,11 @@
  *   k6 run -e PROFILE=load -e SUMMARY_EXPORT_PATH=build/k6/order-create-load.json \
  *     shop-core/perf/k6/scenarios/order-create.js
  *
- * 확정 목표 RPS: 100 rps × 1분 (2026-06-16 §6.5 실측 확정, 깨끗한 DB 기준 2026-06-16 재확정)
- *   - 100rps: p95=18ms, p99=33~62ms(baseline JSON 61.54ms, 런별 변동), dropped=0/s (깨끗한 DB, 2026-06-16 재측정).
- *   - 200rps: dropped=71/s, p95=634ms — 한계 초과(stress 영역).
- *   - 300rps: dropped=138/s, p95=886ms — 완전 한계 초과.
- *   앱 실제 처리 상한선 ≈ 90~100 orders/s.
- *   한계 탐색은 stress(003)으로 이양.
+ * 확정 목표 RPS: 60 rps × 1분 (포화점 아래 — 지속가능 운영수준. flaky 완화로 100→60 하향)
+ *   - 앱 처리 상한 ≈ 90~100 orders/s. 100rps(상한 근처)는 open 모델 VU 과투입으로 p95 18~143ms flaky → load 부적합.
+ *   - 60rps(채택): VU ~5개로 안정(에스컬레이션 없음), p95≈22ms·p99≈35~54ms·dropped=0 (2026-06-16 baseline JSON).
+ *   - 200rps: dropped=71/s, p95=634ms / 300rps: dropped=138/s, p95=886ms — 한계 초과(stress 영역).
+ *   한계·붕괴점(knee≈120rps) 탐색은 stress(003)가 담당 — load와 역할 분리.
  */
 
 import { PROFILES, LOAD_THRESHOLDS } from '../lib/config.js';

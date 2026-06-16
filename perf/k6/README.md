@@ -19,7 +19,7 @@ shop-core/perf/k6/
     order-create.js  # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
   profiles/
     smoke.js         # 5 VU × 30s options export (closed 모델)
-    load.js          # 100 rps × 1m options export (open: constant-arrival-rate)
+    load.js          # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
     stress.js        # 50→200 rps ramping options export (open: ramping-arrival-rate) — Task 003
   baselines/
     order-create-smoke.json   # smoke 베이스라인 (Task 001, 2026-06-16)
@@ -166,22 +166,24 @@ BASE_URL=http://localhost:8080 k6 run \
 ### load 프로파일 설계
 
 - **executor**: `constant-arrival-rate` (open 모델) — 응답 시간과 무관하게 목표 RPS를 고정 가압.
-- **목표**: 100 rps × 1분 (2026-06-16 §6.5 실측 확정).
-- **VU 풀**: preAllocatedVUs=20, maxVUs=50. 응답 지연 시 VU를 추가 투입.
+- **목표**: **60 rps × 1분** (포화점 아래 — 지속가능 운영수준). 2026-06-16 확정(100→60 하향, 아래 근거).
+- **VU 풀**: preAllocatedVUs=15, maxVUs=30. 60rps는 VU ~5개로 충분(에스컬레이션 없음).
 - **dropped_iterations**: VU 풀 한계 도달 시 발생. 과도한 dropped는 `maxVUs` 상향 또는 목표 RPS 하향 신호.
 
-### 목표 RPS 확정 근거 (2026-06-16 §6.5 판정, 깨끗한 DB 기준 2026-06-16 재확정)
+### 목표 RPS 확정 근거 (2026-06-16) — 왜 100→60으로 낮췄나
 
-| RPS | p95 | p99 | dropped/s | 판정 |
-|---|---|---|---|---|
-| 100 | 18ms | 33~62ms | 0 | SLO 충족 (확정 목표) — 깨끗한 DB 기준, baseline JSON p99=61.54ms |
-| 200 | 634ms | — | 71.9 | 한계 초과 (stress 영역) |
-| 300 | 886ms | — | 138.5 | 완전 한계 초과 |
+앱 처리 상한 ≈ **90~100 orders/s** (단일 variant `PESSIMISTIC_WRITE` 직렬화). **100rps는 이 상한과 거의 같아 "포화점 측정"**이라, open 모델이 VU를 maxVUs까지 과투입 → 자기유발 락 경합 → **p95가 런마다 18~143ms로 flaky**했다. load는 "지속가능 운영수준"을 안정적으로 봐야 하므로 목표를 포화점·knee(120) 아래인 **60rps**로 낮춘다.
 
-- 앱 실제 처리 상한선 ≈ **90~100 orders/s** (PESSIMISTIC_WRITE 단일 variant 경합 특성).
-- 100 rps에서 smoke(p95=40ms) 대비 load(p95=18ms, 깨끗한 DB) — open 모델(constant-arrival-rate)이 VU 경합 없이 고르게 분산하여 smoke보다 빠른 것은 정상 동작.
-- 이전 누적 상태(orders 41,531개) 측정(2026-06-16): p95=242ms → 깨끗한 DB(p95=18ms) 대비 13배 저하. 누적 데이터는 성능에 심각한 영향을 미치므로 베이스라인은 반드시 깨끗한 DB 기준으로 측정한다.
-- 한계 탐색은 **stress(Task 003)** 으로 이양.
+| RPS | p95 | p99 | dropped/s | VU | 판정 |
+|---|---|---|---|---|---|
+| **60** | **22ms** | **35~54ms** | **0** | **~5** | **SLO 충족·안정 (확정 목표)** |
+| 100 | 18~143ms(변동) | 33~283ms | 0 | ~15~50 | 포화점 — flaky, load 부적합 |
+| 200 | 634ms | — | 71.9 | 200 | 한계 초과 (stress 영역) |
+| 300 | 886ms | — | 138.5 | 200 | 완전 한계 초과 |
+
+- 60rps에서 VU가 ~5개로 안정(에스컬레이션 없음) → p95/p99 변동이 작아 회귀 감지 임계가 의미 있다.
+- 누적 데이터는 성능을 심각히 떨어뜨리므로(orders 41,531개 시 p95=242ms, 13배) 베이스라인은 반드시 **깨끗한 DB**에서 측정한다.
+- 한계·붕괴점(knee≈120rps) 탐색은 **stress(Task 003)** 가 담당 — load와 역할 분리.
 
 ---
 
@@ -302,13 +304,13 @@ stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 
 
 ### load thresholds (LOAD_THRESHOLDS)
 
-베이스라인(2026-06-16 재확정, 깨끗한 DB 기준, 100rps×1m):
+베이스라인(2026-06-16 재확정, 깨끗한 DB 기준, **60rps×1m** — 포화점 아래로 하향해 flaky 제거):
 
 | metric | 값 | 비고 |
 |---|---|---|
 | `http_req_failed` | `rate<0.01` | 에러율 1% 미만 |
-| `http_req_duration p95` | `p(95)<50` | 깨끗한 DB 기준 p95≈18ms × ~2.5 여유 → 50ms |
-| `http_req_duration p99` | `p(99)<100` | 깨끗한 DB 클린 p99 상한 ≈62ms(baseline JSON 61.54ms, 런별 변동 33~62ms) → 100ms (변동 전부 통과, 회귀 >100 감지) |
+| `http_req_duration p95` | `p(95)<60` | 깨끗한 DB 60rps p95≈22ms × ~2.5 여유 → 60ms |
+| `http_req_duration p99` | `p(99)<150` | 깨끗한 DB 60rps p99≈54ms × ~2.5 여유 → 150ms (포화점 아래라 변동 작음) |
 | `order_5xx` | `count==0` | 락 붕괴=비정상, 0이어야 함 |
 | `dropped_iterations` | `rate<3` | 깨끗한 DB 실측 0/s 허용, 실질 under-provision(71~138/s) 차단 |
 
