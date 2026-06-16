@@ -2,31 +2,35 @@
 
 > 대상 Task: `docs/tasks/performance/001-performance-shop-core-k6-order-create-smoke-baseline.md` (Task 001)
 >           `docs/tasks/performance/002-performance-shop-core-k6-order-create-load-profile.md` (Task 002)
+>           `docs/tasks/performance/003-performance-shop-core-k6-order-create-stress-profile.md` (Task 003)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
+>       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
 
 ## 디렉토리 구조
 
 ```
 shop-core/perf/k6/
   lib/
-    config.js        # BASE_URL·PROFILE·thresholds(smoke/load 분리)·시드 상수 (공통)
-    auth.js          # 로그인·회원가입·Bearer 헤더 헬퍼
-    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드
+    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress 분리)·시드 상수 (공통)
+    auth.js          # 로그인·회원가입·Bearer 헤더 헬퍼·토큰 갱신(getValidToken)
+    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 (refreshToken 포함)
   scenarios/
-    order-create.js  # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load 분기)
+    order-create.js  # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
   profiles/
     smoke.js         # 5 VU × 30s options export (closed 모델)
     load.js          # 100 rps × 1m options export (open: constant-arrival-rate)
+    stress.js        # 50→200 rps ramping options export (open: ramping-arrival-rate) — Task 003
   baselines/
-    order-create-smoke.json  # smoke 베이스라인 (Task 001, 2026-06-16)
-    order-create-load.json   # load 베이스라인 (Task 002, 2026-06-16)
+    order-create-smoke.json   # smoke 베이스라인 (Task 001, 2026-06-16)
+    order-create-load.json    # load 베이스라인 (Task 002, 2026-06-16)
+    order-create-stress.json  # stress 베이스라인 (Task 003, 2026-06-16)
   README.md          # 이 문서
 ```
 
 산출 JSON:
 - **런타임 export**: `build/k6/order-create-{smoke,load}.json` (`--summary-export`로 생성). `build/`는 gitignore 대상 — 일회성·비커밋.
-- **커밋된 베이스라인(추세 비교 기준)**: `shop-core/perf/k6/baselines/order-create-{smoke,load}.json`. 새 기준을 세울 때만 의도적으로 갱신·커밋한다.
+- **커밋된 베이스라인(추세 비교 기준)**: `shop-core/perf/k6/baselines/order-create-{smoke,load,stress}.json`. 새 기준을 세울 때만 의도적으로 갱신·커밋한다.
 
 ---
 
@@ -181,15 +185,105 @@ BASE_URL=http://localhost:8080 k6 run \
 
 ---
 
+## 5-2. stress 실행 (Task 003 추가)
+
+```bash
+# Windows (k6 전체 경로)
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=stress `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/order-create-stress.json `
+  shop-core/perf/k6/scenarios/order-create.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=stress \
+  -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/order-create-stress.json \
+  shop-core/perf/k6/scenarios/order-create.js
+```
+
+### stress 프로파일 설계
+
+- **executor**: `ramping-arrival-rate` (open 모델) — 단계별 목표 RPS를 자동 점증.
+- **단계**: 50rps 시작 → 100→120→140→160→180→200rps (각 45s) → 0 쿨다운 (총 약 4분 30초).
+- **VU 풀**: preAllocatedVUs=50, maxVUs=200. 응답 지연이 쌓여도 VU를 최대 200까지 투입.
+- **선행 탐색(002) 근거**: 100rps(p95=18ms, dropped=0) 정상 / 200rps(p95=634ms, dropped=71/s) 붕괴. knee는 100~200rps 사이로 추정.
+
+### 붕괴점(knee) 해석
+
+**aggregate summary는 모든 단계 합산**이므로 단계별 분리가 안 된다. 단계별 p95/dropped는 두 가지 방법으로 읽는다.
+
+1. **k6 stdout 주기 출력** (10초 간격): 실행 중 터미널에 출력되는 진행률 라인(iters/s·VU 수)을 시간대별로 관찰한다. VU 수가 갑자기 폭증하고 `Insufficient VUs` 경고가 나타나는 시점이 포화 시작이다.
+2. **Grafana 시계열** (관측성 도입 시): hikaricp·http_server_requests p95 등 서버측 지표와 함께 볼 수 있다.
+
+knee 판정 기준:
+- `dropped_iterations`가 눈에 띄게 증가하기 시작하는 단계의 직전 RPS = SLO 마지막 유지 RPS.
+- stdout VU 수가 3~5개에서 갑자기 수십~200개로 폭증하는 시점 = VU 풀 포화 = 처리 한계 도달.
+
+**2026-06-16 Task 003 실측 (깨끗한 DB, baselines/order-create-stress.json)**:
+
+| 단계 | 시간대 | iters/s | 활성 VU | 관찰 |
+|---|---|---|---|---|
+| 50→100rps (워밍업) | 0~30s | ~50→100 | 1~4 | 정상, SLO 충족 |
+| 100→120rps | 30s~1m30s | ~100→115 | 3~13 | 안정 처리 |
+| ~130rps 초과 | ~1m30s | ~115 | 13→197→200 | **VU 풀 포화** + `Insufficient VUs` 경고 |
+| 140~200rps | 1m30s~4m30s | ~130→192 | 200 (고정) | dropped 누적 (총 8442회, 28.5/s) |
+| 쿨다운 | ~4m42s | 192→138 급감 | 200→0 | 정상 감소 |
+
+**확정 knee: 약 120rps** — 이 RPS 이하에서는 dropped 없이 3~4 VU로 처리. 130rps 초과 시 VU 풀 포화 + dropped 발생.
+
+aggregate 요약: p95=1.1s / p99=1.4s / http_req_failed=0.00% / order_5xx=0 / dropped=8442(28.5/s).
+
+> Grafana로 서버측(hikaricp 커넥션 포화·http_server_requests p95)도 함께 볼 수 있다.
+
+### stress thresholds
+
+stress는 "어디서 무너지나"를 측정하는 것이 목적이므로 p95/dropped_iterations로 런을 죽이지 않는다.
+
+| metric | 값 | 비고 |
+|---|---|---|
+| `http_req_failed` | `rate<0.01` | 과부하 타임아웃 시 위반 가능 — 곡선의 일부로 기록 |
+| `order_5xx` | `count==0` | 비관적 락은 느려질 뿐 5xx는 비정상 붕괴 |
+| `http_req_duration` | 임계 없음 | 측정 대상 — stdout/Grafana로 곡선 관찰 |
+| `dropped_iterations` | 임계 없음 | 측정 대상 — knee 식별 지표 |
+
+---
+
+## 5-3. 토큰 갱신(TOKEN_REFRESH_AFTER_SEC)
+
+stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 설정(1500초=25분)에서는 토큰 갱신이 발화하지 않는다.
+
+토큰 갱신 기능 자체를 검증하려면 임계를 줄여 강제 발화한다:
+
+```bash
+# 토큰 갱신 기능 검증 — TOKEN_REFRESH_AFTER_SEC=5로 짧게 발화
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e TOKEN_REFRESH_AFTER_SEC=5 `
+  shop-core/perf/k6/scenarios/order-create.js
+# → 5초마다 POST /api/v1/auth/refresh 호출, 401 없이 통과해야 함
+```
+
+갱신 흐름:
+1. VU 최초 이터레이션: `setup()`에서 받은 accessToken + refreshToken을 VU-로컬 캐시에 저장.
+2. 이후 이터레이션: 토큰 나이(현재 시각 - issuedAt) > `TOKEN_REFRESH_AFTER_SEC`이면 `POST /api/v1/auth/refresh {refreshToken}`으로 새 accessToken 획득·캐시 교체.
+3. smoke/load(기본 임계 1500초): 짧은 런에서는 임계에 도달하지 않아 갱신이 발화하지 않는다 — 기존 동작 동일(회귀 없음).
+
+---
+
 ## 6. 환경변수
 
 | 변수명 | 기본값 | 설명 |
 |---|---|---|
 | `BASE_URL` | `http://localhost:8080` | 가압 대상 앱 루트 |
-| `PROFILE` | `smoke` | 부하 프로파일 (`smoke` \| `load`) |
+| `PROFILE` | `smoke` | 부하 프로파일 (`smoke` \| `load` \| `stress`) |
 | `ADMIN_EMAIL` | `admin@example.com` | admin 계정 이메일 |
 | `ADMIN_PASSWORD` | `Admin1234!` | admin 계정 비밀번호 |
 | `RUN_TAG` | uuidv4 자동 생성 | 런별 유니크 prefix (데이터 네임스페이스) |
+| `TOKEN_REFRESH_AFTER_SEC` | `1500` | 토큰 갱신 발화 임계(초). 기본 25분(30분 TTL - 5분 버퍼). 갱신 기능 검증 시 `5` 등으로 지정. |
 
 ---
 
@@ -217,6 +311,17 @@ BASE_URL=http://localhost:8080 k6 run \
 | `http_req_duration p99` | `p(99)<100` | 깨끗한 DB 클린 p99 상한 ≈62ms(baseline JSON 61.54ms, 런별 변동 33~62ms) → 100ms (변동 전부 통과, 회귀 >100 감지) |
 | `order_5xx` | `count==0` | 락 붕괴=비정상, 0이어야 함 |
 | `dropped_iterations` | `rate<3` | 깨끗한 DB 실측 0/s 허용, 실질 under-provision(71~138/s) 차단 |
+
+### stress thresholds (STRESS_THRESHOLDS)
+
+베이스라인(2026-06-16, 깨끗한 DB 기준, ramping-arrival-rate 50→200rps):
+
+| metric | 값 | 비고 |
+|---|---|---|
+| `http_req_failed` | `rate<0.01` | 과부하 타임아웃 시 위반 가능 — 곡선의 일부로 기록 |
+| `order_5xx` | `count==0` | 락 붕괴=비정상, 0이어야 함 |
+| `http_req_duration p95` | 임계 없음 | 붕괴 곡선 측정이 목적 |
+| `dropped_iterations` | 임계 없음 | knee 식별 지표 |
 
 ### thresholds 갱신 절차
 
@@ -260,7 +365,6 @@ Kafka가 중단된 상태에서 실행하면:
 
 ## 11. 비범위 (후속 Task 예정)
 
-- `profiles/stress.js` — Task 003 (한계 탐색, 점증 부하)
 - `scenarios/payment-confirm.js`, `scenarios/coupon-apply.js` — Task 004, 005
 - Grafana/InfluxDB 시계열 파이프라인, 분산 부하(k6 Cloud) — 보류(YAGNI)
 - teardown() self-clean — 후속 Task

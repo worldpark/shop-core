@@ -5,11 +5,13 @@
  * 모든 시나리오·프로파일은 이 파일을 import해 중복을 제거한다.
  *
  * 환경변수:
- *   BASE_URL       — 가압 대상 앱 루트 (기본: http://localhost:8080)
- *   PROFILE        — 부하 프로파일 선택 smoke|load|stress (기본: smoke)
- *   ADMIN_EMAIL    — admin 계정 이메일 (기본: admin@example.com)
- *   ADMIN_PASSWORD — admin 계정 비밀번호 (기본: Admin1234!)
- *   RUN_TAG        — 런별 유니크 prefix (미지정 시 uuidv4 자동 생성)
+ *   BASE_URL                — 가압 대상 앱 루트 (기본: http://localhost:8080)
+ *   PROFILE                 — 부하 프로파일 선택 smoke|load|stress (기본: smoke)
+ *   ADMIN_EMAIL             — admin 계정 이메일 (기본: admin@example.com)
+ *   ADMIN_PASSWORD          — admin 계정 비밀번호 (기본: Admin1234!)
+ *   RUN_TAG                 — 런별 유니크 prefix (미지정 시 uuidv4 자동 생성)
+ *   TOKEN_REFRESH_AFTER_SEC — 토큰 갱신 발화 임계(초). 기본 1500(25분). stress 런 중 갱신
+ *                             기능 검증 시 5 등 짧게 지정. (auth.js getValidToken 참조)
  */
 
 // ---------------------------------------------------------------
@@ -112,6 +114,23 @@ export const LOAD_THRESHOLDS = {
 };
 
 // ---------------------------------------------------------------
+// stress thresholds — 진단용(느슨), 게이트 아님
+//
+// stress는 "어디서 무너지나"를 보는 것이 목적이므로
+// p95/dropped_iterations 임계로 런을 죽이지 않는다(측정 대상이므로).
+// 단, 과부하라도 비관적 락은 느려질 뿐 5xx로 무너지면 안 된다(order_5xx==0 유지).
+// http_req_failed: 과부하 타임아웃이 실패로 잡힐 수 있어 위반 가능 → 곡선의 일부로 기록.
+//
+// 베이스라인: 2026-06-16 stress 실행 (ramping-arrival-rate 50→200rps)
+//   002 탐색 근거: 100rps 정상(p95=18ms, dropped=0) / 200rps 붕괴(p95=634ms, dropped=71/s).
+//   100~200rps 구간 정밀 점증으로 knee 식별.
+// ---------------------------------------------------------------
+export const STRESS_THRESHOLDS = {
+  ...BUSINESS_THRESHOLDS,   // http_req_failed rate<0.01, order_5xx count==0
+  // http_req_duration / dropped_iterations 임계 없음 — 붕괴 곡선 측정이 목적.
+};
+
+// ---------------------------------------------------------------
 // 하위 호환: 기존 THRESHOLDS 심볼 유지 (smoke.js 가 참조)
 // smoke.js 는 THRESHOLDS → SMOKE_THRESHOLDS 로 마이그레이션 권장
 // ---------------------------------------------------------------
@@ -147,5 +166,33 @@ export const PROFILES = {
     preAllocatedVUs: 20,
     maxVUs: 50,
     thresholds: LOAD_THRESHOLDS,
+  },
+  stress: {
+    kind: 'ramping-arrival-rate',
+    // 002 탐색 결과: 100rps 정상 / 200rps 붕괴. 100~200rps 구간을 정밀 점증해 knee 식별.
+    // 단계 설계:
+    //   [0→100]  30s — 워밍업·정상 구간 (002에서 confirmed SLO 충족)
+    //   [100→120] 45s — 점증 시작
+    //   [120→140] 45s
+    //   [140→160] 45s
+    //   [160→180] 45s
+    //   [180→200] 45s — 붕괴 구간 진입 탐색
+    //   [200→0]   15s — 쿨다운
+    // 총 ~5분 (< access TTL 30분 → 토큰 갱신은 기능으로 넣되 이 런에선 미발화가 정상).
+    // 토큰 갱신 기능 검증은 -e TOKEN_REFRESH_AFTER_SEC=5로 별도 smoke 런에서 수행.
+    startRate: 50,
+    timeUnit: '1s',
+    stages: [
+      { target: 100, duration: '30s' },
+      { target: 120, duration: '45s' },
+      { target: 140, duration: '45s' },
+      { target: 160, duration: '45s' },
+      { target: 180, duration: '45s' },
+      { target: 200, duration: '45s' },
+      { target: 0,   duration: '15s' },
+    ],
+    preAllocatedVUs: 50,
+    maxVUs: 200,
+    thresholds: STRESS_THRESHOLDS,
   },
 };

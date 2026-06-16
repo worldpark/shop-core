@@ -29,7 +29,7 @@ import {
   ADMIN_PASSWORD,
   SEED,
 } from './config.js';
-import { login, signup, authHeaders, jsonHeaders } from './auth.js';
+import { login, loginFull, signup, authHeaders, jsonHeaders } from './auth.js';
 
 // ---------------------------------------------------------------
 // 내부 헬퍼 — admin 권한으로 seller 승격
@@ -207,15 +207,25 @@ export function setupSeed(buyerCount) {
   const variantId = createVariant(sellerToken, productId, prefix);
 
   // 8. buyer N개 signup + login
+  // buyer 객체: { token, accessToken, refreshToken, issuedAt, email }
+  //   - token: 하위 호환(기존 코드가 buyer.token을 직접 참조하는 경우)
+  //   - accessToken/refreshToken/issuedAt: getValidToken() 토큰 갱신용
+  //   - email: getValidToken() VU-로컬 캐시 키
   const buyers = [];
   for (let i = 0; i < buyerCount; i++) {
     const buyerEmail = `buyer+${prefix}+${i}${SEED.BUYER_EMAIL_DOMAIN}`;
     const buyerName  = `Perf-Buyer-${prefix}-${i}`;
 
     signup(buyerEmail, SEED.DEFAULT_PASSWORD, buyerName);
-    const buyerToken = login(buyerEmail, SEED.DEFAULT_PASSWORD);
+    const { accessToken, refreshToken, issuedAt } = loginFull(buyerEmail, SEED.DEFAULT_PASSWORD);
 
-    buyers.push({ token: buyerToken });
+    buyers.push({
+      token: accessToken,         // 하위 호환 (기존 buyer.token 참조)
+      accessToken,                // getValidToken() 캐시 초기값
+      refreshToken,               // getValidToken() refresh 호출용
+      issuedAt,                   // 토큰 발급 시각(ms) — 나이 계산용
+      email: buyerEmail,          // getValidToken() VU-로컬 캐시 키
+    });
   }
 
   return { variantId, buyers };
