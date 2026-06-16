@@ -7,6 +7,11 @@ spring:
     username: ${SHOP_CORE_DB_USERNAME:shop_core}
     password: ${SHOP_CORE_DB_PASSWORD:shop_core}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # [측정용 가드] 기본 10 = HikariCP 현행 기본값. 프로덕션 동작 무변경.
+      # VT A/B 측정 시 환경변수로만 상향 (예: SHOP_CORE_HIKARI_MAX_POOL=80).
+      # 상향 시 PG max_connections(기본 100) 미만으로만 설정할 것.
+      maximum-pool-size: ${SHOP_CORE_HIKARI_MAX_POOL:10}
 
   jpa:
     open-in-view: false
