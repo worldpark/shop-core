@@ -236,4 +236,28 @@ class PaymentModuleStructureTest {
 
         rule.check(shopClasses);
     }
+
+    // ============================================================
+    // 035 신규 규칙
+    // ============================================================
+
+    /**
+     * 규칙 11: payment 클래스는 Redisson API를 직접 참조하지 않는다 (035).
+     *
+     * <p>분산락 호출은 {@code common.concurrency.SchedulerLeaderGuard} 인터페이스를 통해서만 이뤄져야 한다.
+     * payment 클래스가 {@code org.redisson} 패키지를 직접 의존하면 락 메커니즘이 도메인에 흩뿌려진다(ADR-005 격리).
+     */
+    @Test
+    @DisplayName("규칙 11: payment 클래스가 Redisson API(org.redisson..)를 직접 참조하지 않음 (035 — guard 격리)")
+    void payment_does_not_depend_on_redisson_directly() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("com.shop.shop.payment..")
+                .should().dependOnClassesThat()
+                .resideInAPackage("org.redisson..")
+                .because("payment 모듈은 Redisson API를 직접 참조하지 않고 " +
+                         "common.concurrency.SchedulerLeaderGuard(OPEN 모듈)만 사용해야 한다(035 — 락 메커니즘 격리).")
+                .allowEmptyShould(true);
+
+        rule.check(shopClasses);
+    }
 }

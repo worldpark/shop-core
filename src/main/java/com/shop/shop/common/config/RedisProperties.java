@@ -73,9 +73,16 @@ public record RedisProperties(
     }
 
     /**
-     * 분산락 key prefix / TTL.
-     * 실제 락 획득/해제 구현과 Redisson 도입 여부는 분산락 Task에서 결정.
-     * 데드락 방지를 위해 짧은 TTL(PT10S) 기본값 사용.
+     * 분산락 key prefix / TTL (Task 035 — Redisson 스케줄러 리더 게이트).
+     *
+     * <p><b>prefix</b>: 락 키 조립에 사용. 키 형식 = {@code {prefix}scheduler:{name}}.
+     * 예: {@code shopcore:lock:scheduler:unpaid-order-expiry}.
+     *
+     * <p><b>ttl — 스케줄러 리더 게이트에 미사용(레거시 stub)</b>:
+     * {@code RedissonSchedulerLeaderGuard}는 {@code tryLock(0, SECONDS)} + leaseTime 미지정(2-인자 오버로드)으로
+     * Redisson watchdog 자동 갱신에 맡긴다. 고정 leaseTime(= ttl)은 작업 overrun 시 실행 중 만료 →
+     * 중복 실행 재오픈이므로 리더 게이트에서 사용하지 않는다(Task 035 기술제약 3).
+     * ttl 필드는 고정 lease가 필요한 다른 용도를 위해 존재하는 레거시 stub이다.
      */
     public record Lock(
             String prefix,
@@ -87,7 +94,7 @@ public record RedisProperties(
                 prefix = "shopcore:lock:";
             }
             if (ttl == null) {
-                ttl = Duration.ofSeconds(10);  // PT10S — 데드락 방지 짧은 TTL
+                ttl = Duration.ofSeconds(10);  // PT10S — 고정 lease 용도용 stub (리더 게이트에 미사용)
             }
         }
     }

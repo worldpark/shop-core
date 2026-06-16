@@ -1,5 +1,7 @@
 package com.shop.shop.security;
 
+import com.shop.shop.common.concurrency.RedissonSchedulerLeaderGuard;
+import com.shop.shop.common.concurrency.SchedulerLeaderGuard;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
@@ -20,6 +22,7 @@ import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.support.MockSharedRepositories;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -110,5 +113,36 @@ class RefreshTokenStoreWiringTest {
     void refreshTokenStore_bean_is_RedisRefreshTokenStore_without_fake() {
         RefreshTokenStore store = context.getBean(RefreshTokenStore.class);
         assertThat(store).isInstanceOf(RedisRefreshTokenStore.class);
+    }
+
+    // ============================================================
+    // Task 035 — Redisson 추가 후 무브로커 컨텍스트 로드 회귀 가드 (C6 보존)
+    // ============================================================
+
+    /**
+     * Redisson plain 의존 추가 후에도 브로커 없이 풀컨텍스트 로드가 통과하는지 검증 (C6).
+     *
+     * <p>plain {@code org.redisson:redisson}(starter 아님)이라 {@code RedisConnectionFactory}를
+     * 교체하지 않으므로 Lettuce 지연 연결이 보존된다 → 브로커 없이도 빈 생성 통과.
+     */
+    @Test
+    @DisplayName("[Task 035] Redisson 추가 후에도 무브로커 풀컨텍스트 로드 통과 (C6 보존)")
+    void redisson_does_not_break_no_broker_context_load() {
+        // 컨텍스트가 로드됐다면 이미 통과
+        assertThat(context).isNotNull();
+    }
+
+    @Test
+    @DisplayName("[Task 035] RedissonClient 빈이 컨텍스트에 등록된다")
+    void redissonClient_bean_registered_in_context() {
+        RedissonClient redissonClient = context.getBean(RedissonClient.class);
+        assertThat(redissonClient).isNotNull();
+    }
+
+    @Test
+    @DisplayName("[Task 035] SchedulerLeaderGuard 빈이 RedissonSchedulerLeaderGuard로 컨텍스트에 등록된다")
+    void schedulerLeaderGuard_bean_is_redisson_impl() {
+        SchedulerLeaderGuard guard = context.getBean(SchedulerLeaderGuard.class);
+        assertThat(guard).isInstanceOf(RedissonSchedulerLeaderGuard.class);
     }
 }

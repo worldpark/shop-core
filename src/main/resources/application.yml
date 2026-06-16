@@ -114,9 +114,12 @@ shop:
       # [SSOT] reset-ttl은 PasswordResetService.requestReset에서 참조. 기본 30분.
       reset-ttl: ${SHOP_REDIS_AUTH_RESET_TTL:PT30M}
     lock:
-      # 분산락 — 키는 {resource}, 실제 락 획득/해제는 분산락 Task에서 구현(Redisson 재검토 포함)
+      # 스케줄러 리더 게이트에서 사용(Task 035 — Redisson). 키 = {prefix}scheduler:{name}.
+      # 예: shopcore:lock:scheduler:unpaid-order-expiry
+      # watchdog 자동 갱신(leaseTime 미지정)이므로 ttl(고정 lease)은 리더 게이트에 미사용.
+      # ttl은 고정 lease가 필요한 다른 용도용 레거시 stub.
       prefix: ${SHOP_REDIS_LOCK_PREFIX:shopcore:lock:}
-      ttl: ${SHOP_REDIS_LOCK_TTL:PT10S}  # 10초 — 데드락 방지 짧은 TTL
+      ttl: ${SHOP_REDIS_LOCK_TTL:PT10S}  # 10초 — 고정 lease 용도용 stub (리더 게이트 미사용)
 
   storage:
     root: ${SHOP_STORAGE_ROOT:./uploads}

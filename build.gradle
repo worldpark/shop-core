@@ -62,6 +62,12 @@ dependencies {
     // Redis (JWT 로그인 상태 저장 + 분산락 기반 — 버전 Spring Boot BOM 위임)
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // Redisson (분산락 — plain 의존, starter 금지. Spring Boot BOM 미관리이므로 버전 명시 — jjwt 선례와 동일)
+    // redisson-spring-boot-starter 금지: RedisConnectionFactory를 교체해 기존 Lettuce(StringRedisTemplate) 동작
+    // 및 "지연 연결 → 무브로커 테스트 컨텍스트 로드 통과" 특성을 깨뜨린다(C6, Task 035 기술제약 1).
+    // RedissonClient 빈은 RedissonConfig(@Configuration)에서 별도 등록(Lettuce 무영향).
+    implementation 'org.redisson:redisson:3.50.0'
+
     // JWT (jjwt 0.12.x — Spring Boot BOM 미관리, 버전 명시)
     // jjwt-api: 컴파일 타임 API / jjwt-impl·jjwt-jackson: 런타임 구현체 + JSON 직렬화
     implementation 'io.jsonwebtoken:jjwt-api:0.12.7'
@@ -89,6 +95,10 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // Task 035: Redisson(Netty 워커 스레드)+Testcontainers Redis 추가로 풀스위트 메모리 사용이 늘어,
+    // 미설정 시 시스템 레벨 OOM이 Testcontainers 프로세스를 고아로 남겨 build 파일을 잠그는 현상을 관측.
+    // 테스트 JVM 힙 상한을 고정해 풀스위트 메모리 압박을 완화한다(test 태스크 한정).
+    jvmArgs '-Xmx1536m'
 }
 
 // =============================================================
