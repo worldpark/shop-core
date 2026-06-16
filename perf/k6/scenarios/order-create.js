@@ -9,11 +9,12 @@
  *   teardown(): 현재 비범위 (self-clean은 후속 Task)
  *
  * 프로파일 선택:
- *   -e PROFILE=smoke  (기본값, 5 VU × 30s)
+ *   -e PROFILE=smoke  (기본값, closed 모델: 5 VU × 30s)
+ *   -e PROFILE=load   (open 모델: constant-arrival-rate 100rps × 1m)
  *
  * 환경변수:
  *   BASE_URL       — 기본 http://localhost:8080
- *   PROFILE        — smoke (기본)
+ *   PROFILE        — smoke (기본) | load
  *   ADMIN_EMAIL    — 기본 admin@example.com
  *   ADMIN_PASSWORD — 기본 Admin1234!
  *   RUN_TAG        — 런별 유니크 prefix (미지정 시 uuidv4 자동)
@@ -28,8 +29,9 @@
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter, Trend } from 'k6/metrics';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
-import { THRESHOLDS, PROFILES, BASE_URL } from '../lib/config.js';
+import { PROFILES, BASE_URL } from '../lib/config.js';
 import { authHeaders } from '../lib/auth.js';
 import { setupSeed } from '../lib/seed.js';
 
@@ -38,21 +40,44 @@ import { setupSeed } from '../lib/seed.js';
 // ---------------------------------------------------------------
 const PROFILE = __ENV.PROFILE || 'smoke';
 
-const profileConfig = PROFILES[PROFILE];
-if (!profileConfig) {
+const p = PROFILES[PROFILE];
+if (!p) {
   throw new Error(
     `[order-create] 알 수 없는 PROFILE="${PROFILE}". 허용값: ${Object.keys(PROFILES).join('|')}`,
   );
 }
 
 // ---------------------------------------------------------------
-// k6 options — thresholds는 lib/config.js 에서 공통 관리
+// k6 options — closed(vus+duration) / open(constant-arrival-rate) 분기
+//
+// closed 모델 (smoke): top-level vus + duration
+// open 모델 (load):    scenarios + constant-arrival-rate executor
+//   * top-level vus/duration 과 scenarios 혼용 금지 (k6 제약)
 // ---------------------------------------------------------------
-export const options = {
-  vus: profileConfig.vus,
-  duration: profileConfig.duration,
-  thresholds: THRESHOLDS,
-};
+// summaryTrendStats: p99를 baseline JSON에 포함시키기 위해 명시 (k6 기본 export는 p99 미포함)
+const SUMMARY_TREND_STATS = ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)'];
+
+export const options = p.kind === 'arrival-rate'
+  ? {
+      summaryTrendStats: SUMMARY_TREND_STATS,
+      scenarios: {
+        order_create: {
+          executor: 'constant-arrival-rate',
+          rate: p.rate,
+          timeUnit: p.timeUnit,
+          duration: p.duration,
+          preAllocatedVUs: p.preAllocatedVUs,
+          maxVUs: p.maxVUs,
+        },
+      },
+      thresholds: p.thresholds,
+    }
+  : {
+      summaryTrendStats: SUMMARY_TREND_STATS,
+      vus: p.vus,
+      duration: p.duration,
+      thresholds: p.thresholds,
+    };
 
 // ---------------------------------------------------------------
 // 커스텀 메트릭
@@ -66,13 +91,15 @@ const orderCreateDuration = new Trend('order_create_duration', true); // ms, 선
 // setup() — 런 1회, VU 공유 데이터 생성
 // ---------------------------------------------------------------
 export function setup() {
-  // buyer 수 = 프로파일 최대 VU (VU별 전용 buyer로 카트 교차오염 방지)
-  const buyerCount = profileConfig.vus;
+  // buyer 수: open 모델은 maxVUs까지 VU가 늘어나므로 maxVUs 기준으로 시드
+  // closed 모델은 vus 기준 (기존과 동일)
+  // — VU별 전용 buyer로 카트 교차오염 방지, (__VU-1)%buyers.length 매핑 유지
+  const buyerCount = p.maxVUs || p.vus;
   return setupSeed(buyerCount);
 }
 
 // ---------------------------------------------------------------
-// default() — VU 본문
+// default() — VU 본문 (흐름 무변경)
 // ---------------------------------------------------------------
 export default function (data) {
   // VU별 전용 buyer 선택 (카트는 사용자 단위 — 주문 생성이 카트를 비움)
@@ -126,4 +153,37 @@ export default function (data) {
   } else if (orderRes.status >= 500) {
     order5xx.add(1);
   }
+}
+
+// ---------------------------------------------------------------
+// handleSummary() — setup_data(JWT 토큰) 제외, 메트릭 전용 JSON export
+//
+// k6의 --summary-export는 setup() 반환값(buyer 토큰 포함)을 setup_data 필드에
+// 자동 포함한다. 이를 방지하기 위해 handleSummary에서 setup_data를 제거한
+// 메트릭 전용 JSON을 SUMMARY_EXPORT_PATH 환경변수 경로로 내보낸다.
+//
+// 사용 예:
+//   k6 run -e SUMMARY_EXPORT_PATH=build/k6/order-create-load.json ...
+//
+// handleSummary가 존재하면 --summary-export는 무시된다(k6 설계).
+// ---------------------------------------------------------------
+export function handleSummary(data) {
+  // setup_data 제거 — JWT 토큰 노출 방지
+  const safeData = {
+    root_group: data.root_group,
+    metrics: data.metrics,
+    // setup_data는 의도적으로 제외
+  };
+
+  const outputs = {
+    stdout: textSummary(data, { indent: ' ', enableColors: true }),
+  };
+
+  // SUMMARY_EXPORT_PATH 환경변수로 파일 경로 지정 (--summary-export 대체)
+  const exportPath = __ENV.SUMMARY_EXPORT_PATH;
+  if (exportPath) {
+    outputs[exportPath] = JSON.stringify(safeData, null, 2);
+  }
+
+  return outputs;
 }

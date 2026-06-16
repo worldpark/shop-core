@@ -47,7 +47,22 @@ export const SEED = {
 };
 
 // ---------------------------------------------------------------
-// thresholds — lib/config.js에서 형태 정의, 프로파일이 import해 사용
+// 공통 비즈니스 불변식 thresholds (smoke/load 공유)
+// — 에러율·5xx는 프로파일 불문 동일하게 적용
+// ---------------------------------------------------------------
+const BUSINESS_THRESHOLDS = {
+  // HTTP 에러율 1% 미만 (4xx/5xx 포함)
+  http_req_failed: ['rate<0.01'],
+
+  // 주문 5xx — 락 붕괴 징후. 반드시 0이어야 함.
+  order_5xx: ['count==0'],
+
+  // order_conflict(409)은 임계로 죽이지 않음.
+  // 낙관 충돌·재고 부족은 정상 비즈니스 흐름이므로 Counter로 가시화만.
+};
+
+// ---------------------------------------------------------------
+// smoke thresholds
 //
 // 베이스라인: 2026-06-16 측정 (smoke, 5VU×30s, order-create.js).
 //   관측: http_req_duration p95=40.21ms, p99=53.02ms, http_req_failed=0.00%,
@@ -56,31 +71,81 @@ export const SEED = {
 //   관측 p95/p99에 여유율 ×2~3(개발 머신 단일 런 변동·CI 하드웨어 편차 흡수)을 적용해
 //   round 수치로 고정한다. 명백한 회귀(2~3배 지연)는 잡고, 노이즈 단발 실패는 피한다.
 // ---------------------------------------------------------------
-export const THRESHOLDS = {
-  // HTTP 에러율 1% 미만 (4xx/5xx 포함)
-  http_req_failed: ['rate<0.01'],
+export const SMOKE_THRESHOLDS = {
+  ...BUSINESS_THRESHOLDS,
 
-  // HTTP 응답 시간 — 베이스라인(p95=40.21ms / p99=53.02ms)에 여유율 적용
+  // 베이스라인(p95=40.21ms / p99=53.02ms)에 여유율 적용
   http_req_duration: [
     'p(95)<100',   // 베이스라인 p95=40.21ms × ~2.5 여유
     'p(99)<200',   // 베이스라인 p99=53.02ms × ~3.8 여유
   ],
-
-  // 주문 5xx — 락 붕괴 징후. 베이스라인에서 반드시 0이어야 함.
-  order_5xx: ['count==0'],
-
-  // order_conflict(409)은 임계로 죽이지 않음.
-  // 낙관 충돌/재고 부족은 정상 비즈니스 흐름이므로 Counter로 가시화만.
 };
 
 // ---------------------------------------------------------------
+// load thresholds
+//
+// 베이스라인: 2026-06-16 재측정 (깨끗한 DB 기준, constant-arrival-rate, 100rps×1m)
+//   확정 출처 = 커밋된 baselines/order-create-load.json: p95=17.99ms, p99=61.54ms, dropped=0, order_5xx=0.
+//   (클린 런 p99는 런마다 ~33~62ms로 변동 — 아래 임계는 변동 폭 전체를 통과한다.)
+//   임계값 = baseline p95(≈18ms) × ~2.5 여유율 → 50ms (round).
+//            클린 p99 상한(≈62ms) × ~1.6 여유 → 100ms (round). 변동 하한 33ms도 통과, 회귀(>100ms)는 감지.
+//   smoke(40ms→100ms, ×2.5)와 일관된 여유율 기준. 250ms~500ms 같은 과대 여유는 회귀 감지를 무력화하므로 금지.
+//   smoke(p95=40ms) 대비 load(p95=18ms) — 깨끗한 DB에서 load가 오히려 더 빠른 것은
+//   constant-arrival-rate(open 모델)가 VU 경합 없이 고르게 요청을 분산하기 때문.
+//   이전 누적 상태(orders 41,531개) 관측: p95=242ms → 깨끗한 DB 대비 13배 저하(주의 사례, 기준 아님).
+// ---------------------------------------------------------------
+export const LOAD_THRESHOLDS = {
+  ...BUSINESS_THRESHOLDS,
+
+  // load 베이스라인: 2026-06-16 재측정 (깨끗한 DB 기준, baselines/order-create-load.json)
+  // 관측 p95=17.99ms × ~2.5 → 50ms, 클린 p99 상한 ≈62ms → 100ms (변동 33~62ms 전부 통과)
+  http_req_duration: [
+    'p(95)<50',    // 베이스라인 p95=17.99ms × ~2.5 여유 → 50ms
+    'p(99)<100',   // 클린 p99 상한 ≈62ms 기준 (런별 변동 33~62ms 전부 < 100, 회귀 >100 감지)
+  ],
+
+  // 목표 RPS 미달(under-provision) 감시 — dropped 과다면 maxVUs 상향 또는 목표 하향 필요.
+  // 깨끗한 DB 실측: dropped=0(0/s). 이전 누적 상태: 1.72/s(startup warmup 지연).
+  // 실질 under-provision 임계(200rps 이상): 71~138/s.
+  // rate<3 → 100rps 정상 범위(0/s)를 허용하고, 200rps+ 이상 폭증 시 게이트 발동.
+  dropped_iterations: ['rate<3'],
+};
+
+// ---------------------------------------------------------------
+// 하위 호환: 기존 THRESHOLDS 심볼 유지 (smoke.js 가 참조)
+// smoke.js 는 THRESHOLDS → SMOKE_THRESHOLDS 로 마이그레이션 권장
+// ---------------------------------------------------------------
+export const THRESHOLDS = SMOKE_THRESHOLDS;
+
+// ---------------------------------------------------------------
 // 프로파일별 VU/duration 설정
-// profiles/smoke.js 가 import해서 사용 가능하도록 export
+// profiles/smoke.js, profiles/load.js 가 import해서 사용한다.
+//
+// kind 필드:
+//   'closed'       — vus + duration (기존 모델)
+//   'arrival-rate' — constant-arrival-rate executor (open 모델)
 // ---------------------------------------------------------------
 export const PROFILES = {
   smoke: {
+    kind: 'closed',
     vus: 5,
     duration: '30s',
+    thresholds: SMOKE_THRESHOLDS,
   },
-  // load / stress 는 후속 Task — 현재 비범위
+  load: {
+    kind: 'arrival-rate',
+    // 확정 목표: 100 rps × 1분
+    // §6.5 판정(2026-06-16):
+    //   - 100rps: p95=17.99ms, p99=61.54ms(클린 변동 33~62ms), dropped=0/s (깨끗한 DB, 2026-06-16, baseline JSON).
+    //   - 200rps: dropped=71/s(폭증), p95=634ms — 한계 초과(stress 영역).
+    //   - 300rps: dropped=138/s, p95=886ms — 완전 한계 초과.
+    //   앱 실제 처리 상한선 ≈ 90~100 orders/s. load는 SLO 내 지속 가능 RPS 확인이 목적이므로
+    //   100rps를 확정 목표로 채택(한계 탐색은 stress(003)으로 이양).
+    rate: 100,
+    timeUnit: '1s',
+    duration: '1m',
+    preAllocatedVUs: 20,
+    maxVUs: 50,
+    thresholds: LOAD_THRESHOLDS,
+  },
 };
