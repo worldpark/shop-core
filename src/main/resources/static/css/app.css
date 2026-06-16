@@ -1162,7 +1162,7 @@ input[type="email"]:focus {
     border-radius: 6px;
     padding: 12px;
     background: #f9f9f9;
-    width: 200px;
+    width: 240px;
 }
 
 .image-preview {
@@ -1208,6 +1208,7 @@ input[type="email"]:focus {
 .inline-form {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
 }
 
