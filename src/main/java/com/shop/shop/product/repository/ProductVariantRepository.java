@@ -1,8 +1,12 @@
 package com.shop.shop.product.repository;
 
 import com.shop.shop.product.domain.ProductVariant;
+import com.shop.shop.product.dto.ProductStockSum;
+import com.shop.shop.product.dto.VariantProductMapping;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -85,4 +89,43 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
      */
     @EntityGraph(attributePaths = {"product", "optionValues", "optionValues.option"})
     List<ProductVariant> findWithOptionsByIdIn(Collection<Long> ids);
+
+    /**
+     * 상품 ID 집합 기준 상품별 재고 합계 집계 쿼리.
+     *
+     * <p>variant가 없는 상품은 결과에 포함되지 않는다(totalStock=0 항목 미포함 — 합산 시 0 처리).
+     * COALESCE로 NULL → 0 방어.
+     *
+     * @param productIds 집계 대상 상품 ID 컬렉션
+     * @return 상품별 재고 합계 projection 리스트
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.ProductStockSum(
+                pv.product.id,
+                COALESCE(SUM(pv.stock), 0)
+            )
+            FROM ProductVariant pv
+            WHERE pv.product.id IN :productIds
+            GROUP BY pv.product.id
+            """)
+    List<ProductStockSum> findStockSumsByProductIdIn(@Param("productIds") Collection<Long> productIds);
+
+    /**
+     * 상품 ID 집합 기준 variantId ↔ productId 매핑 조회.
+     *
+     * <p>web 계층에서 variant별 판매 집계를 상품 기준으로 병합할 때 사용한다.
+     * 삭제된 variant는 조회되지 않는다.
+     *
+     * @param productIds 조회 대상 상품 ID 컬렉션
+     * @return variantId → productId 매핑 projection 리스트
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.VariantProductMapping(
+                pv.id,
+                pv.product.id
+            )
+            FROM ProductVariant pv
+            WHERE pv.product.id IN :productIds
+            """)
+    List<VariantProductMapping> findVariantProductMappingsByProductIdIn(@Param("productIds") Collection<Long> productIds);
 }

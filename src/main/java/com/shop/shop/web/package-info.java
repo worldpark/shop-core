@@ -20,7 +20,11 @@
  *   <li>{@code product.spi} (named interface) — {@code SellerProductFacade}, {@code SellerProductVariantFacade}</li>
  *   <li>{@code product.dto} (named interface) — {@code ProductForm}, {@code CategoryResponse},
  *       {@code ProductFormView}, {@code VariantManagementView}, {@code SellerProductRef},
- *       {@code ProductOptionResponse}, {@code OptionValueResponse}, {@code ProductVariantResponse}</li>
+ *       {@code ProductOptionResponse}, {@code OptionValueResponse}, {@code ProductVariantResponse},
+ *       {@code SellerProductStatsData}, {@code VariantProductMapping}</li>
+ *   <li>{@code order.spi} (named interface) — {@code SellerSalesStatsPort}, {@code OrderFacade},
+ *       {@code AdminOrderFulfillmentFacade}</li>
+ *   <li>{@code order.spi.dto} (named interface) — {@code VariantSalesAggregate}</li>
  *   <li>{@code common} (OPEN 모듈) — {@code DuplicateEmailException}, {@code BusinessException}</li>
  *   <li>Spring MVC / Spring Security / Thymeleaf 프레임워크 타입</li>
  * </ul>

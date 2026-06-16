@@ -23,6 +23,7 @@ import com.shop.shop.order.repository.OrderRepository;
 import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.order.repository.CouponRepository;
 import com.shop.shop.order.repository.UserCouponRepository;
+import com.shop.shop.order.repository.OrderItemSalesRepository;
 import com.shop.shop.order.adapter.OrderItemQueryRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.security.JwtTokenProvider;
@@ -122,6 +123,8 @@ class SellerStockAdjustmentRestControllerSecurityTest {
     private ReviewRepository reviewRepository;
     @MockitoBean
     private OrderItemQueryRepository orderItemQueryRepository;
+    @MockitoBean
+    private OrderItemSalesRepository orderItemSalesRepository; // Task 040 신규 — SellerSalesStatsService 의존(빈 그래프 충족)
 
     private String adminToken;
     private String sellerToken;

@@ -29,7 +29,10 @@
     <div class="seller-product-list-container">
         <div class="seller-product-list-header">
             <h1 class="page-title">내 상품</h1>
-            <a th:href="@{/seller/products/new}" class="btn btn-primary">상품 등록</a>
+            <div style="display:flex;gap:8px;">
+                <a th:href="@{/seller/products/stats}" class="btn btn-outline">판매 현황</a>
+                <a th:href="@{/seller/products/new}" class="btn btn-primary">상품 등록</a>
+            </div>
         </div>
 
         <!-- 상품 없을 때 -->

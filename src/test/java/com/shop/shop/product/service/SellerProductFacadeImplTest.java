@@ -56,6 +56,9 @@ class SellerProductFacadeImplTest {
     @Mock
     private UserDirectory userDirectory;
 
+    @Mock
+    private com.shop.shop.product.repository.ProductVariantRepository productVariantRepository;
+
     private SellerProductFacade facade;
 
     private static final long ACTOR_ID = 2L;
@@ -64,7 +67,7 @@ class SellerProductFacadeImplTest {
 
     @BeforeEach
     void setUp() {
-        facade = new SellerProductFacadeImpl(productService, categoryService, userDirectory);
+        facade = new SellerProductFacadeImpl(productService, categoryService, userDirectory, productVariantRepository);
         // userDirectory stub은 actorEmail을 사용하는 테스트에서만 개별 설정
         // (listCategories/productStatusNames는 userDirectory를 호출하지 않으므로 공통 설정 제외)
     }

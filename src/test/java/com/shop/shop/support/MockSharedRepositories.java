@@ -1,6 +1,7 @@
 package com.shop.shop.support;
 
 import com.shop.shop.inventory.repository.StockLedgerRepository;
+import com.shop.shop.order.repository.OrderItemSalesRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.lang.annotation.ElementType;
@@ -23,11 +24,18 @@ import java.lang.annotation.Target;
  *
  * <p>주의: 특정 Repository를 <b>stub</b>해야 하는 테스트는 그 타입을 여기 넣지 말고 종전대로
  * 필드 {@code @MockitoBean}으로 선언한다(같은 타입 이중 override 충돌 방지).
+ *
+ * <p>갱신 이력:
+ * <ul>
+ *   <li>Task 034: {@code StockLedgerRepository} 추가 (InventoryStockPortImpl 의존)</li>
+ *   <li>Task 040: {@code OrderItemSalesRepository} 추가 (SellerSalesStatsService 의존)</li>
+ * </ul>
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @MockitoBean(types = {
-        StockLedgerRepository.class
+        StockLedgerRepository.class,
+        OrderItemSalesRepository.class
 })
 public @interface MockSharedRepositories {
 }

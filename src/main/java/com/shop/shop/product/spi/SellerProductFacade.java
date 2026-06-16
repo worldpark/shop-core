@@ -2,6 +2,7 @@ package com.shop.shop.product.spi;
 
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.SellerProductStatsData;
 import com.shop.shop.product.dto.SellerProductSummaryView;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -104,4 +105,20 @@ public interface SellerProductFacade {
     void update(String actorEmail, boolean actorIsAdmin, long productId,
                 Long categoryId, String name, String description,
                 BigDecimal basePrice, String status);
+
+    /**
+     * 판매자 현황 페이지용 소유 상품 통계 데이터 조회.
+     *
+     * <p>actorEmail → ownerId 변환 후 소유 상품(페이지)과 함께
+     * 상품별 재고 합계 맵, variantId ↔ productId 매핑을 반환한다.
+     * web 계층이 productId/variantId를 외부 입력으로 받지 않고, 소유 검증된 데이터만 사용하도록 보장한다(IDOR 방지).
+     *
+     * <p>variant가 없는 상품은 stockByProduct 맵에 키가 없음(→ 0으로 처리).
+     * variant가 없는 상품은 variantMappings에도 포함되지 않음(→ 판매 집계 0).
+     *
+     * @param actorEmail 행위자 이메일 (facade 내부에서 ownerId로 해석)
+     * @param pageable   페이지 정보 (소유 상품 목록 페이지네이션)
+     * @return 소유 상품 목록 + 재고맵 + variantId 매핑 번들
+     */
+    SellerProductStatsData getMyProductStatsData(String actorEmail, Pageable pageable);
 }

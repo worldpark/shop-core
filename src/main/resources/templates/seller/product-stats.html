@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<!--
+    판매자 상품 현황 화면.
+    view name: seller/product-stats
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 모델 키: statsPage (Page<SellerProductStatsRow>)
+          ㄴ content[*].productId  (long)
+          ㄴ content[*].name       (String)
+          ㄴ content[*].status     (String: DRAFT/ON_SALE/SOLD_OUT/HIDDEN)
+          ㄴ content[*].totalStock (long)
+          ㄴ content[*].salesQty   (long)
+          ㄴ content[*].revenue    (BigDecimal scale 2)
+      - 빈 상태: "판매 현황이 없습니다."
+      - 페이지네이션: statsPage.number, .totalPages, .totalElements, .size
+      - 한계 주석: 삭제된 옵션의 과거 판매분 제외 명시
+      - nav active: seller-products (NavActiveControllerAdvice 자동 주입)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>판매 현황</title>
+</head>
+<body>
+<main>
+    <div class="seller-product-list-container">
+        <div class="seller-product-list-header">
+            <h1 class="page-title">판매 현황</h1>
+            <a th:href="@{/seller/products}" class="btn btn-outline">내 상품 목록</a>
+        </div>
+
+        <!-- 데이터 없을 때 -->
+        <div class="order-empty" th:if="${statsPage.totalElements == 0}">
+            <p class="empty-msg">판매 현황이 없습니다.</p>
+        </div>
+
+        <!-- 현황 테이블 -->
+        <div class="table-wrapper" th:unless="${statsPage.totalElements == 0}">
+            <table class="order-table">
+                <thead>
+                    <tr>
+                        <th scope="col">상품명</th>
+                        <th scope="col">상태</th>
+                        <th scope="col">총재고</th>
+                        <th scope="col">판매수량</th>
+                        <th scope="col">매출</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${statsPage.content}" class="order-row">
+                        <td class="seller-product-name" th:text="${row.name}">상품명</td>
+                        <td class="seller-product-status">
+                            <span class="badge-product-status"
+                                  th:classappend="' badge-product-' + ${row.status.toLowerCase()}"
+                                  th:with="statusLabel=(${row.status} == 'ON_SALE' ? '판매중' :
+                                                       (${row.status} == 'DRAFT' ? '임시저장' :
+                                                       (${row.status} == 'SOLD_OUT' ? '품절' :
+                                                       (${row.status} == 'HIDDEN' ? '숨김' : ${row.status}))))"
+                                  th:text="${statusLabel}">상태</span>
+                        </td>
+                        <td th:text="${row.totalStock}">0</td>
+                        <td th:text="${row.salesQty}">0</td>
+                        <td>
+                            <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <!-- 한계 주석: 삭제된 옵션(variant)의 과거 판매분은 집계에서 제외됩니다 -->
+            <p class="field-hint">* 삭제된 옵션의 과거 판매분은 제외됩니다.</p>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <section class="pagination-section" th:unless="${statsPage.totalElements == 0}">
+            <div class="pagination">
+                <div class="page-info">
+                    <span th:text="'총 ' + ${statsPage.totalElements} + '건'">총 0건</span>
+                    <span th:text="'(' + (${statsPage.number} + 1) + ' / ' + ${statsPage.totalPages} + ' 페이지)'"> (1 / 1 페이지)</span>
+                </div>
+                <div class="page-nav">
+                    <!-- 이전 페이지 -->
+                    <a th:if="${statsPage.number > 0}"
+                       th:href="@{/seller/products/stats(page=${statsPage.number - 1}, size=${statsPage.size})}"
+                       class="btn btn-outline btn-sm">이전</a>
+                    <span th:unless="${statsPage.number > 0}"
+                          class="btn btn-outline btn-sm disabled">이전</span>
+
+                    <!-- 다음 페이지 -->
+                    <a th:if="${statsPage.number + 1 < statsPage.totalPages}"
+                       th:href="@{/seller/products/stats(page=${statsPage.number + 1}, size=${statsPage.size})}"
+                       class="btn btn-outline btn-sm">다음</a>
+                    <span th:unless="${statsPage.number + 1 < statsPage.totalPages}"
+                          class="btn btn-outline btn-sm disabled">다음</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>

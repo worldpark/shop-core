@@ -4,17 +4,23 @@ import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
+import com.shop.shop.product.dto.ProductStockSum;
+import com.shop.shop.product.dto.SellerProductStatsData;
 import com.shop.shop.product.dto.SellerProductSummaryView;
+import com.shop.shop.product.dto.VariantProductMapping;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.spi.SellerProductFacade;
 import com.shop.shop.product.spi.UserDirectory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -41,6 +47,7 @@ class SellerProductFacadeImpl implements SellerProductFacade {
     private final ProductService productService;
     private final CategoryService categoryService;
     private final UserDirectory userDirectory;
+    private final ProductVariantRepository productVariantRepository;
 
     /**
      * {@inheritDoc}
@@ -121,5 +128,41 @@ class SellerProductFacadeImpl implements SellerProductFacade {
         long actorId = userDirectory.findUserIdByEmail(actorEmail);
         ProductStatus productStatus = ProductStatus.valueOf(status);
         productService.update(actorId, actorIsAdmin, productId, categoryId, name, description, basePrice, productStatus);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>actorEmail → ownerId 변환 후 소유 상품 페이지, 재고 합계 맵, variantId 매핑을 한 번에 조회한다.
+     * web 계층이 productId/variantId를 외부에서 입력받지 않고 소유 검증된 데이터만 사용하도록 보장한다(IDOR 방지).
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public SellerProductStatsData getMyProductStatsData(String actorEmail, Pageable pageable) {
+        long ownerId = userDirectory.findUserIdByEmail(actorEmail);
+        Page<Product> productPage = productService.getMyProducts(ownerId, pageable);
+
+        List<SellerProductSummaryView> products = productPage.getContent().stream()
+                .map(SellerProductSummaryView::from)
+                .collect(Collectors.toList());
+
+        List<Long> productIds = products.stream()
+                .map(SellerProductSummaryView::productId)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> stockByProduct;
+        List<VariantProductMapping> variantMappings;
+
+        if (productIds.isEmpty()) {
+            stockByProduct = Map.of();
+            variantMappings = List.of();
+        } else {
+            List<ProductStockSum> stockSums = productVariantRepository.findStockSumsByProductIdIn(productIds);
+            stockByProduct = stockSums.stream()
+                    .collect(Collectors.toMap(ProductStockSum::productId, ProductStockSum::totalStock));
+            variantMappings = productVariantRepository.findVariantProductMappingsByProductIdIn(productIds);
+        }
+
+        return new SellerProductStatsData(products, productPage.getTotalElements(), stockByProduct, variantMappings);
     }
 }
