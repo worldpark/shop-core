@@ -281,7 +281,8 @@ input[type="password"],
 input[type="tel"],
 input[type="number"],
 input[type="search"],
-input[type="url"] {
+input[type="url"],
+textarea {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #ccc;
@@ -296,8 +297,16 @@ input[type="password"]:focus,
 input[type="tel"]:focus,
 input[type="number"]:focus,
 input[type="search"]:focus,
-input[type="url"]:focus {
+input[type="url"]:focus,
+textarea:focus {
     border-color: #337ab7;
+}
+
+/* textarea 전용 — 적정 높이·세로 리사이즈·페이지 폰트 상속(기본 monospace 방지) */
+textarea {
+    min-height: 96px;
+    resize: vertical;
+    font-family: inherit;
 }
 
 /* ── 이메일 입력(아이디 + 도메인 선택) ── */
