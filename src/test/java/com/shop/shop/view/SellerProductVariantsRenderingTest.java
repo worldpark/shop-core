@@ -147,6 +147,7 @@ class SellerProductVariantsRenderingTest {
     private static final long VARIANT_ID = 30L;
     private static final String SELLER_EMAIL = "seller@example.com";
     private static final String BASE_URL = "/seller/products/" + PRODUCT_ID + "/variants";
+    private static final String OPTIONS_URL = "/seller/products/" + PRODUCT_ID + "/options";
 
     /** footer 프래그먼트 식별 마커 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";
@@ -321,7 +322,7 @@ class SellerProductVariantsRenderingTest {
     @DisplayName("(R9) POST /options — name 누락 시 에러 메시지 '옵션명은 필수입니다.' 렌더링")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void option_create_validation_fail_renders_error_message() throws Exception {
-        String body = mockMvc.perform(post(BASE_URL + "/options")
+        String body = mockMvc.perform(post(OPTIONS_URL)
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();

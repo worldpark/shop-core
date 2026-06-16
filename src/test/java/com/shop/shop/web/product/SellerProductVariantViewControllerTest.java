@@ -156,7 +156,10 @@ class SellerProductVariantViewControllerTest {
     private static final long VARIANT_ID = 30L;
     private static final String SELLER_EMAIL = "seller@example.com";
 
-    private static final String BASE_URL = "/seller/products/" + PRODUCT_ID + "/variants";
+    private static final String VARIANTS_URL = "/seller/products/" + PRODUCT_ID + "/variants";
+    private static final String OPTIONS_URL = "/seller/products/" + PRODUCT_ID + "/options";
+    /** 하위 호환 — 기존 코드가 BASE_URL을 참조하는 경우를 위해 variants URL로 유지 */
+    private static final String BASE_URL = VARIANTS_URL;
 
     private VariantManagementView stubView;
 
@@ -238,7 +241,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options — 성공(CSRF) → 302 redirect:/seller/products/{productId}/variants")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOption_success_redirects() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options")
+        mockMvc.perform(post(OPTIONS_URL)
                         .with(csrf())
                         .param("name", "색상"))
                 .andExpect(status().is3xxRedirection())
@@ -249,7 +252,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options — 성공 → facade.createOption 호출 검증")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOption_success_calls_facade() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options")
+        mockMvc.perform(post(OPTIONS_URL)
                         .with(csrf())
                         .param("name", "색상"))
                 .andExpect(status().is3xxRedirection());
@@ -262,7 +265,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options — name 누락(@Valid 실패) → 200 seller/product-variants 재렌더")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOption_validation_fail_rerenders() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options")
+        mockMvc.perform(post(OPTIONS_URL)
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("seller/product-variants"))
@@ -282,7 +285,7 @@ class SellerProductVariantViewControllerTest {
                 .when(sellerProductVariantFacade)
                 .createOption(anyString(), anyBoolean(), anyLong(), anyString());
 
-        mockMvc.perform(post(BASE_URL + "/options")
+        mockMvc.perform(post(OPTIONS_URL)
                         .with(csrf())
                         .param("name", "색상"))
                 .andExpect(status().is3xxRedirection())
@@ -297,7 +300,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options/{optionId}/values — 성공 → 302 redirect")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOptionValue_success_redirects() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options/" + OPTION_ID + "/values")
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/values")
                         .with(csrf())
                         .param("value", "빨강"))
                 .andExpect(status().is3xxRedirection())
@@ -308,7 +311,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options/{optionId}/values — 성공 → facade.createOptionValue 호출 검증")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOptionValue_success_calls_facade() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options/" + OPTION_ID + "/values")
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/values")
                         .with(csrf())
                         .param("value", "빨강"))
                 .andExpect(status().is3xxRedirection());
@@ -321,7 +324,7 @@ class SellerProductVariantViewControllerTest {
     @DisplayName("POST /options/{optionId}/values — value 누락(@Valid 실패) → 200 재렌더")
     @WithMockUser(username = SELLER_EMAIL, roles = "SELLER")
     void createOptionValue_validation_fail_rerenders() throws Exception {
-        mockMvc.perform(post(BASE_URL + "/options/" + OPTION_ID + "/values")
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/values")
                         .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("seller/product-variants"));
@@ -335,7 +338,7 @@ class SellerProductVariantViewControllerTest {
                 .when(sellerProductVariantFacade)
                 .createOptionValue(anyString(), anyBoolean(), anyLong(), anyLong(), anyString());
 
-        mockMvc.perform(post(BASE_URL + "/options/" + OPTION_ID + "/values")
+        mockMvc.perform(post(OPTIONS_URL + "/" + OPTION_ID + "/values")
                         .with(csrf())
                         .param("value", "빨강"))
                 .andExpect(status().is3xxRedirection())

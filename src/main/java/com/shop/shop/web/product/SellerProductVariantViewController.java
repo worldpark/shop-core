@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Collections;
@@ -50,7 +49,6 @@ import java.util.Collections;
  */
 @Slf4j
 @Controller
-@RequestMapping("/seller/products/{productId}/variants")
 @RequiredArgsConstructor
 public class SellerProductVariantViewController {
 
@@ -70,7 +68,7 @@ public class SellerProductVariantViewController {
      * @param model     Spring MVC 모델
      * @return view name "seller/product-variants"
      */
-    @GetMapping
+    @GetMapping("/seller/products/{productId}/variants")
     public String managementView(
             @PathVariable long productId,
             Authentication auth,
@@ -99,7 +97,7 @@ public class SellerProductVariantViewController {
      * @param ra            RedirectAttributes
      * @return view name 또는 redirect
      */
-    @PostMapping("/options")
+    @PostMapping("/seller/products/{productId}/options")
     public String createOption(
             @PathVariable long productId,
             @Valid @ModelAttribute("optionForm") OptionForm form,
@@ -145,7 +143,7 @@ public class SellerProductVariantViewController {
      * @param ra            RedirectAttributes
      * @return view name 또는 redirect
      */
-    @PostMapping("/options/{optionId}/values")
+    @PostMapping("/seller/products/{productId}/options/{optionId}/values")
     public String createOptionValue(
             @PathVariable long productId,
             @PathVariable long optionId,
@@ -193,7 +191,7 @@ public class SellerProductVariantViewController {
      * @param ra            RedirectAttributes
      * @return view name 또는 redirect
      */
-    @PostMapping
+    @PostMapping("/seller/products/{productId}/variants")
     public String createVariant(
             @PathVariable long productId,
             @Valid @ModelAttribute("variantForm") VariantForm form,
@@ -241,7 +239,7 @@ public class SellerProductVariantViewController {
      * @param ra            RedirectAttributes
      * @return view name 또는 redirect
      */
-    @PostMapping("/{variantId}")
+    @PostMapping("/seller/products/{productId}/variants/{variantId}")
     public String updateVariant(
             @PathVariable long productId,
             @PathVariable long variantId,
