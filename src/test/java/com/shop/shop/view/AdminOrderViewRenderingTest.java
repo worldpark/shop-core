@@ -8,6 +8,7 @@ import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView;
+import com.shop.shop.order.dto.AdminOrderFulfillmentView.AdminShipmentView;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.adapter.OrderItemQueryRepository;
@@ -167,7 +168,8 @@ class AdminOrderViewRenderingTest {
     /** preparing 주문 + 미발송 항목 1건 + 기존 배송 1건 */
     private AdminOrderFulfillmentView preparingOrderWithUnshipped() {
         ShipmentItemResponse si = new ShipmentItemResponse(101L, "티셔츠", 2);
-        ShipmentResponse shipment = new ShipmentResponse(10L, 2L, "preparing", null, null, null, null, List.of(si));
+        AdminShipmentView shipment = new AdminShipmentView(
+                10L, "preparing", null, "관리자 직접 처리", null, null, null, null, List.of(si));
         return new AdminOrderFulfillmentView(
                 2L,
                 "ORD-TEST-0002",

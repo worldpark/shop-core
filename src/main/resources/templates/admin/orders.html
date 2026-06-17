@@ -47,6 +47,7 @@
                                                (${s.status} == 'shipping' ? '배송 중' :
                                                (${s.status} == 'delivered' ? '배송 완료' : ${s.status})))"
                           th:text="${statusLabel}"></span>
+                    <span class="shipment-seller" th:text="${s.sellerLabel}"></span>
                     <ul class="shipment-items-list">
                         <li th:each="si : ${s.items}"
                             th:text="${si.productName} + ' x' + ${si.quantity}"></li>

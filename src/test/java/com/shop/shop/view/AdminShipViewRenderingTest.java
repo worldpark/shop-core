@@ -9,6 +9,7 @@ import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.AdminOrderFulfillmentView;
+import com.shop.shop.order.dto.AdminOrderFulfillmentView.AdminShipmentView;
 import com.shop.shop.order.dto.ShipmentItemResponse;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.adapter.OrderItemQueryRepository;
@@ -152,8 +153,8 @@ class AdminShipViewRenderingTest {
     /** preparing 주문 + preparing 배송 1건 (배송 시작 폼 노출 대상) */
     private AdminOrderFulfillmentView preparingOrderWithPreparingShipment() {
         ShipmentItemResponse si = new ShipmentItemResponse(101L, "티셔츠", 2);
-        ShipmentResponse shipment = new ShipmentResponse(
-                20L, 1L, "preparing", null, null, null, null, List.of(si));
+        AdminShipmentView shipment = new AdminShipmentView(
+                20L, "preparing", null, "관리자 직접 처리", null, null, null, null, List.of(si));
         return new AdminOrderFulfillmentView(
                 1L,
                 "ORD-TEST-0020",
@@ -166,8 +167,9 @@ class AdminShipViewRenderingTest {
     /** shipping 주문 + shipping 배송 1건 (추적정보 표시, 폼 미노출) */
     private AdminOrderFulfillmentView shippingOrderWithShippingShipment() {
         ShipmentItemResponse si = new ShipmentItemResponse(102L, "바지", 1);
-        ShipmentResponse shipment = new ShipmentResponse(
-                21L, 2L, "shipping",
+        AdminShipmentView shipment = new AdminShipmentView(
+                21L, "shipping",
+                null, "관리자 직접 처리",
                 "CJ대한통운", "1234567890",
                 Instant.parse("2026-06-11T10:00:00Z"), null,
                 List.of(si));
