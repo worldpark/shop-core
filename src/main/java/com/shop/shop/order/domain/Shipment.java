@@ -84,19 +84,36 @@ public class Shipment extends BaseEntity {
     private List<ShipmentItem> items = new ArrayList<>();
 
     /**
-     * 배송 생성 정적 팩토리 — preparing 상태.
+     * 배송 생성 정적 팩토리 — preparing 상태 (admin 경로, seller_id=null).
      *
      * <p>추적 필드(carrier/trackingNumber/shippedAt/deliveredAt)는 모두 null로 초기화된다.
-     * 본 Task는 preparing 생성까지만 구현한다.
      *
      * @param orderId 대상 주문 ID
-     * @return 새 Shipment 인스턴스 (status="preparing")
+     * @return 새 Shipment 인스턴스 (status="preparing", seller_id=null)
      */
     public static Shipment preparing(long orderId) {
         Shipment shipment = new Shipment();
         shipment.orderId = orderId;
         shipment.status = "preparing";
-        // carrier/trackingNumber/shippedAt/deliveredAt 은 null (020/021에서 채움)
+        // sellerId = null (admin 경로 — 판매자 스탬프 없음)
+        return shipment;
+    }
+
+    /**
+     * 배송 생성 정적 팩토리 — preparing 상태 + seller_id 스탬프 (판매자 경로).
+     *
+     * <p>판매자가 자기 소유 항목으로 배송을 생성할 때 사용한다.
+     * seller_id를 스탬프해 admin 생성 배송(seller_id=null)과 구분한다.
+     *
+     * @param orderId  대상 주문 ID
+     * @param sellerId 판매자 ID (요청 판매자 스탬프)
+     * @return 새 Shipment 인스턴스 (status="preparing", seller_id=sellerId)
+     */
+    public static Shipment preparing(long orderId, long sellerId) {
+        Shipment shipment = new Shipment();
+        shipment.orderId = orderId;
+        shipment.sellerId = sellerId;
+        shipment.status = "preparing";
         return shipment;
     }
 

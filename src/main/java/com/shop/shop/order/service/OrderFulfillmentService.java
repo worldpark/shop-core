@@ -60,7 +60,7 @@ public class OrderFulfillmentService {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 배송 생성 — 주문 row 비관락 + 상태/항목 검증 + Shipment/ShipmentItem 생성 + rollup.
+     * 배송 생성 (admin 경로) — 주문 row 비관락 + 상태/항목 검증 + Shipment/ShipmentItem 생성 + rollup.
      *
      * <p>처리 흐름:
      * <ol>
@@ -73,7 +73,7 @@ public class OrderFulfillmentService {
      *       <li>대상 0건 → 409</li>
      *     </ul>
      *   </li>
-     *   <li>Shipment.preparing + ShipmentItem 생성 → save</li>
+     *   <li>Shipment.preparing(orderId) — seller_id=null (admin 경로)</li>
      *   <li>rollup: {@code paid}면 markPreparing() (첫 배송). 이미 {@code preparing}이면 no-op (status 불변)</li>
      *   <li>원자 커밋 → {@link ShipmentResponse} 반환</li>
      * </ol>
@@ -93,49 +93,141 @@ public class OrderFulfillmentService {
         Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(OrderNotFoundException::new);
 
-        String currentStatus = order.getStatus();
-
-        // 2. 상태 검증 — 부작용 전 throw (모순2)
-        if (!"paid".equals(currentStatus) && !"preparing".equals(currentStatus)) {
-            log.warn("배송 생성 불가 — 주문 상태 충돌: orderId={}, status={}", orderId, currentStatus);
-            throw new OrderFulfillmentConflictException(
-                    "주문 상태(" + currentStatus + ")에서 배송을 생성할 수 없습니다.");
-        }
-
-        // 3. 대상 항목 결정
-        List<Long> assignedIds = shipmentRepository.findAssignedOrderItemIds(orderId);
-        Set<Long> assignedSet = Set.copyOf(assignedIds);
-
         List<OrderItem> orderItems = order.getItems();
         Set<Long> orderItemIdSet = orderItems.stream()
                 .map(OrderItem::getId)
                 .collect(Collectors.toSet());
 
-        List<Long> targetOrderItemIds;
+        // 2. admin 경로: 미발송 전체 또는 지정 항목 산출 (owner 구분 없음)
+        List<Long> targetOrderItemIds = resolveAdminTargetItems(orderId, orderItemIds, orderItems, orderItemIdSet);
+
+        // 3. 공통 생성 로직 위임 (seller_id=null — admin 경로)
+        return createShipmentInternal(order, orderItems, targetOrderItemIds, null);
+    }
+
+    /**
+     * 배송 생성 (판매자 경로) — 소유권 스코핑 + seller_id 스탬프.
+     *
+     * <p>처리 흐름:
+     * <ol>
+     *   <li>주문 row {@code PESSIMISTIC_WRITE} 잠금</li>
+     *   <li>상태 검증: paid/preparing이어야 함</li>
+     *   <li>대상 항목 산출:
+     *     <ul>
+     *       <li>orderItemIds 지정 시: 지정 항목 전부가 이 판매자 소유(owner_id==sellerId)이고 미발송이어야 함.
+     *           타 판매자/미존재 항목이 하나라도 섞이면 404(존재 은닉)</li>
+     *       <li>orderItemIds 생략 시: 이 판매자의 미발송 owned 항목 전부</li>
+     *       <li>대상 0건 → 409(상태 충돌 — 만들 배송 없음)</li>
+     *     </ul>
+     *   </li>
+     *   <li>공통 생성 로직 위임 + seller_id 스탬프</li>
+     * </ol>
+     *
+     * @param orderId        대상 주문 ID
+     * @param orderItemIds   포함할 주문 항목 ID 목록 (null/빈 = 판매자 소유 미발송 전부)
+     * @param sellerId       요청 판매자 ID (소유권 검사 + 스탬프)
+     * @return 생성된 배송 응답 DTO
+     * @throws OrderNotFoundException             미존재 주문 (404)
+     * @throws ShipmentNotFoundException          타 판매자/미존재 항목 지정 시 (404, 존재 은닉)
+     * @throws OrderFulfillmentConflictException  상태 충돌 또는 대상 0건 (409)
+     */
+    public ShipmentResponse createShipmentForSeller(long orderId, List<Long> orderItemIds, long sellerId) {
+        // 1. 주문 row PESSIMISTIC_WRITE 잠금
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(OrderNotFoundException::new);
+
+        List<OrderItem> orderItems = order.getItems();
+
+        // 2. 판매자 경로: 소유권 스코핑 항목 산출
+        List<Long> targetOrderItemIds = resolveSellerTargetItems(orderId, orderItemIds, orderItems, sellerId);
+
+        // 3. 공통 생성 로직 위임 (seller_id 스탬프)
+        return createShipmentInternal(order, orderItems, targetOrderItemIds, sellerId);
+    }
+
+    /**
+     * admin 경로 대상 항목 산출.
+     *
+     * <p>orderItemIds 지정 시 미존재/타 주문 소속 → 400, 이미 배정 → 409.
+     * 생략 시 미발송 항목 전부.
+     */
+    private List<Long> resolveAdminTargetItems(long orderId, List<Long> orderItemIds,
+                                               List<OrderItem> orderItems, Set<Long> orderItemIdSet) {
+        List<Long> assignedIds = shipmentRepository.findAssignedOrderItemIds(orderId);
+        Set<Long> assignedSet = Set.copyOf(assignedIds);
 
         if (orderItemIds == null || orderItemIds.isEmpty()) {
-            // 생략(null/빈): 미발송 항목 전부
-            targetOrderItemIds = orderItems.stream()
+            return orderItems.stream()
                     .map(OrderItem::getId)
                     .filter(id -> !assignedSet.contains(id))
                     .toList();
-        } else {
-            // 지정: 각 id 검증 (부작용 전 throw)
-            for (Long itemId : orderItemIds) {
-                if (!orderItemIdSet.contains(itemId)) {
-                    // 미존재 또는 타 주문 소속 → 400 입력 오류 (모순3)
-                    log.warn("배송 항목 입력 오류 — 미존재/타 주문 소속: orderId={}, orderItemId={}", orderId, itemId);
-                    throw new InvalidShipmentItemException(
-                            "주문 항목 ID " + itemId + "은(는) 해당 주문에 속하지 않습니다.");
-                }
-                if (assignedSet.contains(itemId)) {
-                    // 이미 배정 → 409 상태 충돌 (모순3)
-                    log.warn("배송 항목 이미 배정됨: orderId={}, orderItemId={}", orderId, itemId);
-                    throw new OrderFulfillmentConflictException(
-                            "주문 항목 ID " + itemId + "은(는) 이미 다른 배송에 배정되었습니다.");
-                }
+        }
+
+        for (Long itemId : orderItemIds) {
+            if (!orderItemIdSet.contains(itemId)) {
+                log.warn("배송 항목 입력 오류 — 미존재/타 주문 소속: orderId={}, orderItemId={}", orderId, itemId);
+                throw new InvalidShipmentItemException(
+                        "주문 항목 ID " + itemId + "은(는) 해당 주문에 속하지 않습니다.");
             }
-            targetOrderItemIds = orderItemIds;
+            if (assignedSet.contains(itemId)) {
+                log.warn("배송 항목 이미 배정됨: orderId={}, orderItemId={}", orderId, itemId);
+                throw new OrderFulfillmentConflictException(
+                        "주문 항목 ID " + itemId + "은(는) 이미 다른 배송에 배정되었습니다.");
+            }
+        }
+        return orderItemIds;
+    }
+
+    /**
+     * 판매자 경로 대상 항목 산출 (소유권 스코핑).
+     *
+     * <p>orderItemIds 지정 시: 지정 항목이 모두 owner_id==sellerId 이고 미발송이어야 함.
+     * 타 판매자/미존재 항목 포함 시 → 404(존재 은닉).
+     * 생략 시: 이 판매자의 미발송 owned 항목 전부.
+     */
+    private List<Long> resolveSellerTargetItems(long orderId, List<Long> requestedItemIds,
+                                                List<OrderItem> orderItems, long sellerId) {
+        List<Long> assignedIds = shipmentRepository.findAssignedOrderItemIds(orderId);
+        Set<Long> assignedSet = Set.copyOf(assignedIds);
+
+        // 이 판매자 소유 + 미발송 항목 집합
+        Set<Long> ownedUnshippedIds = orderItems.stream()
+                .filter(item -> sellerId == (item.getOwnerId() != null ? item.getOwnerId() : -1L))
+                .map(OrderItem::getId)
+                .filter(id -> !assignedSet.contains(id))
+                .collect(Collectors.toSet());
+
+        if (requestedItemIds == null || requestedItemIds.isEmpty()) {
+            return List.copyOf(ownedUnshippedIds);
+        }
+
+        // 지정: 요청 항목이 모두 owned + 미발송이어야 함 (타 판매자/미존재 → 404 존재 은닉)
+        for (Long itemId : requestedItemIds) {
+            if (!ownedUnshippedIds.contains(itemId)) {
+                log.warn("배송 항목 소유권 위반 또는 미발송 아님 — 존재 은닉 404: orderId={}, orderItemId={}, sellerId={}",
+                        orderId, itemId, sellerId);
+                throw new ShipmentNotFoundException();
+            }
+        }
+        return requestedItemIds;
+    }
+
+    /**
+     * 배송 생성 공통 로직 — 락·상태검증·UNIQUE·rollup.
+     *
+     * <p>admin/seller 둘 다 이미 산출된 targetOrderItemIds를 주입받아 이 메서드를 호출한다.
+     * {@code sellerIdStamp}가 null이면 admin 경로(seller_id=null), non-null이면 판매자 경로(seller_id 스탬프).
+     */
+    private ShipmentResponse createShipmentInternal(Order order, List<OrderItem> orderItems,
+                                                    List<Long> targetOrderItemIds, Long sellerIdStamp) {
+        long orderId = order.getId();
+        String currentStatus = order.getStatus();
+
+        // 상태 검증 — 부작용 전 throw
+        if (!"paid".equals(currentStatus) && !"preparing".equals(currentStatus)) {
+            log.warn("배송 생성 불가 — 주문 상태 충돌: orderId={}, status={}", orderId, currentStatus);
+            throw new OrderFulfillmentConflictException(
+                    "주문 상태(" + currentStatus + ")에서 배송을 생성할 수 없습니다.");
         }
 
         // 대상 0건 → 409 (만들 배송 없음)
@@ -145,15 +237,17 @@ public class OrderFulfillmentService {
                     "미발송 항목이 없어 배송을 생성할 수 없습니다.");
         }
 
-        // orderItemId → productName/quantity 역참조 맵
+        // orderItemId → OrderItem 역참조 맵
         Map<Long, OrderItem> orderItemMap = orderItems.stream()
                 .collect(Collectors.toMap(OrderItem::getId, item -> item));
 
-        // 4. Shipment.preparing + ShipmentItem 생성 → save
-        Shipment shipment = Shipment.preparing(orderId);
+        // Shipment 생성 — admin: seller_id=null, seller: seller_id=sellerId
+        Shipment shipment = sellerIdStamp != null
+                ? Shipment.preparing(orderId, sellerIdStamp)
+                : Shipment.preparing(orderId);
+
         for (Long itemId : targetOrderItemIds) {
-            ShipmentItem shipmentItem = ShipmentItem.of(itemId);
-            shipment.addItem(shipmentItem);
+            shipment.addItem(ShipmentItem.of(itemId));
         }
 
         try {
@@ -165,14 +259,12 @@ public class OrderFulfillmentService {
                     "배송 항목이 이미 다른 배송에 배정되었습니다. 다시 시도해 주세요.");
         }
 
-        // 5. rollup: paid → preparing (첫 배송 생성 시)
+        // rollup: paid → preparing (첫 배송 생성 시)
         if ("paid".equals(currentStatus)) {
             order.markPreparing();
             log.info("주문 rollup paid→preparing: orderId={}", orderId);
         }
-        // 이미 preparing이면 markPreparing 멱등 no-op (호출 생략)
 
-        // 6. ShipmentResponse 변환·반환
         List<ShipmentItemResponse> itemResponses = shipment.getItems().stream()
                 .map(si -> {
                     OrderItem orderItem = orderItemMap.get(si.getOrderItemId());
@@ -184,8 +276,8 @@ public class OrderFulfillmentService {
                 })
                 .toList();
 
-        log.info("배송 생성 완료: orderId={}, shipmentId={}, itemCount={}",
-                orderId, shipment.getId(), itemResponses.size());
+        log.info("배송 생성 완료: orderId={}, shipmentId={}, itemCount={}, sellerIdStamp={}",
+                orderId, shipment.getId(), itemResponses.size(), sellerIdStamp);
 
         return new ShipmentResponse(
                 shipment.getId(),
@@ -194,7 +286,7 @@ public class OrderFulfillmentService {
                 null, // carrier: preparing 단계 null
                 null, // trackingNumber: preparing 단계 null
                 null, // shippedAt: preparing 단계 null
-                null, // deliveredAt: preparing 단계 null (정합3)
+                null, // deliveredAt: preparing 단계 null
                 itemResponses
         );
     }

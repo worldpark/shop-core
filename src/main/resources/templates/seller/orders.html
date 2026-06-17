@@ -1,28 +1,41 @@
 <!DOCTYPE html>
 <!--
-    판매자 주문 조회 화면 (읽기 전용 — Phase 1).
+    판매자 주문 조회 화면 (Phase 2 — Task 049: 배송 생성·시작·완료 폼 포함).
     view name: seller/orders
     레이아웃: layout/base :: layout(title, content)
 
     보존 계약:
       - 모델 키: sellerOrderPage (Page<SellerOrderView>)
-          ㄴ content[*].orderId       (long)
-          ㄴ content[*].orderNumber   (String)
-          ㄴ content[*].orderStatus   (String: pending/paid/preparing/shipping/delivered/cancelled/refunded)
-          ㄴ content[*].finalAmount   (BigDecimal)
-          ㄴ content[*].createdAt     (Instant — KST 변환)
-          ㄴ content[*].items         (List<SellerOrderItemView>)
-              ㄴ orderItemId          (long)
-              ㄴ productName          (String)
-              ㄴ optionLabel          (String, nullable)
-              ㄴ quantity             (int)
-              ㄴ unitPrice            (BigDecimal)
-              ㄴ shipmentStatus       (String: null/"preparing"/"shipping"/"delivered")
+          ㄴ content[*].orderId              (long)
+          ㄴ content[*].orderNumber          (String)
+          ㄴ content[*].orderStatus          (String: pending/paid/preparing/shipping/delivered/cancelled/refunded)
+          ㄴ content[*].finalAmount          (BigDecimal)
+          ㄴ content[*].createdAt            (Instant — KST 변환)
+          ㄴ content[*].items                (List<SellerOrderItemView>)
+              ㄴ orderItemId                 (long)
+              ㄴ productName                 (String)
+              ㄴ optionLabel                 (String, nullable)
+              ㄴ quantity                    (int)
+              ㄴ unitPrice                   (BigDecimal)
+              ㄴ shipmentStatus              (String: null/"preparing"/"shipping"/"delivered")
+              ㄴ shipmentId                  (Long, nullable)
+          ㄴ content[*].sellerShipments      (List<SellerShipmentView>) — Phase 2
+              ㄴ shipmentId                  (long)
+              ㄴ status                      (String: preparing/shipping/delivered)
+              ㄴ orderItemIds                (List<Long>)
+          ㄴ content[*].unshippedOwnedItems  (List<UnshippedOwnedItem>) — Phase 2
+              ㄴ orderItemId                 (long)
+              ㄴ productName                 (String)
+              ㄴ quantity                    (int)
       - 배송 상태 한글 라벨: null → "배송 준비 전", preparing → "배송 준비 중", shipping → "배송 중", delivered → "배송 완료"
       - 빈 상태: "조회된 주문이 없습니다."
       - 페이지네이션: sellerOrderPage.number, .totalPages, .totalElements, .size
-      - Phase 1 읽기 전용: 배송 생성/시작/완료 버튼·폼 없음 (Phase 2 — Task 049)
       - nav active: seller-orders (NavActiveControllerAdvice 자동 주입)
+      - CSRF: th:action 사용으로 자동 주입 (_csrf 수동 금지)
+      - PRG + flash: POST 성공/실패 모두 redirect:/seller/orders, flashSuccess/flashError 표시
+      - 배송 생성 폼 노출 조건: (orderStatus==paid or preparing) AND unshippedOwnedItems.size ≥ 1
+      - 배송 시작 폼 노출 조건: sellerShipments 중 status==preparing
+      - 배송 완료 버튼 노출 조건: sellerShipments 중 status==shipping
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
@@ -111,7 +124,98 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- Phase 1: 배송 생성/시작/완료 버튼 없음 — Phase 2(Task 049)에서 추가 예정 -->
+                <!--
+                    배송 현황 + 시작/완료 폼 (Phase 2 — Task 049).
+                    sellerShipments: 이 판매자 소유 배송 목록.
+                    - status==preparing → 배송 시작 폼 (택배사·운송장, POST /seller/shipments/{id}/ship)
+                    - status==shipping  → 배송 완료 버튼 (POST /seller/shipments/{id}/deliver)
+                    - status==delivered → 완료 표시만
+                    th:action 사용으로 CSRF 자동 주입 (_csrf 수동 금지).
+                -->
+                <div class="shipments-section" th:if="${!order.sellerShipments.isEmpty()}">
+                    <h3 class="section-title">내 배송 현황</h3>
+                    <div th:each="s : ${order.sellerShipments}" class="shipment-item">
+                        <span class="shipment-id" th:text="'배송 #' + ${s.shipmentId}"></span>
+                        <span class="shipment-status"
+                              th:with="shipStatusLabel=(${s.status} == 'preparing' ? '배송 준비 중' :
+                                                       (${s.status} == 'shipping'  ? '배송 중' :
+                                                       (${s.status} == 'delivered' ? '배송 완료' : ${s.status})))"
+                              th:classappend="(${s.status} == 'preparing' ? ' badge-shipment-preparing' :
+                                              (${s.status} == 'shipping'  ? ' badge-shipment-shipping' :
+                                              (${s.status} == 'delivered' ? ' badge-shipment-delivered' : '')))"
+                              th:text="${shipStatusLabel}">배송 준비 중</span>
+
+                        <!--
+                            배송 시작 폼: preparing 배송에만 노출.
+                            POST /seller/shipments/{shipmentId}/ship (절대경로 — SellerShipViewController).
+                            th:action 사용 시 _csrf 토큰 자동 주입 (Thymeleaf + Spring Security).
+                        -->
+                        <div class="ship-form-section" th:if="${s.status == 'preparing'}">
+                            <form class="ship-start-form"
+                                  method="post"
+                                  th:action="@{/seller/shipments/{id}/ship(id=${s.shipmentId})}">
+                                <div class="form-group">
+                                    <label th:for="'carrier-' + ${s.shipmentId}">택배사</label>
+                                    <input type="text"
+                                           th:id="'carrier-' + ${s.shipmentId}"
+                                           name="carrier"
+                                           placeholder="예: CJ대한통운"
+                                           required>
+                                </div>
+                                <div class="form-group">
+                                    <label th:for="'trackingNumber-' + ${s.shipmentId}">운송장번호</label>
+                                    <input type="text"
+                                           th:id="'trackingNumber-' + ${s.shipmentId}"
+                                           name="trackingNumber"
+                                           placeholder="운송장 번호 입력"
+                                           required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm">배송 시작</button>
+                            </form>
+                        </div>
+
+                        <!--
+                            배송 완료 버튼: shipping 배송에만 노출.
+                            POST /seller/shipments/{shipmentId}/deliver (절대경로 — SellerShipViewController).
+                            th:action 사용 시 _csrf 토큰 자동 주입.
+                        -->
+                        <div class="deliver-form-section" th:if="${s.status == 'shipping'}">
+                            <form class="ship-deliver-form"
+                                  method="post"
+                                  th:action="@{/seller/shipments/{id}/deliver(id=${s.shipmentId})}">
+                                <button type="submit" class="btn btn-primary btn-sm">배송 완료</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!--
+                    배송 생성 폼 (Phase 2 — Task 049).
+                    노출 조건: orderStatus가 paid 또는 preparing이고 unshippedOwnedItems가 1건 이상.
+                    POST /seller/orders/{orderId}/shipments.
+                    미선택 시 판매자 소유 미발송 항목 전부 포함(facade 처리).
+                    th:action 사용으로 CSRF 자동 주입 (_csrf 수동 금지).
+                -->
+                <div class="shipment-form-section"
+                     th:if="${(order.orderStatus == 'paid' or order.orderStatus == 'preparing') and !order.unshippedOwnedItems.isEmpty()}">
+                    <h3 class="section-title">배송 생성</h3>
+                    <form class="shipment-create-form"
+                          method="post"
+                          th:action="@{/seller/orders/{orderId}/shipments(orderId=${order.orderId})}">
+                        <div class="unshipped-items">
+                            <p class="form-hint">포함할 항목을 선택하세요. (미선택 시 내 미발송 항목 전부 포함)</p>
+                            <div th:each="item : ${order.unshippedOwnedItems}" class="checkbox-item">
+                                <label>
+                                    <input type="checkbox"
+                                           name="orderItemIds"
+                                           th:value="${item.orderItemId}">
+                                    <span th:text="${item.productName} + ' x' + ${item.quantity}"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">배송 생성</button>
+                    </form>
+                </div>
             </div>
         </div>
 

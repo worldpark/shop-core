@@ -74,17 +74,43 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     List<Long> findAssignedOrderItemIdsByOrderIdIn(@Param("orderIds") Collection<Long> orderIds);
 
     /**
-     * orderItemId 목록에 해당하는 배송 상태 배치 조회 (판매자 주문 목록 N+1 방지).
+     * orderItemId 목록에 해당하는 배송 상태·ID 배치 조회 (판매자 주문 목록 N+1 방지).
      *
-     * <p>판매자 주문 목록에서 항목별 배송 상태를 조회할 때 사용한다.
+     * <p>판매자 주문 목록에서 항목별 배송 상태 및 shipmentId를 조회할 때 사용한다.
      * shipment_items.order_item_id IN (...) JOIN shipments 1회 조회로
-     * {@code Map<Long orderItemId, String shipmentStatus>} 조립 데이터를 제공한다.
+     * {@code Map<Long orderItemId, [shipmentId, shipmentStatus]>} 조립 데이터를 제공한다.
      * 미존재 orderItemId(배송 미생성)는 결과에 포함되지 않는다(null = 미생성).
      *
      * @param orderItemIds 조회할 주문 항목 ID 컬렉션
-     * @return [orderItemId, shipmentStatus] 쌍의 Object[] 목록
+     * @return [orderItemId, shipmentId, shipmentStatus] 쌍의 Object[] 목록
      */
-    @Query("select si.orderItemId, s.status from ShipmentItem si join si.shipment s " +
+    @Query("select si.orderItemId, s.id, s.status from ShipmentItem si join si.shipment s " +
            "where si.orderItemId in :orderItemIds")
     List<Object[]> findShipmentStatusByOrderItemIdIn(@Param("orderItemIds") Collection<Long> orderItemIds);
+
+    /**
+     * shipmentId → sellerId 스칼라 projection (소유권 검사용 — 엔티티 적재 금지).
+     *
+     * <p>판매자 ship/deliver 소유권 검사 전용.
+     * 엔티티를 락 전에 적재하면 JPA 1차 캐시가 stale 상태를 보관해 동시 ship 시
+     * 이벤트 중복 발행이 발생한다(stale-read 가드 — §1.2).
+     * 이 스칼라만 읽어 sellerId 비교 후 기존 ship/deliver에 위임한다.
+     *
+     * @param id 배송 ID
+     * @return sellerId Optional (배송 미존재 시 empty, admin 생성 배송은 Optional.of(null)이 아닌 empty에 준해 처리)
+     */
+    @Query("select s.sellerId from Shipment s where s.id = :id")
+    Optional<Long> findSellerIdById(@Param("id") long id);
+
+    /**
+     * shipmentId → orderId + sellerId 동시 조회 (판매자 소유권 검사용 복합 projection).
+     *
+     * <p>판매자 ship/deliver 흐름에서 존재 확인 겸 sellerId 비교에 사용한다.
+     * seller 확인 후 orderId는 기존 service 내부에서 다시 조회하므로 별도 메서드.
+     *
+     * @param id 배송 ID
+     * @return [orderId, sellerId] Object[] (배송 미존재 시 빈 목록)
+     */
+    @Query("select s.orderId, s.sellerId from Shipment s where s.id = :id")
+    List<Object[]> findOrderIdAndSellerIdById(@Param("id") long id);
 }
