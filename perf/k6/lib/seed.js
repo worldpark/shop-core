@@ -175,8 +175,16 @@ function createVariant(sellerToken, productId, prefix) {
 /**
  * k6 setup() 에서 호출하는 전체 시드 흐름.
  *
+ * ORDER_VARIANT_COUNT(기본 1) 개수만큼 상품×variant를 생성한다.
+ * 각 상품에 variant 1개 패턴(setupCatalogSeed 선례) — 옵션 없는 variant를
+ * 단일 상품에 N개 달면 "옵션 조합 없음" 중복 제약 위반이므로 상품을 N개로 나눈다.
+ *
  * @param {number} buyerCount 생성할 buyer 수 (= 프로파일 최대 VU)
- * @returns {{ variantId: number, buyers: Array<{ token: string }> }}
+ * @returns {{
+ *   variantId: number,         — variantIds[0] (하위 호환: 기존 단수 소비자 무파손)
+ *   variantIds: number[],      — 생성된 모든 variant ID 목록 (order-create 분산 선택용)
+ *   buyers: Array<{ token: string, accessToken: string, refreshToken: string, issuedAt: number, email: string }>
+ * }}
  * @throws {Error} 어느 단계든 실패 시 즉시 throw → 런 중단
  */
 export function setupSeed(buyerCount) {
@@ -198,14 +206,24 @@ export function setupSeed(buyerCount) {
   // 4. seller 재로그인 (승격 후 SELLER 권한 토큰 확보)
   const sellerToken = login(sellerEmail, SEED.DEFAULT_PASSWORD);
 
-  // 5. 상품 등록 (DRAFT)
-  const productId = registerProduct(sellerToken, prefix);
+  // 5~7. 상품 N개 × variant 1개 루프 (setupCatalogSeed 패턴 차용)
+  //   ORDER_VARIANT_COUNT 개수만큼 반복. N=1이면 기존과 동일(상품1·variant1).
+  //   prefix에 `-i`를 부여해 상품·SKU 네임스페이스를 런 내에서도 분리한다.
+  const variantCount = SEED.ORDER_VARIANT_COUNT;
+  const variantIds = [];
+  for (let i = 0; i < variantCount; i++) {
+    const productPrefix = `${prefix}-${i}`;
 
-  // 6. 상품 게시 (ON_SALE) — 구매 가능 불변식 충족
-  publishProduct(sellerToken, productId, prefix);
+    // 5. 상품 등록 (DRAFT)
+    const productId = registerProduct(sellerToken, productPrefix);
 
-  // 7. variant 생성 (stock 대량, active:true)
-  const variantId = createVariant(sellerToken, productId, prefix);
+    // 6. 상품 게시 (ON_SALE) — 구매 가능 불변식 충족
+    publishProduct(sellerToken, productId, productPrefix);
+
+    // 7. variant 생성 (stock 대량, active:true)
+    const variantId = createVariant(sellerToken, productId, productPrefix);
+    variantIds.push(variantId);
+  }
 
   // 8. buyer N개 signup + login
   // buyer 객체: { token, accessToken, refreshToken, issuedAt, email }
@@ -229,7 +247,11 @@ export function setupSeed(buyerCount) {
     });
   }
 
-  return { variantId, buyers };
+  return {
+    variantId: variantIds[0],   // 하위 호환: setupCouponSeed·payment-confirm·coupon-apply가 단수 소비
+    variantIds,                 // 신규: order-create가 분산 선택에 사용
+    buyers,
+  };
 }
 
 // ---------------------------------------------------------------

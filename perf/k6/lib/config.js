@@ -14,6 +14,9 @@
  *                             기능 검증 시 5 등 짧게 지정. (auth.js getValidToken 참조)
  *   CONC_VUS                — conc 프로파일 VU 수 (기본: 300). A/B 측정 시 100/300/500 스윕.
  *   CONC_DURATION           — conc 프로파일 지속 시간 (기본: 40s).
+ *   ORDER_VARIANT_COUNT     — order-create 시드의 variant 수 (기본: 1).
+ *                             1=단일 variant(기존 베이스라인 재현), >1=분산(행 락 경합 분산).
+ *                             order-create 측정 전용 — payment-confirm/coupon-apply 실행 시엔 지정 말 것.
  */
 
 // ---------------------------------------------------------------
@@ -48,6 +51,20 @@ export const SEED = {
   BUYER_EMAIL_DOMAIN: '@perf.local',
   /** 공통 테스트 비밀번호 (8자 이상, @Size(min=8) + @PasswordMatches 충족) */
   DEFAULT_PASSWORD: 'Perf1234!',
+
+  // ---- order-create 다중 variant 분산 (order-create.js 전용) ---------
+  /**
+   * order-create 시드에서 생성할 variant 수.
+   * 1 = 단일 variant(기존 베이스라인 재현 — 전 VU가 같은 행에 PESSIMISTIC_WRITE 직렬화).
+   * >1 = 분산(variant 수만큼 상품을 별도 생성해 행 락 경합을 분산).
+   *
+   * 주의: ORDER_VARIANT_COUNT는 order-create 측정 전용이다.
+   *   payment-confirm / coupon-apply 실행 시에는 이 env를 지정하지 말 것.
+   *   지정해도 결과는 동일(variantIds[0]만 사용)이지만 setup 시간이 늘어난다.
+   *
+   * 분산 측정 시작 후보값: 50 (setupCatalogSeed 선례와 동일).
+   */
+  ORDER_VARIANT_COUNT: __ENV.ORDER_VARIANT_COUNT ? Number(__ENV.ORDER_VARIANT_COUNT) : 1,
 
   // ---- 카탈로그 읽기 시드 상수 (catalog-read.js 전용) ---------------
   /** catalog-read 시드에서 등록할 공개 상품 수 (읽기 부하 다양성 확보). */

@@ -6,6 +6,7 @@
 >           `docs/tasks/performance/004-performance-shop-core-k6-payment-confirm-scenario.md` (Task 004)
 >           `docs/tasks/performance/005-performance-shop-core-k6-coupon-apply-scenario.md` (Task 005)
 >           `docs/tasks/performance/006-performance-shop-core-virtual-thread-ab-evaluation.md` (Task 006)
+>           `docs/tasks/performance/007-performance-shop-core-k6-order-create-multi-variant-distribution.md` (Task 007)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
 >       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
@@ -264,6 +265,138 @@ stress는 "어디서 무너지나"를 측정하는 것이 목적이므로 p95/dr
 
 ---
 
+## 5-4. 다중 variant 분산 측정 — 단일 vs 분산 A/B 비교 (Task 007)
+
+> Plan: `docs/plans/performance/007-shop-core-k6-order-create-multi-variant-distribution-plan.md`
+>
+> 현재 베이스라인은 "모든 VU가 같은 variant 1개를 동시에 주문"하는 **최악 자기경합** 조건이다.
+> `ORDER_VARIANT_COUNT` env로 variant 수를 늘려 행 락 경합을 분산하고, 단일 vs 분산 throughput 차이를
+> 동일 머신·동일 프로파일에서 A/B로 비교한다.
+
+### ORDER_VARIANT_COUNT 동작 원리
+
+`lib/seed.js` `setupSeed()`가 `ORDER_VARIANT_COUNT` 수만큼 **상품 N개 × variant 1개**를 생성한다.
+`scenarios/order-create.js` `default()` 함수는 cart add 시 아래 식으로 variant를 결정적 분배한다:
+
+```
+variantId = data.variantIds[(__VU - 1 + __ITER) % data.variantIds.length]
+```
+
+- VU와 iteration 진행에 따라 variant 공간을 고르게 훑는다(random 미사용 — 재현성 확보).
+- `ORDER_VARIANT_COUNT=1`(기본)이면 분배가 항상 `variantIds[0]`로 수렴 → 기존 단일 variant 동작 완전 재현.
+
+> **주의**: `ORDER_VARIANT_COUNT`는 **order-create 측정 전용**이다.
+> payment-confirm / coupon-apply 실행 시에는 이 env를 지정하지 말 것
+> (지정해도 결과는 동일하지만 setup 시간이 늘어난다 — 기본값 1 사용).
+
+### 측정 전 필수 준비
+
+```
+1. 인프라·앱 완전 기동 (PG + Redis + Kafka + shop-core)
+2. notification 안전 확인: log 모드(NOTIFICATION_MAIL_MODE=log) + mail health off
+   — signup(buyer) → 환영메일이 부하 테스트 중 실 Gmail SMTP를 대량 발송하지 않도록
+3. 깨끗한 DB: 측정 전 테스트 주문·장바구니 TRUNCATE (누적 데이터 열화 배제)
+   — 누적 orders 41,531건 시 p95가 13배 상승하는 사례 기록 있음
+```
+
+**깨끗한 DB TRUNCATE 예시 (perf DB에만 적용)**:
+
+```sql
+TRUNCATE orders, order_items, cart_items RESTART IDENTITY CASCADE;
+```
+
+### 단일 vs 분산 A/B 측정 (load 프로파일, 각 3런)
+
+```bash
+# ─────────── 단일 variant (ORDER_VARIANT_COUNT=1, 기존 베이스라인 재현) ───────────
+
+# Windows PowerShell
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=load `
+  -e ORDER_VARIANT_COUNT=1 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-load-single-run1.json `
+  shop-core/perf/k6/scenarios/order-create.js
+
+# macOS/Linux
+mkdir -p build/k6
+ORDER_VARIANT_COUNT=1 BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=load \
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-load-single-run1.json \
+  shop-core/perf/k6/scenarios/order-create.js
+
+# ── 총 3회 실행 (run1 / run2 / run3) — 분포 비중첩 확인 ──
+
+# ─────────── 분산 variant (ORDER_VARIANT_COUNT=50) ───────────
+
+# Windows PowerShell
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=load `
+  -e ORDER_VARIANT_COUNT=50 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-load-multi50-run1.json `
+  shop-core/perf/k6/scenarios/order-create.js
+
+# macOS/Linux
+ORDER_VARIANT_COUNT=50 BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=load \
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-load-multi50-run1.json \
+  shop-core/perf/k6/scenarios/order-create.js
+
+# ── 총 3회 실행 (run1 / run2 / run3) ──
+```
+
+### 분산 천장 탐색 (stress 프로파일, 선택)
+
+분산(N=50)에서 load 상한이 충분히 상향되면 stress로 새 천장을 탐색한다:
+
+```bash
+# Windows PowerShell
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=stress `
+  -e ORDER_VARIANT_COUNT=50 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=shop-core/perf/k6/baselines/order-create-load-multivariant.json `
+  shop-core/perf/k6/scenarios/order-create.js
+```
+
+> 베이스라인 JSON 최종 확정 후 `baselines/order-create-load-multivariant.json`으로 보관(커밋).
+
+### 서버측 메트릭 수집 (ADR-010, 측정 중 병행)
+
+분산 측정 중 아래 actuator 엔드포인트를 주기적으로 수집해 진짜 병목이 어디인지 확인한다:
+
+```bash
+# HikariCP 커넥션 풀 포화 여부
+curl -s http://localhost:8080/actuator/metrics/hikaricp.connections.active
+curl -s http://localhost:8080/actuator/metrics/hikaricp.connections.pending
+
+# JVM 스레드 수
+curl -s http://localhost:8080/actuator/metrics/jvm.threads.live
+
+# CPU (시스템/프로세스)
+curl -s http://localhost:8080/actuator/metrics/system.cpu.usage
+curl -s http://localhost:8080/actuator/metrics/process.cpu.usage
+```
+
+분산으로 행 락이 풀리면 천장이 **행 락 → 커넥션 풀/CPU**로 이동하는지 확인.
+
+> **CPU 공유 주의**: k6·앱·PG가 동일 머신에 있으면 절대 throughput은 비대표적이다.
+> 단일 vs 분산은 동일 머신·동일 조건이므로 **상대 비교만** 결론으로 사용한다
+> (측정 방법론: `docs/report/performance/001-virtual-thread-ab-measurement.md` ★).
+
+### 비교표 (산출물 예시)
+
+| 조건 | 목표 RPS | 실측 throughput | p95 | p99 | order_5xx | 서버측 병목 |
+|---|---|---|---|---|---|---|
+| 단일 (N=1) | 60rps | ~60/s | ~22ms | ~54ms | 0 | 행 락 직렬화 |
+| 분산 (N=50) | 60rps | 측정 후 기입 | 측정 후 기입 | 측정 후 기입 | 0 | 풀/CPU(이동 여부 확인) |
+
+결과 리포트: `docs/report/performance/002-order-create-multi-variant-distribution.md` (측정 완료 후 신규 작성).
+
+---
+
 ## 5-3. 토큰 갱신(TOKEN_REFRESH_AFTER_SEC)
 
 stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 설정(1500초=25분)에서는 토큰 갱신이 발화하지 않는다.
@@ -297,6 +430,7 @@ stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 
 | `ADMIN_PASSWORD` | `Admin1234!` | admin 계정 비밀번호 |
 | `RUN_TAG` | uuidv4 자동 생성 | 런별 유니크 prefix (데이터 네임스페이스) |
 | `TOKEN_REFRESH_AFTER_SEC` | `1500` | 토큰 갱신 발화 임계(초). 기본 25분(30분 TTL - 5분 버퍼). 갱신 기능 검증 시 `5` 등으로 지정. |
+| `ORDER_VARIANT_COUNT` | `1` | order-create 시드의 variant 수. 1=단일(기존 베이스라인 재현), >1=분산(행 락 경합 분산). **order-create 전용** — payment-confirm/coupon-apply 실행 시엔 지정 말 것. |
 
 ---
 

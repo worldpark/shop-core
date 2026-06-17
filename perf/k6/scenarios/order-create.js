@@ -136,9 +136,14 @@ export default function (data) {
   const headers    = authHeaders(token);
 
   // ---- 1. 장바구니 담기 ----------------------------------------
+  // 결정적 variant 분배: (__VU-1 + __ITER) % variantIds.length
+  //   - VU와 iteration 진행에 따라 variant 공간을 고르게 훑음(random 미사용 — 재현성 확보).
+  //   - N=1(기본)이면 분배가 항상 variantIds[0]로 수렴 → 기존 단일 variant 동작 보장.
+  //   - maxVUs와 N의 공약수로 인한 쏠림은 +__ITER 항이 완화(VU 진행 내내 variant를 순환).
+  const variantId = data.variantIds[(__VU - 1 + __ITER) % data.variantIds.length];
   const cartRes = http.post(
     `${BASE_URL}/api/v1/cart/items`,
-    JSON.stringify({ variantId: data.variantId, quantity: 1 }),
+    JSON.stringify({ variantId: variantId, quantity: 1 }),
     headers,
   );
 
