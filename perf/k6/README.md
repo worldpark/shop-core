@@ -7,37 +7,41 @@
 >           `docs/tasks/performance/005-performance-shop-core-k6-coupon-apply-scenario.md` (Task 005)
 >           `docs/tasks/performance/006-performance-shop-core-virtual-thread-ab-evaluation.md` (Task 006)
 >           `docs/tasks/performance/007-performance-shop-core-k6-order-create-multi-variant-distribution.md` (Task 007)
+>           `docs/tasks/performance/008-performance-shop-core-k6-order-create-high-rps-saturation-bottleneck.md` (Task 008)
 > Plan: `docs/plans/performance/001-shop-core-k6-order-create-smoke-baseline-plan.md`
 >       `docs/plans/performance/002-shop-core-k6-order-create-load-profile-plan.md`
 >       `docs/plans/performance/003-shop-core-k6-order-create-stress-profile-plan.md`
 >       `docs/plans/performance/004-shop-core-k6-payment-confirm-scenario-plan.md`
 >       `docs/plans/performance/005-shop-core-k6-coupon-apply-scenario-plan.md`
 >       `docs/plans/performance/006-shop-core-virtual-thread-ab-evaluation-plan.md`
+>       `docs/plans/performance/008-shop-core-k6-order-create-high-rps-saturation-bottleneck-plan.md`
 
 ## 디렉토리 구조
 
 ```
 shop-core/perf/k6/
   lib/
-    config.js        # BASE_URL·PROFILE·thresholds(smoke/load/stress/coupon/read 분리)·시드 상수 (공통)
-    auth.js          # 로그인·회원가입·Bearer 헤더 헬퍼·토큰 갱신(getValidToken)
-    seed.js          # setup() 전용 — seller/상품/variant/buyer 시드 + setupCouponSeed + setupCatalogSeed
+    config.js           # BASE_URL·PROFILE·thresholds(smoke/load/stress/saturate/coupon/read 분리)·시드 상수 (공통)
+    auth.js             # 로그인·회원가입·Bearer 헤더 헬퍼·토큰 갱신(getValidToken)
+    seed.js             # setup() 전용 — seller/상품/variant/buyer 시드 + setupCouponSeed + setupCatalogSeed
+    scrape-metrics.py   # 서버측 메트릭 스크랩 — /actuator/prometheus 폴링 → CSV (Task 008)
   scenarios/
-    order-create.js   # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress 분기)
-    payment-confirm.js # 종단: cart→order→결제 확정(빈 바디) + payment_confirm_duration (Task 004)
-    coupon-apply.js   # 쿠폰 사용 동시성: cart→쿠폰적용 주문 + 충돌(409) 직렬화 검증 (Task 005)
-    catalog-read.js   # 공개 읽기 가압 (VT A/B 측정 — Task 006): GET /products + GET /products/{id}
+    order-create.js     # 핫패스: cart add → order create + 커스텀 메트릭 (smoke/load/stress/saturate 분기)
+    payment-confirm.js  # 종단: cart→order→결제 확정(빈 바디) + payment_confirm_duration (Task 004)
+    coupon-apply.js     # 쿠폰 사용 동시성: cart→쿠폰적용 주문 + 충돌(409) 직렬화 검증 (Task 005)
+    catalog-read.js     # 공개 읽기 가압 (VT A/B 측정 — Task 006): GET /products + GET /products/{id}
   profiles/
-    smoke.js         # 5 VU × 30s options export (closed 모델)
-    load.js          # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
-    stress.js        # 50→200 rps ramping options export (open: ramping-arrival-rate) — Task 003
+    smoke.js            # 5 VU × 30s options export (closed 모델)
+    load.js             # 60 rps × 1m options export (open: constant-arrival-rate, 포화점 아래)
+    stress.js           # 50→200 rps ramping options export (open: ramping-arrival-rate) — Task 003
   baselines/
-    order-create-smoke.json    # smoke 베이스라인 (Task 001, 2026-06-16)
-    order-create-load.json     # load 베이스라인 (Task 002, 2026-06-16)
-    order-create-stress.json   # stress 베이스라인 (Task 003, 2026-06-16)
-    payment-confirm-load.json  # payment-confirm load 베이스라인 (Task 004, 2026-06-16)
-    coupon-apply-load.json     # coupon-apply load 베이스라인 (Task 005, 측정 후 추가)
-  README.md          # 이 문서
+    order-create-smoke.json      # smoke 베이스라인 (Task 001, 2026-06-16)
+    order-create-load.json       # load 베이스라인 (Task 002, 2026-06-16)
+    order-create-stress.json     # stress 베이스라인 (Task 003, 2026-06-16)
+    payment-confirm-load.json    # payment-confirm load 베이스라인 (Task 004, 2026-06-16)
+    coupon-apply-load.json       # coupon-apply load 베이스라인 (Task 005, 측정 후 추가)
+    order-create-saturate-*.json # saturate 대표 런 (Task 008, 측정 후 추가)
+  README.md             # 이 문서
 ```
 
 산출 JSON:
@@ -267,6 +271,9 @@ stress는 "어디서 무너지나"를 측정하는 것이 목적이므로 p95/dr
 
 ## 5-4. 다중 variant 분산 측정 — 단일 vs 분산 A/B 비교 (Task 007)
 
+> **정합 메모**: 아래 §5-4의 "서버측 메트릭 수집" 항목에서는 단발 `curl /actuator/metrics/...`로 스냅샷을 찍는다.
+> §5-5(고RPS saturation + 병목 탐색)는 `/actuator/prometheus` 폴링 스크립트(`scrape-metrics.py`)로 타임시리즈를 수집한다 — 두 방식은 혼용이지 대체가 아니며, saturate 런에는 반드시 스크립트 방식을 써야 시계열 교차 판정이 가능하다.
+
 > Plan: `docs/plans/performance/007-shop-core-k6-order-create-multi-variant-distribution-plan.md`
 >
 > 현재 베이스라인은 "모든 VU가 같은 variant 1개를 동시에 주문"하는 **최악 자기경합** 조건이다.
@@ -397,6 +404,169 @@ curl -s http://localhost:8080/actuator/metrics/process.cpu.usage
 
 ---
 
+## 5-5. 고RPS saturation + 병목 탐색 (Task 008)
+
+> Plan: `docs/plans/performance/008-shop-core-k6-order-create-high-rps-saturation-bottleneck-plan.md`
+>
+> 분산(N=50) stress(50→200rps)가 p95=21ms·dropped=0으로 **완주** → 200rps에서 미포화. 진짜 처리량 천장과 병목(풀/CPU/DB)을 찾는다.
+> 이 섹션의 서버측 메트릭은 `/actuator/prometheus` **폴링 스크립트** (`lib/scrape-metrics.py`)로 수집한다.
+> §5-4의 단발 `curl /actuator/metrics/...` 스냅샷과는 다른 방식이다 — saturate 런에는 반드시 이 스크립트를 병행 기동해야 히카리/CPU 타임시리즈로 교차 판정이 가능하다.
+
+### ★ 전제 조건 (측정 전 필수 확인)
+
+| 항목 | 조건 | 확인 방법 |
+|---|---|---|
+| **깨끗한 DB** | 측정 전 TRUNCATE 필수 — 누적 데이터가 쿼리를 심각히 저하시킴 | `TRUNCATE orders, order_items, cart_items RESTART IDENTITY CASCADE;` |
+| **notification 안전** | log 모드이거나 프로세스 정지 — signup→환영메일 대량 발송 방지 | `NOTIFICATION_MAIL_MODE=log` 확인 또는 프로세스 종료 |
+| **Kafka up** | Outbox 이벤트 발행 필수 — 미기동 시 order POST가 5xx로 오염 | `docker compose ps` → kafka healthy |
+| **앱 인스턴스 1개** | 좀비 프로세스 제거 — 중복 인스턴스가 PG 커넥션·DB 간섭 → 수치 오염 | `tasklist \| grep java` (Windows) 또는 `pgrep -a java` |
+| **분산 전제** | `ORDER_VARIANT_COUNT≥50` 필수 — 단일(N=1)은 행 락 산물이지 일반 트래픽 천장 아님 | 커맨드에 `-e ORDER_VARIANT_COUNT=50` 포함 확인 |
+
+### scrape-metrics.py 기동 (k6와 병행)
+
+터미널 2개를 준비한다. 스크랩 스크립트를 먼저 기동한 뒤 k6를 실행한다.
+
+**터미널 1 — scrape-metrics.py 기동**:
+
+```bash
+# build/k6/ 디렉토리 생성
+mkdir -p build/k6
+
+# 폴링 시작 (Ctrl-C로 종료 — k6 런 완료 후 종료)
+python3 shop-core/perf/k6/lib/scrape-metrics.py \
+  --base-url http://localhost:8080 \
+  --output build/k6/server-metrics-saturate-pool10.csv \
+  --interval 3
+
+# 또는 자동 종료 (예: 400초)
+python3 shop-core/perf/k6/lib/scrape-metrics.py \
+  --base-url http://localhost:8080 \
+  --output build/k6/server-metrics-saturate-pool10.csv \
+  --interval 3 \
+  --duration 400
+```
+
+```powershell
+# Windows PowerShell
+New-Item -ItemType Directory -Force -Path build\k6
+
+# Ctrl-C로 종료
+python shop-core\perf\k6\lib\scrape-metrics.py `
+  --base-url http://localhost:8080 `
+  --output build\k6\server-metrics-saturate-pool10.csv `
+  --interval 3
+```
+
+**터미널 2 — saturate 런**:
+
+```bash
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=saturate \
+  -e ORDER_VARIANT_COUNT=50 \
+  -e SATURATE_PEAK_RPS=600 \
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-saturate-pool10-run1.json \
+  shop-core/perf/k6/scenarios/order-create.js
+
+# Windows PowerShell
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=saturate `
+  -e ORDER_VARIANT_COUNT=50 `
+  -e SATURATE_PEAK_RPS=600 `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/order-create-saturate-pool10-run1.json `
+  shop-core/perf/k6/scenarios/order-create.js
+```
+
+k6 런 완료 후 scrape-metrics.py를 Ctrl-C로 종료한다.
+
+### saturate 프로파일 설계
+
+- **executor**: `ramping-arrival-rate` (open 모델) — 단계별 목표 RPS를 자동 점증.
+- **stages**: `buildSaturateStages(SATURATE_PEAK_RPS)` 헬퍼가 결정적 생성.
+  기본(피크 600): 100→200→300→400→500→600rps (각 40s) → 0 쿨다운 (총 약 4분 15초).
+  env로 피크 조정 — 천장이 예상 위/아래이면 `SATURATE_PEAK_RPS` 값을 올리거나 낮춘다.
+- **VU 풀**: preAllocatedVUs=100, maxVUs=400. stdout "Insufficient VUs" 경고가 나타나면 VU 부족이 인위적 병목인지 앱 한계인지 구분 필요.
+- **thresholds**: 진단용(느슨) — `order_5xx count==0`만 게이트. p95/dropped는 측정 곡선이므로 임계 없음.
+
+### 천장(knee) 판정
+
+stress(§5-2) knee 판정과 동일한 방법을 적용한다:
+
+- `dropped_iterations`가 눈에 띄게 증가하기 시작하는 직전 RPS = SLO 마지막 유지 RPS (= 처리량 천장).
+- stdout VU 수가 10개 이하에서 갑자기 수백으로 폭증하는 시점 = VU 풀 포화 = 처리 한계 도달.
+- k6 stdout의 10초 간격 진행률 라인을 시간대별로 관찰한다.
+
+### 풀 스윕 — 병목 분류
+
+동일 saturate 프로파일을 **HikariCP 풀 크기 3셀**로 각 3런씩 실행한다(셀마다 앱 재기동 필수):
+
+```
+SHOP_CORE_HIKARI_MAX_POOL=10   → 기본값. 앱 재기동: 기본 설정
+SHOP_CORE_HIKARI_MAX_POOL=30   → 앱 재기동: 환경변수 주입
+SHOP_CORE_HIKARI_MAX_POOL=50   → 앱 재기동: 환경변수 주입 (PG max_connections 기본 100 미만)
+```
+
+앱 재기동 예 (bootRun 사용 시):
+
+```bash
+# 풀 크기 30으로 재기동 (Gradle)
+SHOP_CORE_HIKARI_MAX_POOL=30 ./gradlew bootRun
+
+# Windows PowerShell
+$env:SHOP_CORE_HIKARI_MAX_POOL=30; ./gradlew bootRun
+```
+
+**풀 적용 검증**: scrape-metrics.py CSV의 `hikaricp_connections_max` 컬럼 값이 셀 설정값(10/30/50)과 일치하는지 확인한다. Gradle 데몬이 env를 캐시해 반영 안 될 수 있으므로 CSV 값으로 검증한다(report 001 §7 교훈).
+
+**병목 분류 판정 기준**:
+
+| 패턴 | 판정 | 대응 |
+|---|---|---|
+| 풀 크기와 함께 throughput이 **상승** | 풀-바운드 | 풀 상향이 레버 (다음 Task) |
+| 풀 크기와 무관하게 throughput **평탄** + `process_cpu_usage`≈1.0 | CPU-바운드 | 개발 머신 공유 — 전용 perf 환경 재측정 필요 |
+| 풀 크기와 무관하게 throughput **평탄** + `hikaricp_connections_pending`>0 지속 | 풀 경합 잔존 | 풀을 더 올리거나 PG max_connections 점검 |
+| 위 어느 것도 해당 없음 | DB-바운드(쿼리/락) | 락 창 단축·인덱스·쿼리 분석 task |
+
+> **CPU 공유 주의**: k6·앱·PG가 동일 개발 머신에 있으면 절대 처리량 천장은 비대표적이다.
+> 병목 "분류"(풀/CPU/DB 중 어느 것인가)는 현 머신에서 유효하지만,
+> CPU-바운드로 판명되면 절대 천장값은 전용 perf 환경(부하발생기·앱·DB 분리)에서 재측정해야 운영 기준값이 된다.
+
+### 스크랩 CSV 해석
+
+출력 예 (`build/k6/server-metrics-saturate-pool10.csv`):
+
+```
+ts,metric,value
+1718500000.1,hikaricp_connections_active,8.0
+1718500000.1,hikaricp_connections_pending,0.0
+1718500000.1,hikaricp_connections_max,10.0
+1718500000.1,process_cpu_usage,0.42
+...
+```
+
+핵심 신호:
+- `hikaricp_connections_pending > 0` 이 지속되는 구간 = 풀 포화(커넥션 대기 중)
+- `hikaricp_connections_max` = 셀 설정값 확인
+- `process_cpu_usage ≈ 1.0` = CPU 병목 의심
+- `hikaricp_connections_acquire_seconds_sum` 의 증분 / `_count` 증분 = 평균 획득 지연
+
+k6 stdout의 단계별 dropped/iters와 CSV 타임스탬프를 사후 정렬해 교차 분석한다.
+
+### 비교표 (풀 스윕 산출물 예시)
+
+| 풀 크기 | 천장 RPS (dropped 급증 직전) | p95 at knee | order_5xx | hikari_pending 지속 | process_cpu_avg | 병목 판정 |
+|---|---|---|---|---|---|---|
+| 10 | 측정 후 기입 | 측정 후 기입 | 0 | 측정 후 기입 | 측정 후 기입 | 측정 후 기입 |
+| 30 | 측정 후 기입 | 측정 후 기입 | 0 | 측정 후 기입 | 측정 후 기입 | 측정 후 기입 |
+| 50 | 측정 후 기입 | 측정 후 기입 | 0 | 측정 후 기입 | 측정 후 기입 | 측정 후 기입 |
+
+결과 리포트: `docs/report/performance/003-order-create-saturation-bottleneck.md` (측정 완료 후 신규 작성).
+
+---
+
 ## 5-3. 토큰 갱신(TOKEN_REFRESH_AFTER_SEC)
 
 stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 설정(1500초=25분)에서는 토큰 갱신이 발화하지 않는다.
@@ -425,12 +595,13 @@ stress는 약 4분 30초 런으로 JWT access TTL(30분) 미만이므로 기본 
 | 변수명 | 기본값 | 설명 |
 |---|---|---|
 | `BASE_URL` | `http://localhost:8080` | 가압 대상 앱 루트 |
-| `PROFILE` | `smoke` | 부하 프로파일 (`smoke` \| `load` \| `stress`) |
+| `PROFILE` | `smoke` | 부하 프로파일 (`smoke` \| `load` \| `stress` \| `saturate`) |
 | `ADMIN_EMAIL` | `admin@example.com` | admin 계정 이메일 |
 | `ADMIN_PASSWORD` | `Admin1234!` | admin 계정 비밀번호 |
 | `RUN_TAG` | uuidv4 자동 생성 | 런별 유니크 prefix (데이터 네임스페이스) |
 | `TOKEN_REFRESH_AFTER_SEC` | `1500` | 토큰 갱신 발화 임계(초). 기본 25분(30분 TTL - 5분 버퍼). 갱신 기능 검증 시 `5` 등으로 지정. |
 | `ORDER_VARIANT_COUNT` | `1` | order-create 시드의 variant 수. 1=단일(기존 베이스라인 재현), >1=분산(행 락 경합 분산). **order-create 전용** — payment-confirm/coupon-apply 실행 시엔 지정 말 것. |
+| `SATURATE_PEAK_RPS` | `600` | saturate 프로파일의 피크 RPS. 첫 광역 탐색은 600, 천장이 좁혀지면 조정. **saturate는 ORDER_VARIANT_COUNT≥50 분산 전제** — 단일(N=1)은 행 락 산물. |
 
 ---
 

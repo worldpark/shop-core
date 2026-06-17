@@ -6,7 +6,7 @@
  *
  * 환경변수:
  *   BASE_URL                — 가압 대상 앱 루트 (기본: http://localhost:8080)
- *   PROFILE                 — 부하 프로파일 선택 smoke|load|stress|conc (기본: smoke)
+ *   PROFILE                 — 부하 프로파일 선택 smoke|load|stress|conc|saturate (기본: smoke)
  *   ADMIN_EMAIL             — admin 계정 이메일 (기본: admin@example.com)
  *   ADMIN_PASSWORD          — admin 계정 비밀번호 (기본: Admin1234!)
  *   RUN_TAG                 — 런별 유니크 prefix (미지정 시 uuidv4 자동 생성)
@@ -17,6 +17,10 @@
  *   ORDER_VARIANT_COUNT     — order-create 시드의 variant 수 (기본: 1).
  *                             1=단일 variant(기존 베이스라인 재현), >1=분산(행 락 경합 분산).
  *                             order-create 측정 전용 — payment-confirm/coupon-apply 실행 시엔 지정 말 것.
+ *   SATURATE_PEAK_RPS       — saturate 프로파일의 피크 RPS (기본: 600).
+ *                             첫 광역 탐색은 600, 천장이 좁혀지면 조정.
+ *                             주의: saturate는 ORDER_VARIANT_COUNT≥50 분산 전제.
+ *                             단일 variant(N=1)로 실행하면 행 락 산물이지 일반 트래픽 천장이 아님.
  */
 
 // ---------------------------------------------------------------
@@ -230,6 +234,24 @@ export const COUPON_THRESHOLDS = {
 };
 
 // ---------------------------------------------------------------
+// saturate thresholds — 진단용(느슨), 천장·병목 탐색 목적
+//
+// saturate는 "어디서 포화되나"를 측정하는 것이 목적이므로
+// p95/dropped_iterations 임계로 런을 죽이지 않는다(측정 곡선 대상이므로).
+// 단, 과부하라도 5xx(락 붕괴·서버 오류)는 반드시 0이어야 함.
+// http_req_failed: 과부하 타임아웃이 실패로 잡힐 수 있어 임계 없음 — 곡선의 일부로 기록.
+//
+// 풀 스윕(SHOP_CORE_HIKARI_MAX_POOL=10/30/50)과 서버측 스크랩(scrape-metrics.py)을
+// 병행해 dropped/p95 무릎 + hikaricp_connections_pending / process_cpu_usage로
+// 풀/CPU/DB 병목을 교차 판정한다.
+// ---------------------------------------------------------------
+export const SATURATE_THRESHOLDS = {
+  // order_5xx — 락 붕괴·서버 오류 징후. 과부하라도 반드시 0이어야 함.
+  order_5xx: ['count==0'],
+  // http_req_duration / dropped_iterations / http_req_failed 임계 없음 — 측정 대상(곡선).
+};
+
+// ---------------------------------------------------------------
 // read thresholds — catalog-read.js (가상스레드 A/B 측정, Task 006)
 //
 // 목적: 플랫폼 스레드(200)를 초과하는 동시성(conc 프로파일 300VU)에서
@@ -258,12 +280,42 @@ export const READ_THRESHOLDS = {
 export const THRESHOLDS = SMOKE_THRESHOLDS;
 
 // ---------------------------------------------------------------
+// saturate stages 헬퍼 — SATURATE_PEAK_RPS 기반으로 결정적 생성
+//
+// 설계 원칙:
+//   1. random/Date.now 미사용 — 동일 env 값이면 항상 동일 stages 생성(재현성).
+//   2. 100rps씩 계단식 점증 + 각 계단 40s + {target:0, duration:'15s'} 쿨다운.
+//   3. 200rps 아래는 stress가 이미 담당 — saturate는 200rps 이상부터 시작.
+//      (startRate는 stress의 피크와 겹치지 않도록 200으로 고정)
+//   4. 계단 수 = Math.ceil((peak - 100) / 100) — peak 미만까지 100씩 계단 후 peak에서 마무리.
+//   예: peak=600 → 100→200→300→400→500→600(각 40s) → 0(15s), 계단 6개 + 쿨다운 = 총 ~4m 15s.
+//   예: peak=400 → 100→200→300→400(각 40s) → 0(15s), 계단 4개 + 쿨다운 = 총 ~2m 55s.
+// ---------------------------------------------------------------
+function buildSaturateStages(peakRps) {
+  const stages = [];
+  // 100rps씩 계단식 점증 (100 미만이면 첫 계단 = peak 자체)
+  const step = 100;
+  // 200rps부터 peak까지(또는 peak 자체)를 step씩
+  let target = step;
+  while (target < peakRps) {
+    stages.push({ target: target, duration: '40s' });
+    target += step;
+  }
+  // 마지막 계단: peak RPS
+  stages.push({ target: peakRps, duration: '40s' });
+  // 쿨다운
+  stages.push({ target: 0, duration: '15s' });
+  return stages;
+}
+
+// ---------------------------------------------------------------
 // 프로파일별 VU/duration 설정
 // profiles/smoke.js, profiles/load.js 가 import해서 사용한다.
 //
 // kind 필드:
-//   'closed'       — vus + duration (기존 모델)
-//   'arrival-rate' — constant-arrival-rate executor (open 모델)
+//   'closed'            — vus + duration (기존 모델)
+//   'arrival-rate'      — constant-arrival-rate executor (open 모델)
+//   'ramping-arrival-rate' — ramping-arrival-rate executor (open 모델)
 // ---------------------------------------------------------------
 export const PROFILES = {
   smoke: {
@@ -336,5 +388,40 @@ export const PROFILES = {
     vus: __ENV.CONC_VUS ? Number(__ENV.CONC_VUS) : 300,
     duration: __ENV.CONC_DURATION || '40s',
     thresholds: READ_THRESHOLDS,
+  },
+
+  saturate: {
+    // ramping-arrival-rate 모델 — 200rps를 넘어 점증해 분산 order-create 처리량 천장·병목을 탐색.
+    //
+    // 설계 근거 (report 002 §4.2):
+    //   분산(N=50) stress(50→200rps)가 p95=21ms·dropped=0으로 완주 → 200rps에서 미포화.
+    //   saturate는 200rps 위로 점증해 dropped 급증·p95 무릎이 나타나는 RPS = 실제 처리량 천장.
+    //
+    // 분산 전제: ORDER_VARIANT_COUNT≥50과 함께만 의미.
+    //   단일 variant(N=1)는 행 락 직렬화 산물 — 일반 트래픽 천장 아님.
+    //   실행 예: -e PROFILE=saturate -e ORDER_VARIANT_COUNT=50 -e SATURATE_PEAK_RPS=600
+    //
+    // VU 풀:
+    //   preAllocatedVUs=100 — 피크까지 점증하는 동안 VU 부족이 인위적 병목이 되지 않게 충분히.
+    //   maxVUs=400          — 메모리 가드: 무한 VU 확장 금지. stdout "Insufficient VUs" 경고로
+    //                         VU 부족 vs 앱 한계를 구분. maxVUs 초과 dropped ≠ 앱 한계.
+    //
+    // stages: SATURATE_PEAK_RPS env(기본 600)에 따라 buildSaturateStages()가 결정적 생성.
+    //   100→200→...→peak(각 40s) + {target:0, duration:'15s'} 쿨다운.
+    //
+    // thresholds: 진단용(느슨) — order_5xx count==0만 게이트.
+    //   http_req_duration / dropped_iterations 임계 없음 — 곡선 측정이 목적.
+    //
+    // 병목 분류:
+    //   이 프로파일 단독으로는 병목 위치(풀/CPU/DB) 판별 불가.
+    //   SHOP_CORE_HIKARI_MAX_POOL=10/30/50 풀 스윕 + scrape-metrics.py(서버측 hikari/CPU 타임시리즈)
+    //   교차 판정으로 분류한다. README §5-5 참조.
+    kind: 'ramping-arrival-rate',
+    startRate: 50,
+    timeUnit: '1s',
+    stages: buildSaturateStages(__ENV.SATURATE_PEAK_RPS ? Number(__ENV.SATURATE_PEAK_RPS) : 600),
+    preAllocatedVUs: 100,
+    maxVUs: 400,
+    thresholds: SATURATE_THRESHOLDS,
   },
 };
