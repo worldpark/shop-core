@@ -132,7 +132,7 @@ class OrderPurchaseVerificationAdapterTest {
     private ProductOrderCatalog.OrderableVariantSnapshot buildSnapshot(long variantId, long productId) {
         return new ProductOrderCatalog.OrderableVariantSnapshot(
                 variantId, productId, "테스트 상품", "기본", List.of(),
-                BigDecimal.valueOf(10000), true, 10, "ON_SALE", true
+                BigDecimal.valueOf(10000), true, 10, "ON_SALE", true, null
         );
     }
 }

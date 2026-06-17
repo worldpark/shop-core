@@ -72,4 +72,19 @@ public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
      */
     @Query("select si.orderItemId from ShipmentItem si where si.shipment.orderId in :orderIds")
     List<Long> findAssignedOrderItemIdsByOrderIdIn(@Param("orderIds") Collection<Long> orderIds);
+
+    /**
+     * orderItemId 목록에 해당하는 배송 상태 배치 조회 (판매자 주문 목록 N+1 방지).
+     *
+     * <p>판매자 주문 목록에서 항목별 배송 상태를 조회할 때 사용한다.
+     * shipment_items.order_item_id IN (...) JOIN shipments 1회 조회로
+     * {@code Map<Long orderItemId, String shipmentStatus>} 조립 데이터를 제공한다.
+     * 미존재 orderItemId(배송 미생성)는 결과에 포함되지 않는다(null = 미생성).
+     *
+     * @param orderItemIds 조회할 주문 항목 ID 컬렉션
+     * @return [orderItemId, shipmentStatus] 쌍의 Object[] 목록
+     */
+    @Query("select si.orderItemId, s.status from ShipmentItem si join si.shipment s " +
+           "where si.orderItemId in :orderItemIds")
+    List<Object[]> findShipmentStatusByOrderItemIdIn(@Param("orderItemIds") Collection<Long> orderItemIds);
 }

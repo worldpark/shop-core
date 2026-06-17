@@ -243,7 +243,7 @@ class CouponOrderPaymentPropagationIntegrationTest {
     private void configProductMock(long variantId, long productId, String name, BigDecimal price) {
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, productId, name, null, List.of(),
-                price, true, 100, "ON_SALE", true);
+                price, true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection()))
                 .thenReturn(List.of(snapshot));
     }

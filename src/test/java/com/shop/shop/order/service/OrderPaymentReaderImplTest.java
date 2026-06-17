@@ -203,11 +203,11 @@ class OrderPaymentReaderImplTest {
     }
 
     private OrderItem buildOrderItem(long variantId, String productName) {
-        return OrderItem.create(variantId, productName, null, BigDecimal.valueOf(10000), 1);
+        return OrderItem.create(variantId, null, productName, null, BigDecimal.valueOf(10000), 1);
     }
 
     private OrderItem buildOrderItemWithNullVariant(String productName) {
-        OrderItem item = OrderItem.create(99L, productName, null, BigDecimal.valueOf(10000), 1);
+        OrderItem item = OrderItem.create(99L, null, productName, null, BigDecimal.valueOf(10000), 1);
         setField(item, "variantId", null);
         return item;
     }
@@ -215,7 +215,7 @@ class OrderPaymentReaderImplTest {
     private OrderableVariantSnapshot buildSnapshot(long variantId, long productId) {
         return new OrderableVariantSnapshot(
                 variantId, productId, "상품", null, List.of(),
-                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true, null);
     }
 
     private void setField(Object target, String fieldName, Object value) {

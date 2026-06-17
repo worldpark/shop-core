@@ -321,7 +321,7 @@ class OrderFulfillmentShipOutboxIntegrationTest {
     private void configProductMock(long variantId, long productId, String productName, BigDecimal price) {
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, productId, productName, null, List.of(),
-                price, true, 100, "ON_SALE", true);
+                price, true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection()))
                 .thenReturn(List.of(snapshot));
     }
@@ -334,10 +334,10 @@ class OrderFulfillmentShipOutboxIntegrationTest {
                                           long variantId2, long productId2, String name2) {
         OrderableVariantSnapshot snap1 = new OrderableVariantSnapshot(
                 variantId1, productId1, name1, null, List.of(),
-                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true, null);
         OrderableVariantSnapshot snap2 = new OrderableVariantSnapshot(
                 variantId2, productId2, name2, null, List.of(),
-                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection()))
                 .thenReturn(List.of(snap1, snap2));
     }

@@ -206,7 +206,7 @@ class PaymentConcurrencyIntegrationTest {
 
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, productId, "동시성테스트상품", null, List.of(),
-                price, true, 100, "ON_SALE", true);
+                price, true, 100, "ON_SALE", true, null);
 
         when(productOrderCatalog.getOrderableSnapshots(anyCollection()))
                 .thenReturn(List.of(snapshot));

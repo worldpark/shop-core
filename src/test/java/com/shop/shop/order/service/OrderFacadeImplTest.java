@@ -84,7 +84,7 @@ class OrderFacadeImplTest {
 
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, 20L, "테스트 상품", "빨강 / L", List.of(),
-                unitPrice, true, 10, "ON_SALE", true
+                unitPrice, true, 10, "ON_SALE", true, null
         );
 
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
@@ -133,7 +133,7 @@ class OrderFacadeImplTest {
 
         OrderableVariantSnapshot notPurchasable = new OrderableVariantSnapshot(
                 variantId, 21L, "품절 상품", "", List.of(),
-                new BigDecimal("3000"), true, 0, "SOLD_OUT", false
+                new BigDecimal("3000"), true, 0, "SOLD_OUT", false, null
         );
 
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);

@@ -93,7 +93,8 @@ class ProductOrderCatalogImpl implements ProductOrderCatalog {
                 variant.isActive(),
                 variant.getStock(),
                 productStatus,
-                purchasable
+                purchasable,
+                product.getOwnerId()
         );
     }
 

@@ -62,11 +62,11 @@ class OrderDetailFetchIntegrationTest {
                 userId, "ORD-FETCH-" + System.nanoTime(), new BigDecimal("30000"), BigDecimal.ZERO,
                 "수령인", "010-0000-0000", "12345", "서울시 강남구", "101호");
 
-        OrderItem item1 = OrderItem.create(variantId1, "상품A", "색상:빨강 / 사이즈:L", new BigDecimal("10000"), 1);
+        OrderItem item1 = OrderItem.create(variantId1, null, "상품A", "색상:빨강 / 사이즈:L", new BigDecimal("10000"), 1);
         item1.addOptionValue(OrderItemOptionValue.create("색상", "빨강", 0));
         item1.addOptionValue(OrderItemOptionValue.create("사이즈", "L", 1));
 
-        OrderItem item2 = OrderItem.create(variantId2, "상품B", "색상:파랑", new BigDecimal("20000"), 1);
+        OrderItem item2 = OrderItem.create(variantId2, null, "상품B", "색상:파랑", new BigDecimal("20000"), 1);
         item2.addOptionValue(OrderItemOptionValue.create("색상", "파랑", 0));
 
         order.addItem(item1);

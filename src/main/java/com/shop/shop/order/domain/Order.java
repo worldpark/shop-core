@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -83,7 +84,10 @@ public class Order extends BaseEntity {
     @Column(name = "ship_address2")
     private String shipAddress2;
 
+    // @BatchSize: 판매자 주문 목록 등 페이지 쿼리 후 items 컬렉션 접근 시 IN 배치로 일괄 로딩(N+1 회피).
+    // OrderItem.optionValues의 @BatchSize 선례와 동형.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     private List<OrderItem> items = new ArrayList<>();
 
     /**

@@ -187,7 +187,7 @@ class OrderCreationConcurrencyIntegrationTest {
     private OrderableVariantSnapshot buildSnapshot(long variantId, int stock) {
         return new OrderableVariantSnapshot(
                 variantId, 1L, "동시성테스트상품", "옵션", List.of(),
-                new BigDecimal("1000"), true, stock, "ON_SALE", true
+                new BigDecimal("1000"), true, stock, "ON_SALE", true, null
         );
     }
 }

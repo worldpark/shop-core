@@ -330,7 +330,7 @@ class UnpaidOrderExpiryOutboxIntegrationTest {
     private void configProductMock(long variantId, long productId, String productName, BigDecimal price) {
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, productId, productName, null, List.of(),
-                price, true, 100, "ON_SALE", true);
+                price, true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection())).thenReturn(List.of(snapshot));
     }
 

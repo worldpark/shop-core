@@ -23,8 +23,9 @@ import java.util.List;
 /**
  * 주문 항목 Entity.
  *
- * <p>테이블: order_items (V1__init_schema.sql)
+ * <p>테이블: order_items (V1__init_schema.sql + V10__order_items_owner.sql)
  * <p>variantId 스칼라: variant FK ON DELETE SET NULL → nullable Long.
+ * <p>ownerId 스칼라: 판매자(users.id) 스냅샷 (nullable — V10 백필, variant SET NULL 시 NULL 잔존).
  * <p>updated_at 컬럼 없음 → BaseEntity 미상속.
  * <p>productName/optionLabel/unitPrice/lineAmount: 주문 시점 스냅샷 (변경 불가).
  *
@@ -50,6 +51,14 @@ public class OrderItem {
      */
     @Column(name = "variant_id")
     private Long variantId;
+
+    /**
+     * 판매자(owner) ID 스칼라 스냅샷 (nullable — V10 추가).
+     * 주문 생성 시 products.owner_id를 스냅샷으로 적재한다.
+     * variant가 SET NULL된 기존 행은 NULL 잔존 허용 (스냅샷 손실 명시).
+     */
+    @Column(name = "owner_id")
+    private Long ownerId;
 
     @Column(name = "product_name", nullable = false)
     private String productName;
@@ -78,16 +87,18 @@ public class OrderItem {
      * <p>lineAmount = unitPrice × quantity 내부 계산.
      *
      * @param variantId   variant ID (nullable 허용 — DB SET NULL 대비)
+     * @param ownerId     판매자 ID 스냅샷 (nullable 허용 — variant SET NULL 백필 행 대비)
      * @param productName 상품명 스냅샷
      * @param optionLabel 옵션 라벨 스냅샷 (nullable)
      * @param unitPrice   단가 스냅샷 (락 후 price)
      * @param quantity    주문 수량
      * @return 새 OrderItem 인스턴스
      */
-    public static OrderItem create(long variantId, String productName, String optionLabel,
+    public static OrderItem create(long variantId, Long ownerId, String productName, String optionLabel,
                                    BigDecimal unitPrice, int quantity) {
         OrderItem item = new OrderItem();
         item.variantId = variantId;
+        item.ownerId = ownerId;
         item.productName = productName;
         item.optionLabel = optionLabel;
         item.unitPrice = unitPrice;

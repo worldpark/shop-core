@@ -314,13 +314,13 @@ class OrderConfirmationImplTest {
     }
 
     private OrderItem buildOrderItem(long variantId, String productName, BigDecimal unitPrice, int quantity) {
-        return OrderItem.create(variantId, productName, null, unitPrice, quantity);
+        return OrderItem.create(variantId, null, productName, null, unitPrice, quantity);
     }
 
     private OrderableVariantSnapshot buildSnapshot(long variantId, long productId, String productName) {
         return new OrderableVariantSnapshot(
                 variantId, productId, productName, null, List.of(),
-                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true, null);
     }
 
     private void setField(Object target, String fieldName, Object value) {

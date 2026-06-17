@@ -383,7 +383,7 @@ class OrderServiceTest {
                 variantId, 1L, productName,
                 "옵션라벨", List.of(new OrderOptionValue("색상", "빨강", 0)),
                 price, purchasable, stock,
-                purchasable ? "ON_SALE" : "HIDDEN", purchasable
+                purchasable ? "ON_SALE" : "HIDDEN", purchasable, null
         );
     }
 

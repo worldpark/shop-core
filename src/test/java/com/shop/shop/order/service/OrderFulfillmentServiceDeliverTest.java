@@ -399,7 +399,7 @@ class OrderFulfillmentServiceDeliverTest {
         setField(order, "status", status);
 
         for (long itemId : orderItemIds) {
-            OrderItem orderItem = OrderItem.create(itemId * 100L, "테스트 상품", null,
+            OrderItem orderItem = OrderItem.create(itemId * 100L, null, "테스트 상품", null,
                     BigDecimal.valueOf(10000), 1);
             setField(orderItem, "id", itemId);
             setField(orderItem, "order", order);

@@ -371,7 +371,7 @@ class OrderFulfillmentServiceTest {
     }
 
     private OrderItem createOrderItem(long id, String productName) {
-        OrderItem item = OrderItem.create(id * 100L, productName, null,
+        OrderItem item = OrderItem.create(id * 100L, null, productName, null,
                 BigDecimal.valueOf(1000), 1);
         try {
             java.lang.reflect.Field idField = OrderItem.class.getDeclaredField("id");

@@ -241,7 +241,7 @@ class OrderFulfillmentServiceShipTest {
         // 비활성 + 품절이지만 스냅샷은 반환됨 → P2 통과
         OrderableVariantSnapshot inactiveSnapshot = new OrderableVariantSnapshot(
                 VARIANT_ID, PRODUCT_ID, "상품명", "옵션", List.of(),
-                BigDecimal.valueOf(10000), false, 0, "SOLD_OUT", false
+                BigDecimal.valueOf(10000), false, 0, "SOLD_OUT", false, null
         );
         when(productOrderCatalog.getOrderableSnapshots(any())).thenReturn(List.of(inactiveSnapshot));
         when(memberDirectory.findContactByUserId(any(long.class)))
@@ -395,7 +395,7 @@ class OrderFulfillmentServiceShipTest {
                 .thenReturn(new MemberDirectory.MemberContact("user@example.com", "홍길동"));
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 variantId, productId, "테스트 상품", "빨강/L", List.of(),
-                BigDecimal.valueOf(10000), true, 5, "ON_SALE", true
+                BigDecimal.valueOf(10000), true, 5, "ON_SALE", true, null
         );
         when(productOrderCatalog.getOrderableSnapshots(any())).thenReturn(List.of(snapshot));
     }
@@ -410,7 +410,7 @@ class OrderFulfillmentServiceShipTest {
         setOrderId(order, ORDER_ID);
         setField(order, "status", status);
 
-        OrderItem orderItem = OrderItem.create(variantId, "테스트 상품", "옵션",
+        OrderItem orderItem = OrderItem.create(variantId, null, "테스트 상품", "옵션",
                 BigDecimal.valueOf(10000), 1);
         setField(orderItem, "id", orderItemId);
         setField(orderItem, "order", order);
@@ -429,7 +429,7 @@ class OrderFulfillmentServiceShipTest {
         setField(order, "status", status);
 
         // variantId null: OrderItem을 만들되 variantId 필드를 null로 덮어씀
-        OrderItem orderItem = OrderItem.create(VARIANT_ID, "테스트 상품", "옵션",
+        OrderItem orderItem = OrderItem.create(VARIANT_ID, null, "테스트 상품", "옵션",
                 BigDecimal.valueOf(10000), 1);
         setField(orderItem, "id", orderItemId);
         setField(orderItem, "variantId", null);

@@ -307,17 +307,17 @@ class OrderCancellationImplTest {
     private void mockProductCatalog(long variantId, long productId) {
         OrderableVariantSnapshot snap = new OrderableVariantSnapshot(
                 variantId, productId, "상품", null, List.of(),
-                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection())).thenReturn(List.of(snap));
     }
 
     private void mockProductCatalog(long variantId1, long productId1, long variantId2, long productId2) {
         OrderableVariantSnapshot snap1 = new OrderableVariantSnapshot(
                 variantId1, productId1, "상품A", null, List.of(),
-                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true, null);
         OrderableVariantSnapshot snap2 = new OrderableVariantSnapshot(
                 variantId2, productId2, "상품B", null, List.of(),
-                BigDecimal.valueOf(3000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(3000), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection())).thenReturn(List.of(snap1, snap2));
     }
 
@@ -330,15 +330,15 @@ class OrderCancellationImplTest {
 
     private Order createPendingOrderWithItem(long variantId, int quantity) {
         Order order = createPendingOrder();
-        OrderItem item = OrderItem.create(variantId, "상품", null, BigDecimal.valueOf(5000), quantity);
+        OrderItem item = OrderItem.create(variantId, null, "상품", null, BigDecimal.valueOf(5000), quantity);
         order.addItem(item);
         return order;
     }
 
     private Order createOrderWithTwoItems(long variantId1, int qty1, long variantId2, int qty2) {
         Order order = createPendingOrder();
-        order.addItem(OrderItem.create(variantId1, "상품A", null, BigDecimal.valueOf(5000), qty1));
-        order.addItem(OrderItem.create(variantId2, "상품B", null, BigDecimal.valueOf(3000), qty2));
+        order.addItem(OrderItem.create(variantId1, null, "상품A", null, BigDecimal.valueOf(5000), qty1));
+        order.addItem(OrderItem.create(variantId2, null, "상품B", null, BigDecimal.valueOf(3000), qty2));
         return order;
     }
 
@@ -366,10 +366,10 @@ class OrderCancellationImplTest {
 
     private OrderItem createOrderItemViaReflection(Long variantId, String productName, int quantity) {
         if (variantId != null) {
-            return OrderItem.create(variantId, productName, null, BigDecimal.valueOf(5000), quantity);
+            return OrderItem.create(variantId, null, productName, null, BigDecimal.valueOf(5000), quantity);
         }
         // variantId null: OrderItem.create는 long 파라미터라 null 불가 → reflection으로 직접 설정
-        OrderItem item = OrderItem.create(1L, productName, null, BigDecimal.valueOf(5000), quantity);
+        OrderItem item = OrderItem.create(1L, null, productName, null, BigDecimal.valueOf(5000), quantity);
         try {
             java.lang.reflect.Field f = OrderItem.class.getDeclaredField("variantId");
             f.setAccessible(true);

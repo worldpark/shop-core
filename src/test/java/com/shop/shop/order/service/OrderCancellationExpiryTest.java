@@ -147,8 +147,8 @@ class OrderCancellationExpiryTest {
     void cancelByExpiry_stockRestore_variantIdAscending() {
         // given — variantId: 10, 3 순서로 저장, 복원은 3, 10 순서
         Order order = createPendingOrder();
-        order.addItem(OrderItem.create(10L, "상품A", null, BigDecimal.valueOf(5000), 2));
-        order.addItem(OrderItem.create(3L, "상품B", null, BigDecimal.valueOf(3000), 1));
+        order.addItem(OrderItem.create(10L, null, "상품A", null, BigDecimal.valueOf(5000), 2));
+        order.addItem(OrderItem.create(3L, null, "상품B", null, BigDecimal.valueOf(3000), 1));
         when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
         mockProductCatalog(10L, 1000L, 3L, 300L);
 
@@ -171,7 +171,7 @@ class OrderCancellationExpiryTest {
         // given
         Order order = createPendingOrder();
         OrderItem nullItem = createNullVariantItem("삭제상품", 1);
-        OrderItem normalItem = OrderItem.create(5L, "정상상품", null, BigDecimal.valueOf(5000), 3);
+        OrderItem normalItem = OrderItem.create(5L, null, "정상상품", null, BigDecimal.valueOf(5000), 3);
         order.addItem(nullItem);
         order.addItem(normalItem);
         when(orderRepository.findByIdForUpdate(ORDER_ID)).thenReturn(Optional.of(order));
@@ -261,7 +261,7 @@ class OrderCancellationExpiryTest {
 
     private Order createPendingOrderWithItem(long variantId, int quantity) {
         Order order = createPendingOrder();
-        order.addItem(OrderItem.create(variantId, "상품", null, BigDecimal.valueOf(5000), quantity));
+        order.addItem(OrderItem.create(variantId, null, "상품", null, BigDecimal.valueOf(5000), quantity));
         return order;
     }
 
@@ -276,7 +276,7 @@ class OrderCancellationExpiryTest {
     }
 
     private OrderItem createNullVariantItem(String productName, int quantity) {
-        OrderItem item = OrderItem.create(1L, productName, null, BigDecimal.valueOf(5000), quantity);
+        OrderItem item = OrderItem.create(1L, null, productName, null, BigDecimal.valueOf(5000), quantity);
         try {
             java.lang.reflect.Field f = OrderItem.class.getDeclaredField("variantId");
             f.setAccessible(true);
@@ -290,17 +290,17 @@ class OrderCancellationExpiryTest {
     private void mockProductCatalog(long variantId, long productId) {
         OrderableVariantSnapshot snap = new OrderableVariantSnapshot(
                 variantId, productId, "상품", null, List.of(),
-                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(10000), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection())).thenReturn(List.of(snap));
     }
 
     private void mockProductCatalog(long variantId1, long productId1, long variantId2, long productId2) {
         OrderableVariantSnapshot snap1 = new OrderableVariantSnapshot(
                 variantId1, productId1, "상품A", null, List.of(),
-                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(5000), true, 100, "ON_SALE", true, null);
         OrderableVariantSnapshot snap2 = new OrderableVariantSnapshot(
                 variantId2, productId2, "상품B", null, List.of(),
-                BigDecimal.valueOf(3000), true, 100, "ON_SALE", true);
+                BigDecimal.valueOf(3000), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(anyCollection())).thenReturn(List.of(snap1, snap2));
     }
 }

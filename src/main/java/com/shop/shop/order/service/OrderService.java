@@ -226,6 +226,7 @@ public class OrderService {
             OrderableVariantSnapshot snapshot = authorizedByVariantId.get(cartItem.variantId());
             OrderItem orderItem = OrderItem.create(
                     cartItem.variantId(),
+                    snapshot.ownerId(), // 락-후 권위 스냅샷에서 owner_id 적재 (V10)
                     snapshot.productName(),
                     snapshot.optionLabel(),
                     snapshot.price(), // 락 후 price

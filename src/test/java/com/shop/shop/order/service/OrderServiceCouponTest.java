@@ -69,7 +69,7 @@ class OrderServiceCouponTest {
         when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(new CartCheckout(1L, List.of(item)));
         OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
                 VARIANT_ID, 1000L, "테스트상품", null, List.of(),
-                new BigDecimal("5000"), true, 100, "ON_SALE", true);
+                new BigDecimal("5000"), true, 100, "ON_SALE", true, null);
         when(productOrderCatalog.getOrderableSnapshots(any())).thenReturn(List.of(snapshot));
 
         // Order 저장 모킹

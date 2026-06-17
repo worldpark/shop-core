@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<!--
+    판매자 주문 조회 화면 (읽기 전용 — Phase 1).
+    view name: seller/orders
+    레이아웃: layout/base :: layout(title, content)
+
+    보존 계약:
+      - 모델 키: sellerOrderPage (Page<SellerOrderView>)
+          ㄴ content[*].orderId       (long)
+          ㄴ content[*].orderNumber   (String)
+          ㄴ content[*].orderStatus   (String: pending/paid/preparing/shipping/delivered/cancelled/refunded)
+          ㄴ content[*].finalAmount   (BigDecimal)
+          ㄴ content[*].createdAt     (Instant — KST 변환)
+          ㄴ content[*].items         (List<SellerOrderItemView>)
+              ㄴ orderItemId          (long)
+              ㄴ productName          (String)
+              ㄴ optionLabel          (String, nullable)
+              ㄴ quantity             (int)
+              ㄴ unitPrice            (BigDecimal)
+              ㄴ shipmentStatus       (String: null/"preparing"/"shipping"/"delivered")
+      - 배송 상태 한글 라벨: null → "배송 준비 전", preparing → "배송 준비 중", shipping → "배송 중", delivered → "배송 완료"
+      - 빈 상태: "조회된 주문이 없습니다."
+      - 페이지네이션: sellerOrderPage.number, .totalPages, .totalElements, .size
+      - Phase 1 읽기 전용: 배송 생성/시작/완료 버튼·폼 없음 (Phase 2 — Task 049)
+      - nav active: seller-orders (NavActiveControllerAdvice 자동 주입)
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>주문 조회</title>
+</head>
+<body>
+<main>
+    <div class="seller-product-list-container">
+        <div class="seller-product-list-header">
+            <h1 class="page-title">주문 조회</h1>
+            <a th:href="@{/seller/products}" class="btn btn-outline">내 상품 목록</a>
+        </div>
+
+        <!-- 주문 없을 때 -->
+        <div class="order-empty" th:if="${sellerOrderPage.totalElements == 0}">
+            <p class="empty-msg">조회된 주문이 없습니다.</p>
+        </div>
+
+        <!-- 주문 목록 -->
+        <div th:unless="${sellerOrderPage.totalElements == 0}">
+            <div th:each="order : ${sellerOrderPage.content}" class="seller-order-block">
+
+                <!-- 주문 헤더 -->
+                <div class="seller-order-header">
+                    <div class="seller-order-meta">
+                        <span class="seller-order-number" th:text="${order.orderNumber}">ORDER-0000</span>
+                        <span class="badge-order-status"
+                              th:with="statusLabel=(${order.orderStatus} == 'pending'    ? '결제 대기' :
+                                                   (${order.orderStatus} == 'paid'       ? '결제 완료' :
+                                                   (${order.orderStatus} == 'preparing'  ? '배송 준비' :
+                                                   (${order.orderStatus} == 'shipping'   ? '배송 중' :
+                                                   (${order.orderStatus} == 'delivered'  ? '배송 완료' :
+                                                   (${order.orderStatus} == 'cancelled'  ? '취소됨' :
+                                                   (${order.orderStatus} == 'refunded'   ? '환불됨' : ${order.orderStatus})))))))"
+                              th:classappend="' badge-order-' + ${order.orderStatus}"
+                              th:text="${statusLabel}">상태</span>
+                    </div>
+                    <div class="seller-order-summary">
+                        <span class="order-created-at"
+                              th:text="${#temporals.format(order.createdAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm')}">
+                            2026-01-01 00:00
+                        </span>
+                        <span class="seller-order-amount"
+                              th:text="${#numbers.formatDecimal(order.finalAmount, 1, 'COMMA', 0, 'POINT')} + '원'">
+                            0원
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 판매자 소유 항목 테이블 -->
+                <div class="table-wrapper">
+                    <table class="order-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">상품명</th>
+                                <th scope="col">옵션</th>
+                                <th scope="col">수량</th>
+                                <th scope="col">단가</th>
+                                <th scope="col">배송 상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="item : ${order.items}" class="order-row">
+                                <td th:text="${item.productName}">상품명</td>
+                                <td th:text="${item.optionLabel != null ? item.optionLabel : '-'}">옵션</td>
+                                <td th:text="${item.quantity}">1</td>
+                                <td>
+                                    <span th:text="${#numbers.formatDecimal(item.unitPrice, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                                </td>
+                                <td>
+                                    <span class="badge-shipment-status"
+                                          th:with="shipLabel=(${item.shipmentStatus} == null        ? '배송 준비 전' :
+                                                             (${item.shipmentStatus} == 'preparing' ? '배송 준비 중' :
+                                                             (${item.shipmentStatus} == 'shipping'  ? '배송 중' :
+                                                             (${item.shipmentStatus} == 'delivered' ? '배송 완료' : ${item.shipmentStatus}))))"
+                                          th:classappend="${item.shipmentStatus} == null        ? ' badge-shipment-none' :
+                                                          (${item.shipmentStatus} == 'preparing' ? ' badge-shipment-preparing' :
+                                                          (${item.shipmentStatus} == 'shipping'  ? ' badge-shipment-shipping' :
+                                                          (${item.shipmentStatus} == 'delivered' ? ' badge-shipment-delivered' : '')))"
+                                          th:text="${shipLabel}">배송 준비 전</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- Phase 1: 배송 생성/시작/완료 버튼 없음 — Phase 2(Task 049)에서 추가 예정 -->
+            </div>
+        </div>
+
+        <!-- 페이지네이션 -->
+        <section class="pagination-section" th:unless="${sellerOrderPage.totalElements == 0}">
+            <div class="pagination">
+                <div class="page-info">
+                    <span th:text="'총 ' + ${sellerOrderPage.totalElements} + '건'">총 0건</span>
+                    <span th:text="'(' + (${sellerOrderPage.number} + 1) + ' / ' + ${sellerOrderPage.totalPages} + ' 페이지)'"> (1 / 1 페이지)</span>
+                </div>
+                <div class="page-nav">
+                    <!-- 이전 페이지 -->
+                    <a th:if="${sellerOrderPage.number > 0}"
+                       th:href="@{/seller/orders(page=${sellerOrderPage.number - 1}, size=${sellerOrderPage.size})}"
+                       class="btn btn-outline btn-sm">이전</a>
+                    <span th:unless="${sellerOrderPage.number > 0}"
+                          class="btn btn-outline btn-sm disabled">이전</span>
+
+                    <!-- 다음 페이지 -->
+                    <a th:if="${sellerOrderPage.number + 1 < sellerOrderPage.totalPages}"
+                       th:href="@{/seller/orders(page=${sellerOrderPage.number + 1}, size=${sellerOrderPage.size})}"
+                       class="btn btn-outline btn-sm">다음</a>
+                    <span th:unless="${sellerOrderPage.number + 1 < sellerOrderPage.totalPages}"
+                          class="btn btn-outline btn-sm disabled">다음</span>
+                </div>
+            </div>
+        </section>
+    </div>
+</main>
+</body>
+</html>

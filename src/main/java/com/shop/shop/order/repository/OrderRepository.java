@@ -126,6 +126,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countByCreatedAtAfter(Instant threshold);
 
     /**
+     * 판매자(sellerId) 소유 항목이 포함된 주문 페이지 조회 (최신순).
+     *
+     * <p>order_items.owner_id = :sellerId 인 항목이 하나라도 존재하는 주문을 반환한다.
+     * DISTINCT로 중복 제거(한 주문에 같은 판매자 항목이 여러 개일 수 있음).
+     * 정렬: createdAt DESC, id DESC (타이브레이크).
+     *
+     * <p>항목 N+1은 페이지 확정 후 별도 로드(SellerOrderFacadeImpl 내부에서 OrderItem 컬렉션 접근).
+     *
+     * @param sellerId 판매자 ID (owner_id)
+     * @param pageable 페이지 요청
+     * @return 해당 판매자 항목이 포함된 주문 페이지 (최신순)
+     */
+    @Query("SELECT DISTINCT o FROM Order o JOIN o.items i WHERE i.ownerId = :sellerId " +
+           "ORDER BY o.createdAt DESC, o.id DESC")
+    Page<Order> findPageBySellerOrderByCreatedAtDescIdDesc(
+            @Param("sellerId") long sellerId, Pageable pageable);
+
+    /**
      * 특정 status이면서 threshold 이후 생성된 주문 수.
      * 관리자 통계 대시보드 — 환불율 분자(최근 30일 refunded 주문 수) 계산에 사용.
      *

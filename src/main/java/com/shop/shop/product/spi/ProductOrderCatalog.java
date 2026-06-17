@@ -35,6 +35,7 @@ public interface ProductOrderCatalog {
      * <p>purchasable = (productStatus == ON_SALE && active).
      * optionValues: 옵션명·옵션값·정렬순서 목록 (order_item_option_values 저장용).
      * price: 현재 variant 가격 (락 후 재조회 시 권위 있음).
+     * ownerId: 상품 소유자(판매자) ID 스칼라 스냅샷 (order_items.owner_id 적재용 — V10).
      *
      * @param variantId     variant ID
      * @param productId     상품 ID
@@ -46,6 +47,7 @@ public interface ProductOrderCatalog {
      * @param stock         현재 재고 수치 (사전검증 전용, 외부 미노출)
      * @param productStatus 상품 상태 String
      * @param purchasable   구매가능 = (productStatus==ON_SALE && active)
+     * @param ownerId       상품 소유자(판매자) ID 스칼라 (products.owner_id — order_items.owner_id 적재용)
      */
     record OrderableVariantSnapshot(
             long variantId,
@@ -57,7 +59,8 @@ public interface ProductOrderCatalog {
             boolean active,
             int stock,
             String productStatus,
-            boolean purchasable
+            boolean purchasable,
+            Long ownerId
     ) {}
 
     /**
