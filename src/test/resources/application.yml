@@ -32,6 +32,11 @@ shop:
     pending-expiry:
       enabled: false  # 테스트 컨텍스트: 스케줄러 빈 비활성 (verification-gate §4)
 
+  admin:
+    dashboard:
+      sse:
+        enabled: false  # 테스트 컨텍스트: SSE 스케줄러 빈 비활성 (AdminDashboardSseSchedulingConfig 미로드)
+
   security:
     jwt:
       secret: test-secret-key-for-shop-core-test-environment-only-32chars

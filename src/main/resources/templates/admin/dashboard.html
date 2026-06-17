@@ -13,6 +13,7 @@
     보존 계약:
       - ratioPercent null → "데이터 없음" 표시 (th:if/th:else 분기)
       - 읽기 전용 화면 — 폼 없음, CSRF 불요
+      - SSE: GET /admin/dashboard/stream (event=stats) → EventSource 갱신 (점진 향상)
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
@@ -26,7 +27,9 @@
     <div class="admin-members-container">
         <div class="dashboard-header">
             <h1 class="page-title">통계 대시보드</h1>
-            <span class="dashboard-period-badge" th:text="${dashboard.periodLabel}">최근 30일</span>
+            <span id="dashboard-period-label"
+                  class="dashboard-period-badge"
+                  th:text="${dashboard.periodLabel}">최근 30일</span>
         </div>
 
         <!-- 지표 카드 그리드 -->
@@ -38,19 +41,23 @@
                     <span class="stat-card-title">유저 이용률</span>
                 </div>
                 <div class="stat-card-body">
-                    <!-- 비율 -->
+                    <!-- 비율: SSR 초기값 유지, SSE 갱신은 JS가 id로 접근 -->
                     <div class="stat-ratio">
-                        <span class="stat-ratio-value"
+                        <span id="member-activity-ratio"
+                              class="stat-ratio-value"
                               th:if="${dashboard.memberActivity.ratioPercent != null}"
                               th:text="${dashboard.memberActivity.ratioPercent} + '%'">0%</span>
-                        <span class="stat-ratio-na"
+                        <span id="member-activity-na"
+                              class="stat-ratio-na"
                               th:unless="${dashboard.memberActivity.ratioPercent != null}">데이터 없음</span>
                     </div>
                     <!-- 원시 수치 -->
                     <div class="stat-raw">
-                        <span th:text="${dashboard.memberActivity.numerator}">0</span>
+                        <span id="member-activity-num"
+                              th:text="${dashboard.memberActivity.numerator}">0</span>
                         <span class="stat-raw-sep"> / </span>
-                        <span th:text="${dashboard.memberActivity.denominator}">0</span>
+                        <span id="member-activity-den"
+                              th:text="${dashboard.memberActivity.denominator}">0</span>
                         <span class="stat-raw-unit">(접속 / 전체 활성 회원)</span>
                     </div>
                 </div>
@@ -69,17 +76,21 @@
                 <div class="stat-card-body">
                     <!-- 비율 -->
                     <div class="stat-ratio">
-                        <span class="stat-ratio-value"
+                        <span id="product-sales-ratio"
+                              class="stat-ratio-value"
                               th:if="${dashboard.productSales.ratioPercent != null}"
                               th:text="${dashboard.productSales.ratioPercent} + '%'">0%</span>
-                        <span class="stat-ratio-na"
+                        <span id="product-sales-na"
+                              class="stat-ratio-na"
                               th:unless="${dashboard.productSales.ratioPercent != null}">데이터 없음</span>
                     </div>
                     <!-- 원시 수치 -->
                     <div class="stat-raw">
-                        <span th:text="${dashboard.productSales.numerator}">0</span>
+                        <span id="product-sales-num"
+                              th:text="${dashboard.productSales.numerator}">0</span>
                         <span class="stat-raw-sep"> / </span>
-                        <span th:text="${dashboard.productSales.denominator}">0</span>
+                        <span id="product-sales-den"
+                              th:text="${dashboard.productSales.denominator}">0</span>
                         <span class="stat-raw-unit">(판매된 게시 상품 / 전체 게시 상품)</span>
                     </div>
                 </div>
@@ -98,17 +109,21 @@
                 <div class="stat-card-body">
                     <!-- 비율 -->
                     <div class="stat-ratio">
-                        <span class="stat-ratio-value"
+                        <span id="refund-rate-ratio"
+                              class="stat-ratio-value"
                               th:if="${dashboard.refundRate.ratioPercent != null}"
                               th:text="${dashboard.refundRate.ratioPercent} + '%'">0%</span>
-                        <span class="stat-ratio-na"
+                        <span id="refund-rate-na"
+                              class="stat-ratio-na"
                               th:unless="${dashboard.refundRate.ratioPercent != null}">데이터 없음</span>
                     </div>
                     <!-- 원시 수치 -->
                     <div class="stat-raw">
-                        <span th:text="${dashboard.refundRate.numerator}">0</span>
+                        <span id="refund-rate-num"
+                              th:text="${dashboard.refundRate.numerator}">0</span>
                         <span class="stat-raw-sep"> / </span>
-                        <span th:text="${dashboard.refundRate.denominator}">0</span>
+                        <span id="refund-rate-den"
+                              th:text="${dashboard.refundRate.denominator}">0</span>
                         <span class="stat-raw-unit">(환불 주문 / 전체 주문)</span>
                     </div>
                 </div>
@@ -121,6 +136,102 @@
 
         </div><!-- /.stat-cards-grid -->
     </div><!-- /.admin-members-container -->
+
+    <!--
+        SSE 클라이언트 — 반드시 <main> 내부에 위치해야 레이아웃(content=~{::main})에서 렌더됨.
+        점진 향상: EventSource 미지원 또는 연결 실패 시 SSR 초기값을 그대로 표시.
+    -->
+    <script>
+    (function () {
+        if (typeof EventSource === 'undefined') {
+            // SSE 미지원 브라우저: SSR 초기값 그대로 유지
+            return;
+        }
+
+        /**
+         * 지표 1건을 DOM에 반영한다.
+         * @param {string} prefix - 'member-activity' | 'product-sales' | 'refund-rate'
+         * @param {{ ratioPercent: number|null, numerator: number, denominator: number }} metric
+         */
+        function updateMetric(prefix, metric) {
+            var ratioEl = document.getElementById(prefix + '-ratio');
+            var naEl    = document.getElementById(prefix + '-na');
+            var numEl   = document.getElementById(prefix + '-num');
+            var denEl   = document.getElementById(prefix + '-den');
+
+            var isNull = metric.ratioPercent === null || metric.ratioPercent === undefined;
+
+            // ratio / na 토글
+            if (isNull) {
+                // N/A 케이스: ratio span 제거 또는 숨기고 na span 표시
+                if (ratioEl) {
+                    ratioEl.style.display = 'none';
+                }
+                if (!naEl) {
+                    // SSR에서 ratioPercent가 null이 아니었다면 na span이 DOM에 없을 수 있음 —
+                    // ratio span의 부모에 동적으로 생성한다.
+                    var naSpan = document.createElement('span');
+                    naSpan.id = prefix + '-na';
+                    naSpan.className = 'stat-ratio-na';
+                    naSpan.textContent = '데이터 없음';
+                    if (ratioEl) {
+                        ratioEl.parentNode.insertBefore(naSpan, ratioEl.nextSibling);
+                    }
+                } else {
+                    naEl.style.display = '';
+                    naEl.textContent = '데이터 없음';
+                }
+            } else {
+                // 값 있는 케이스: na span 숨기고 ratio span 갱신
+                if (naEl) {
+                    naEl.style.display = 'none';
+                }
+                if (!ratioEl) {
+                    // SSR에서 ratioPercent가 null이었다면 ratio span이 DOM에 없을 수 있음 —
+                    // na span의 부모에 동적으로 생성한다.
+                    var ratioSpan = document.createElement('span');
+                    ratioSpan.id = prefix + '-ratio';
+                    ratioSpan.className = 'stat-ratio-value';
+                    if (naEl) {
+                        naEl.parentNode.insertBefore(ratioSpan, naEl);
+                    }
+                    ratioEl = ratioSpan;
+                }
+                ratioEl.style.display = '';
+                ratioEl.textContent = Number(metric.ratioPercent).toFixed(1) + '%';
+            }
+
+            // numerator / denominator
+            if (numEl) { numEl.textContent = String(metric.numerator); }
+            if (denEl) { denEl.textContent = String(metric.denominator); }
+        }
+
+        var es = new EventSource('/admin/dashboard/stream');
+
+        es.addEventListener('stats', function (e) {
+            try {
+                var d = JSON.parse(e.data);
+
+                if (d.memberActivity)  { updateMetric('member-activity',  d.memberActivity);  }
+                if (d.productSales)    { updateMetric('product-sales',    d.productSales);    }
+                if (d.refundRate)      { updateMetric('refund-rate',      d.refundRate);      }
+
+                // periodLabel 갱신 (있을 경우)
+                if (d.periodLabel) {
+                    var periodEl = document.getElementById('dashboard-period-label');
+                    if (periodEl) { periodEl.textContent = d.periodLabel; }
+                }
+            } catch (err) {
+                console.warn('[dashboard-sse] stats 이벤트 파싱 실패', err);
+            }
+        });
+
+        es.onerror = function (e) {
+            // EventSource 기본 자동 재연결을 신뢰 — 로깅만 수행, alert 금지
+            console.warn('[dashboard-sse] 연결 오류 발생. 자동 재연결 대기 중.', e);
+        };
+    }());
+    </script>
 </main>
 </body>
 </html>
