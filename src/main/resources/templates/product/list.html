@@ -105,7 +105,8 @@
                             <img th:if="${item.primaryImageUrl != null}"
                                  th:src="${item.primaryImageUrl}"
                                  th:alt="${item.name}"
-                                 class="product-thumb">
+                                 class="product-thumb"
+                                 onerror="this.onerror=null;this.src='/images/placeholder.png'">
                             <!-- 대표 이미지 없을 때 placeholder -->
                             <div th:unless="${item.primaryImageUrl != null}"
                                  class="product-thumb-placeholder">

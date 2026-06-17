@@ -65,7 +65,8 @@
                                     <img th:if="${item.imageUrl != null}"
                                          th:src="${item.imageUrl}"
                                          th:alt="${item.productName}"
-                                         class="cart-item-image">
+                                         class="cart-item-image"
+                                         onerror="this.onerror=null;this.src='/images/placeholder.png'">
                                     <div th:unless="${item.imageUrl != null}"
                                          class="cart-item-image-placeholder">
                                         <span>이미지 없음</span>

@@ -80,5 +80,30 @@ public class StorageProperties {
          * 반드시 환경변수 {@code SHOP_STORAGE_R2_SECRET_KEY}로 주입. 코드·yml에 평문 금지.
          */
         private String secretKey;
+
+        /**
+         * S3Client 단일 API 호출 시도(attempt)에 허용되는 최대 시간(ms).
+         *
+         * <p>산정 근거: 10MB(max-file-size) ÷ 약 1MB/s(보수적 최저 대역폭) = 10s. 여유 50% 적용 → 15,000ms.
+         * SDK 재시도가 최대 3회이면 apiCallTimeout ≥ 3 × 15,000 = 45,000ms 불변식을 만족해야 한다.
+         */
+        private long apiCallAttemptTimeoutMs = 15_000L;
+
+        /**
+         * S3Client 전체 API 호출(재시도 포함)에 허용되는 최대 시간(ms).
+         *
+         * <p>불변식: apiCallTimeout ≥ maxRetryAttempts × apiCallAttemptTimeout.
+         * 기본 SDK standard 재시도 최대 3회 × 15,000ms = 45,000ms. 여유 0% (이미 넉넉한 attempt로 커버).
+         */
+        private long apiCallTimeoutMs = 45_000L;
+
+        /**
+         * PutObject 요청에 설정할 Cache-Control 헤더 값.
+         *
+         * <p>UUID 기반 키는 내용 불변이므로 {@code immutable} 지시어가 유효하다.
+         * CDN·브라우저 모두 1년(31,536,000초) 캐싱을 허용한다.
+         * 삭제 반영 지연(CDN 퍼지 필요)은 후속 패스에서 처리한다.
+         */
+        private String cacheControl = "public, max-age=31536000, immutable";
     }
 }

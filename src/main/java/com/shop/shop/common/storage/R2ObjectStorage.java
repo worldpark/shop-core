@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
@@ -71,9 +72,15 @@ public class R2ObjectStorage implements ObjectStorage {
                     .bucket(bucket)
                     .key(storageKey)
                     .contentType(contentType)
+                    .cacheControl(storageProperties.getR2().getCacheControl())
                     .build();
             s3Client.putObject(request, RequestBody.fromBytes(bytes));
         } catch (S3Exception e) {
+            // S3Exception(AwsServiceException 계열) — HTTP 4xx/5xx 응답 오류
+            throw new StorageException("R2 업로드 실패: " + storageKey, e);
+        } catch (SdkException e) {
+            // SdkClientException 계열 — 타임아웃(ApiCallTimeoutException/ApiCallAttemptTimeoutException),
+            // 연결 실패 등 클라이언트 사이드 예외. S3Exception의 형제(sibling)라 위 catch에 안 잡힌다.
             throw new StorageException("R2 업로드 실패: " + storageKey, e);
         }
 
@@ -97,6 +104,10 @@ public class R2ObjectStorage implements ObjectStorage {
             s3Client.deleteObject(request);
             log.debug("R2 파일 삭제 완료 (또는 부재): {}", storageKey);
         } catch (S3Exception e) {
+            // S3Exception(AwsServiceException 계열) — HTTP 4xx/5xx 응답 오류
+            throw new StorageException("R2 삭제 실패: " + storageKey, e);
+        } catch (SdkException e) {
+            // SdkClientException 계열 — 타임아웃 등 클라이언트 사이드 예외
             throw new StorageException("R2 삭제 실패: " + storageKey, e);
         }
     }

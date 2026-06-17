@@ -75,7 +75,8 @@
                     <div class="image-preview">
                         <img th:src="${image.imageUrl}"
                              th:alt="'이미지 ' + ${image.imageId}"
-                             class="product-image-thumb">
+                             class="product-image-thumb"
+                             onerror="this.onerror=null;this.src='/images/placeholder.png'">
                         <span class="badge-primary" th:if="${image.primary}">대표</span>
                     </div>
 

@@ -5,11 +5,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.net.URI;
+import java.time.Duration;
 
 /**
  * Cloudflare R2(S3 호환) 저장소 S3Client 빈 설정.
@@ -35,10 +37,26 @@ public class R2StorageConfig {
      *
      * <p>credentials는 StorageProperties.r2에서 읽어오며, access-key/secret-key는
      * 반드시 환경변수로만 주입된다 (코드·yml 평문 금지).
+     *
+     * <p>타임아웃 설정:
+     * <ul>
+     *   <li>{@code apiCallAttemptTimeout}: 단일 시도(attempt)의 최대 시간. HTTP 클라이언트 종류와 무관하게
+     *       SDK 레벨에서 강제하므로 신규 의존 없이 "thread 무한 매달림"을 방지한다.</li>
+     *   <li>{@code apiCallTimeout}: 재시도 포함 전체 호출의 최대 시간.
+     *       불변식: apiCallTimeout ≥ maxRetryAttempts × apiCallAttemptTimeout 을 만족해야
+     *       재시도가 전체 타임아웃에 잘리지 않는다.</li>
+     * </ul>
+     * 값은 StorageProperties.R2에서 주입받으며, 환경변수로 운영 튜닝 가능하다.
      */
     @Bean
     public S3Client s3Client(StorageProperties storageProperties) {
         StorageProperties.R2 r2 = storageProperties.getR2();
+
+        ClientOverrideConfiguration overrideConfiguration = ClientOverrideConfiguration.builder()
+                .apiCallAttemptTimeout(Duration.ofMillis(r2.getApiCallAttemptTimeoutMs()))
+                .apiCallTimeout(Duration.ofMillis(r2.getApiCallTimeoutMs()))
+                .build();
+
         return S3Client.builder()
                 .endpointOverride(URI.create(r2.getEndpoint()))
                 .region(Region.of(r2.getRegion()))
@@ -47,6 +65,7 @@ public class R2StorageConfig {
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)
                         .build())
+                .overrideConfiguration(overrideConfiguration)
                 .build();
     }
 }

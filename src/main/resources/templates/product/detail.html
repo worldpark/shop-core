@@ -61,7 +61,8 @@
                         <img th:src="${mainImage.imageUrl}"
                              th:alt="${product.name}"
                              id="main-product-image"
-                             class="gallery-main-img">
+                             class="gallery-main-img"
+                             onerror="this.onerror=null;this.src='/images/placeholder.png'">
                     </div>
 
                     <!-- 이미지 썸네일 목록 -->
@@ -71,7 +72,8 @@
                              th:alt="'상품 이미지 ' + ${image.sortOrder}"
                              th:classappend="${image.primary} ? ' thumb-active' : ''"
                              class="gallery-thumb"
-                             th:attr="data-src=${image.imageUrl}">
+                             th:attr="data-src=${image.imageUrl}"
+                             onerror="this.onerror=null;this.src='/images/placeholder.png'">
                     </div>
                 </div>
             </div>

@@ -148,6 +148,13 @@ shop:
       region: ${SHOP_STORAGE_R2_REGION:auto}
       access-key: ${SHOP_STORAGE_R2_ACCESS_KEY:}
       secret-key: ${SHOP_STORAGE_R2_SECRET_KEY:}
+      # 업로드 타임아웃 — 불변식: api-call-timeout-ms ≥ maxRetryAttempts × api-call-attempt-timeout-ms
+      # 기본 attempt 15s: 10MB ÷ ~1MB/s(보수적) = 10s, 여유 50% 적용
+      # 기본 전체 45s: SDK standard 최대 3회 × 15s = 45s
+      api-call-attempt-timeout-ms: ${SHOP_STORAGE_R2_API_CALL_ATTEMPT_TIMEOUT_MS:15000}
+      api-call-timeout-ms: ${SHOP_STORAGE_R2_API_CALL_TIMEOUT_MS:45000}
+      # PutObject Cache-Control 헤더 — UUID 키 불변이므로 immutable 유효
+      cache-control: ${SHOP_STORAGE_R2_CACHE_CONTROL:public, max-age=31536000, immutable}
   threads:
     virtual:
       enabled: false
