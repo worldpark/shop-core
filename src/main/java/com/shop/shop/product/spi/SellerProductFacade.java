@@ -4,6 +4,7 @@ import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.ProductFormView;
 import com.shop.shop.product.dto.SellerProductStatsData;
 import com.shop.shop.product.dto.SellerProductSummaryView;
+import com.shop.shop.product.dto.VariantProductMapping;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -121,4 +122,20 @@ public interface SellerProductFacade {
      * @return 소유 상품 목록 + 재고맵 + variantId 매핑 번들
      */
     SellerProductStatsData getMyProductStatsData(String actorEmail, Pageable pageable);
+
+    /**
+     * 판매자 소유 전체 상품의 variantId ↔ productId 매핑 조회 (SSE 전체 스코프 전용).
+     *
+     * <p>페이지 제한 없이 소유자의 모든 상품 variant 매핑을 1쿼리로 반환한다.
+     * SSE 연결 시점에 전체 소유 variantId 세트를 캐시하는 데 사용한다.
+     *
+     * <p>IDOR 안전: actorEmail → ownerId는 facade 내부에서 해석(외부 id 미신뢰).
+     * variant가 없는 상품 또는 삭제된 variant는 결과에 포함되지 않는다(기존 한계 동일).
+     *
+     * <p>연결 유지 중 신규 등록 상품은 reconnect 전까지 스트림에 반영되지 않는다(staleness 정책).
+     *
+     * @param actorEmail 행위자 이메일 (facade 내부에서 ownerId로 해석)
+     * @return 소유 variantId ↔ productId 매핑 리스트 (비어 있으면 빈 리스트)
+     */
+    List<VariantProductMapping> getMyOwnedVariantMappings(String actorEmail);
 }

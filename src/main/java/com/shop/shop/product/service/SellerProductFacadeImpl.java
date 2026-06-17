@@ -165,4 +165,19 @@ class SellerProductFacadeImpl implements SellerProductFacade {
 
         return new SellerProductStatsData(products, productPage.getTotalElements(), stockByProduct, variantMappings);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>actorEmail → ownerId 변환 후 {@link ProductVariantRepository#findVariantProductMappingsByOwnerId}
+     * 1쿼리로 소유 전체 variant 매핑을 조회한다(N+1 없음, IDOR 안전).
+     * SSE 연결 시점에 1회 호출되어 registry에 캐시된다.
+     * 연결 유지 중 신규 등록 상품은 reconnect 전까지 반영되지 않는다(staleness 정책).
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<VariantProductMapping> getMyOwnedVariantMappings(String actorEmail) {
+        long ownerId = userDirectory.findUserIdByEmail(actorEmail);
+        return productVariantRepository.findVariantProductMappingsByOwnerId(ownerId);
+    }
 }

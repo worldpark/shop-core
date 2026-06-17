@@ -50,7 +50,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="row : ${statsPage.content}" class="order-row">
+                    <tr th:each="row : ${statsPage.content}" class="order-row"
+                        th:attr="data-product-id=${row.productId}">
                         <td class="seller-product-name" th:text="${row.name}">상품명</td>
                         <td class="seller-product-status">
                             <span class="badge-product-status"
@@ -62,9 +63,10 @@
                                   th:text="${statusLabel}">상태</span>
                         </td>
                         <td th:text="${row.totalStock}">0</td>
-                        <td th:text="${row.salesQty}">0</td>
+                        <td class="sales-qty" th:text="${row.salesQty}">0</td>
                         <td>
-                            <span th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
+                            <span class="revenue"
+                                  th:text="${#numbers.formatDecimal(row.revenue, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
                         </td>
                     </tr>
                 </tbody>
@@ -98,6 +100,61 @@
             </div>
         </section>
     </div>
+
+    <!--
+        SSE 실시간 갱신 (plan §3.6).
+        - EventSource가 없거나 연결 실패해도 서버 렌더 수치는 유지(점진적 향상).
+        - 매출 포맷: 서버와 동일하게 천 단위 콤마, 소수점 0자리 + '원'
+          (Thymeleaf: formatDecimal(revenue, 1, 'COMMA', 0, 'POINT'))
+        - 인라인 script는 반드시 <main> 내부([[inline-script-must-be-inside-main-layout-fragment]])
+    -->
+    <script>
+    (function () {
+        if (typeof EventSource === 'undefined') return;
+
+        var es = new EventSource('/seller/products/stats/stream');
+
+        es.addEventListener('stats', function (e) {
+            var snapshot;
+            try {
+                snapshot = JSON.parse(e.data);
+            } catch (err) {
+                return;
+            }
+
+            // backend SellerSalesSnapshot(record) 직렬화 형태:
+            // { "salesByProduct": { "123": { "salesQty": N, "revenue": "9999.00" }, ... } }
+            var salesData = snapshot.salesByProduct != null ? snapshot.salesByProduct : snapshot;
+
+            Object.keys(salesData).forEach(function (productId) {
+                var cell = salesData[productId];
+                var row = document.querySelector('tr[data-product-id="' + productId + '"]');
+                if (!row) return;
+
+                // 판매수량 갱신
+                var qtyCell = row.querySelector('td.sales-qty');
+                if (qtyCell) {
+                    qtyCell.textContent = cell.salesQty != null ? cell.salesQty : cell.salesqty;
+                }
+
+                // 매출 갱신 — 서버와 동일 포맷: 천 단위 콤마, 소수점 0자리 + '원'
+                var revenueSpan = row.querySelector('td span.revenue');
+                if (revenueSpan) {
+                    var rev = parseFloat(cell.revenue);
+                    if (!isNaN(rev)) {
+                        revenueSpan.textContent = rev.toLocaleString('ko-KR', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0
+                        }) + '원';
+                    }
+                }
+            });
+        });
+
+        // 연결 오류: EventSource가 자동 재연결하므로 별도 처리 없이 조용히 무시
+        es.onerror = function () { /* 자동 재연결 위임 */ };
+    })();
+    </script>
 </main>
 </body>
 </html>

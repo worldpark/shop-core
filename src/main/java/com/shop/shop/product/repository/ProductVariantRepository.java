@@ -131,6 +131,26 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<VariantProductMapping> findVariantProductMappingsByProductIdIn(@Param("productIds") Collection<Long> productIds);
 
     /**
+     * 판매자 소유 전체 상품의 variantId ↔ productId 매핑 조회 (SSE 전체 스코프 전용).
+     *
+     * <p>페이지 제한 없이 소유자(ownerId)의 모든 상품에 속한 variant를 1쿼리로 조회한다.
+     * SSE 연결 시점에 전체 소유 variantId 세트를 캐시하기 위해 사용한다(N+1 없음).
+     * variant가 없는 상품은 결과에 포함되지 않는다.
+     *
+     * @param ownerId 소유자(판매자) 사용자 ID
+     * @return variantId → productId 매핑 projection 리스트
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.VariantProductMapping(
+                pv.id,
+                pv.product.id
+            )
+            FROM ProductVariant pv
+            WHERE pv.product.ownerId = :ownerId
+            """)
+    List<VariantProductMapping> findVariantProductMappingsByOwnerId(@Param("ownerId") long ownerId);
+
+    /**
      * 주어진 variantId 집합 중 게시 상태({@code publishedStatuses}) 상품에 속한 distinct 상품 수.
      * 관리자 통계 대시보드 — 상품 판매율 분자(최근 30일 판매된 게시 상품 distinct 수) 계산에 사용.
      *
