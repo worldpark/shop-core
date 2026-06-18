@@ -2,6 +2,8 @@ package com.shop.shop.cart.service;
 
 import com.shop.shop.cart.domain.Cart;
 import com.shop.shop.cart.repository.CartRepository;
+import com.shop.shop.common.crypto.CryptoConfig;
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.product.spi.ProductPurchaseCatalog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,12 +38,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
+@Import({CartService.class, CryptoConfig.class, EnvelopeEncryptionService.class})
 @TestPropertySource(properties = {
         "spring.autoconfigure.exclude=",
         "spring.flyway.enabled=true",
         "spring.jpa.hibernate.ddl-auto=validate"
 })
-@Import(CartService.class)
 class CartServiceIntegrationTest {
 
     @Container

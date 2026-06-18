@@ -1,5 +1,7 @@
 package com.shop.shop.member.repository;
 
+import com.shop.shop.common.crypto.CryptoConfig;
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.member.domain.MemberStatus;
 import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.domain.User;
@@ -10,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -36,6 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
+@Import({CryptoConfig.class, EnvelopeEncryptionService.class})
 @TestPropertySource(properties = {
         "spring.autoconfigure.exclude=",
         "spring.flyway.enabled=true",

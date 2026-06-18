@@ -1,7 +1,9 @@
 package com.shop.shop.member.domain;
 
 import com.shop.shop.common.domain.BaseEntity;
+import com.shop.shop.common.crypto.EncryptedStringConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -45,9 +47,11 @@ public class User extends BaseEntity {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "phone")
     private String phone;
 

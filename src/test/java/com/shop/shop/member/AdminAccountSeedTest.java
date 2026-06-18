@@ -1,5 +1,6 @@
 package com.shop.shop.member;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,12 +48,16 @@ class AdminAccountSeedTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private EnvelopeEncryptionService crypto;
+
     @Test
     @Commit
     @Transactional
     @DisplayName("로컬 shop_core DB에 ADMIN 계정을 생성하거나 갱신한다")
     void seedAdminAccount() {
         String passwordHash = passwordEncoder.encode(RAW_PASSWORD);
+        String encryptedName = crypto.encrypt(NAME);
 
         int changedRows = entityManager.createNativeQuery("""
                 INSERT INTO users (email, password_hash, name, phone, role)
@@ -65,7 +70,7 @@ class AdminAccountSeedTest {
                 """)
                 .setParameter("email", EMAIL)
                 .setParameter("passwordHash", passwordHash)
-                .setParameter("name", NAME)
+                .setParameter("name", encryptedName)
                 .executeUpdate();
 
         assertThat(changedRows).isEqualTo(1);

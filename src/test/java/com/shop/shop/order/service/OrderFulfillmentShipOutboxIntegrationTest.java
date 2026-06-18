@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.order.event.ShippingStartedEvent;
@@ -71,6 +72,9 @@ class OrderFulfillmentShipOutboxIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     @Autowired
     private CaptureListener captureListener;
@@ -371,8 +375,10 @@ class OrderFulfillmentShipOutboxIntegrationTest {
         BigDecimal lineAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
         jdbc.update("INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, "
                 + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, 'paid', ?, 0, 0, ?, '수령인', '010-1234-5678', '12345', '서울시')",
-                userId, orderNumber, lineAmount, lineAmount);
+                + "VALUES (?, ?, 'paid', ?, 0, 0, ?, ?, ?, ?, ?)",
+                userId, orderNumber, lineAmount, lineAmount,
+                crypto.encrypt("수령인"), crypto.encrypt("010-1234-5678"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         Long orderId = jdbc.queryForObject(
                 "SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
         jdbc.update("INSERT INTO order_items (order_id, variant_id, product_name, unit_price, quantity, line_amount) "
@@ -388,8 +394,10 @@ class OrderFulfillmentShipOutboxIntegrationTest {
         BigDecimal amount = BigDecimal.valueOf(10000);
         jdbc.update("INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, "
                 + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, 'paid', ?, 0, 0, ?, '수령인', '010-1234-5678', '12345', '서울시')",
-                userId, orderNumber, amount, amount);
+                + "VALUES (?, ?, 'paid', ?, 0, 0, ?, ?, ?, ?, ?)",
+                userId, orderNumber, amount, amount,
+                crypto.encrypt("수령인"), crypto.encrypt("010-1234-5678"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         Long orderId = jdbc.queryForObject(
                 "SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
         jdbc.update("INSERT INTO order_items (order_id, variant_id, product_name, unit_price, quantity, line_amount) "

@@ -2,6 +2,7 @@ package com.shop.shop.payment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.payment.event.PaymentFailedEvent;
@@ -84,6 +85,9 @@ class PaymentDeclineOutboxIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     @Autowired
     private CaptureListener captureListener;
@@ -324,8 +328,10 @@ class PaymentDeclineOutboxIntegrationTest {
     private long insertOrder(long userId, long variantId, BigDecimal amount) {
         String orderNumber = "ORD-DECLINE-" + System.nanoTime();
         jdbc.update("INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, 'pending', ?, 0, 0, ?, '수령인', '010-1234-5678', '12345', '서울시')",
-                userId, orderNumber, amount, amount);
+                + "VALUES (?, ?, 'pending', ?, 0, 0, ?, ?, ?, ?, ?)",
+                userId, orderNumber, amount, amount,
+                crypto.encrypt("수령인"), crypto.encrypt("010-1234-5678"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         Long orderId = jdbc.queryForObject(
                 "SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
         jdbc.update("INSERT INTO order_items (order_id, variant_id, product_name, unit_price, quantity, line_amount) "

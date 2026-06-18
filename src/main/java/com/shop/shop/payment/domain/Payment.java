@@ -1,7 +1,9 @@
 package com.shop.shop.payment.domain;
 
+import com.shop.shop.common.crypto.EncryptedStringConverter;
 import com.shop.shop.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -86,8 +88,9 @@ public class Payment extends BaseEntity {
     private BigDecimal amount;
 
     /**
-     * PG 거래 번호 (nullable, 승인 시 기록).
+     * PG 거래 번호 (nullable, 승인 시 기록) — PII 봉투암호화 적용.
      */
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "pg_transaction_id")
     private String pgTransactionId;
 

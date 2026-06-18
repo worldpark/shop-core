@@ -1,8 +1,10 @@
 package com.shop.shop.order.domain;
 
+import com.shop.shop.common.crypto.EncryptedStringConverter;
 import com.shop.shop.common.domain.BaseEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -68,19 +70,24 @@ public class Order extends BaseEntity {
     @Column(name = "final_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal finalAmount;
 
-    // 배송지 스냅샷 (주문 시점 고정, 이후 변경 불가)
+    // 배송지 스냅샷 (주문 시점 고정, 이후 변경 불가) — PII 봉투암호화 적용
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "ship_recipient")
     private String shipRecipient;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "ship_phone")
     private String shipPhone;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "ship_postcode")
     private String shipPostcode;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "ship_address1")
     private String shipAddress1;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "ship_address2")
     private String shipAddress2;
 

@@ -1,7 +1,9 @@
 package com.shop.shop.member.domain;
 
+import com.shop.shop.common.crypto.EncryptedStringConverter;
 import com.shop.shop.common.domain.BaseEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -45,14 +47,17 @@ public class SellerApplication extends BaseEntity {
     private SellerApplicationStatus status;
 
     /** 상호명 */
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "business_name", nullable = false)
     private String businessName;
 
     /** 사업자등록번호 — 숫자 10자리 패턴 검증은 DTO 레이어에서 수행 */
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "business_registration_number", nullable = false)
     private String businessRegistrationNumber;
 
     /** 담당자 연락처 */
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "contact_phone", nullable = false)
     private String contactPhone;
 

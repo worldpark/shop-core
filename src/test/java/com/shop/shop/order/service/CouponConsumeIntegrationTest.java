@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.order.repository.CouponRepository;
 import com.shop.shop.order.repository.UserCouponRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +59,9 @@ class CouponConsumeIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     // ============================================================
     // markUsedIfUnused
@@ -311,8 +315,10 @@ class CouponConsumeIntegrationTest {
         String orderNumber = "ORD-CONSUME-" + System.nanoTime();
         jdbc.update("INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, "
                 + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, 'pending', 10000, 0, 0, 10000, '수령인', '010-0000-0000', '12345', '서울')",
-                userId, orderNumber);
+                + "VALUES (?, ?, 'pending', 10000, 0, 0, 10000, ?, ?, ?, ?)",
+                userId, orderNumber,
+                crypto.encrypt("수령인"), crypto.encrypt("010-0000-0000"),
+                crypto.encrypt("12345"), crypto.encrypt("서울"));
         return jdbc.queryForObject(
                 "SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
     }

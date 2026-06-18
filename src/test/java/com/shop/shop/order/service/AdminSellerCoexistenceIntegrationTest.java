@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.common.exception.ShipmentNotFoundException;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
@@ -79,6 +80,9 @@ class AdminSellerCoexistenceIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     @MockitoBean
     private MemberDirectory memberDirectory;
@@ -393,7 +397,8 @@ class AdminSellerCoexistenceIntegrationTest {
                     "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) " +
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 buyerId, orderNumber, "paid", amount, BigDecimal.ZERO, BigDecimal.ZERO, amount,
-                "수령인", "010-0000-0000", "12345", "서울시");
+                crypto.encrypt("수령인"), crypto.encrypt("010-0000-0000"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         return jdbc.queryForObject("SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
     }
 

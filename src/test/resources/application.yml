@@ -60,3 +60,6 @@ shop:
       - gif
       - webp
     max-images-per-product: 10
+
+  crypto:
+    kek-file: ${user.dir}/src/test/resources/test-kek.b64

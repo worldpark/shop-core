@@ -1,5 +1,7 @@
 package com.shop.shop.product.service;
 
+import com.shop.shop.common.crypto.CryptoConfig;
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.product.domain.Category;
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
@@ -38,12 +40,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
+@Import({CategoryService.class, CryptoConfig.class, EnvelopeEncryptionService.class})
 @TestPropertySource(properties = {
         "spring.autoconfigure.exclude=",
         "spring.flyway.enabled=true",
         "spring.jpa.hibernate.ddl-auto=validate"
 })
-@Import(CategoryService.class)
 class CategoryDeleteIntegrationTest {
 
     @Container

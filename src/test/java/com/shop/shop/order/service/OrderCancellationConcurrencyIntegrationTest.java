@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.common.exception.OrderCancellationConflictException;
 import com.shop.shop.common.exception.OrderNotFoundException;
 import com.shop.shop.member.spi.MemberDirectory;
@@ -87,6 +88,9 @@ class OrderCancellationConcurrencyIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     @MockitoBean
     private MemberDirectory memberDirectory;
@@ -532,8 +536,10 @@ class OrderCancellationConcurrencyIntegrationTest {
         BigDecimal lineAmount = unitPrice.multiply(BigDecimal.valueOf(quantity));
         jdbc.update("INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, "
                 + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, 'pending', ?, 0, 0, ?, '수령인', '010-1234-5678', '12345', '서울시')",
-                userId, orderNumber, lineAmount, lineAmount);
+                + "VALUES (?, ?, 'pending', ?, 0, 0, ?, ?, ?, ?, ?)",
+                userId, orderNumber, lineAmount, lineAmount,
+                crypto.encrypt("수령인"), crypto.encrypt("010-1234-5678"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         Long orderId = jdbc.queryForObject(
                 "SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
         jdbc.update("INSERT INTO order_items (order_id, variant_id, product_name, unit_price, quantity, line_amount) "

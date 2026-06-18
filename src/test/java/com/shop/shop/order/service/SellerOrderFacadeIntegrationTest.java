@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.order.spi.SellerOrderFacade;
 import com.shop.shop.order.spi.dto.SellerOrderView;
 import jakarta.persistence.EntityManagerFactory;
@@ -61,6 +62,9 @@ class SellerOrderFacadeIntegrationTest {
 
     @Autowired
     private EntityManagerFactory entityManagerFactory;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     private static final Pageable PAGE_0_10 = PageRequest.of(0, 10);
 
@@ -279,7 +283,7 @@ class SellerOrderFacadeIntegrationTest {
 
     private long insertUser(String email, String role) {
         jdbc.update("INSERT INTO users(email, password_hash, name, role, status) VALUES(?,?,?,?,?)",
-                email, "hash", "테스터", role, "ACTIVE");
+                email, "hash", crypto.encrypt("테스터"), role, "ACTIVE");
         return jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long.class, email);
     }
 
@@ -315,7 +319,8 @@ class SellerOrderFacadeIntegrationTest {
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 userId, orderNumber, status,
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("10000"),
-                "수령인", "010-0000-0000", "12345", "서울시");
+                crypto.encrypt("수령인"), crypto.encrypt("010-0000-0000"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         return jdbc.queryForObject("SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
     }
 

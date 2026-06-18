@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.member.spi.MemberDirectory;
 import com.shop.shop.member.spi.MemberDirectory.MemberContact;
 import com.shop.shop.order.event.ShippingStartedEvent;
@@ -72,6 +73,9 @@ class SellerShipNotificationSmokeIntegrationTest {
 
     @Autowired
     private CaptureListener captureListener;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     @MockitoBean
     private MemberDirectory memberDirectory;
@@ -207,7 +211,8 @@ class SellerShipNotificationSmokeIntegrationTest {
                     "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) " +
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 buyerId, orderNumber, "paid", lineAmount, BigDecimal.ZERO, BigDecimal.ZERO, lineAmount,
-                "수령인", "010-0000-0000", "12345", "서울시");
+                crypto.encrypt("수령인"), crypto.encrypt("010-0000-0000"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         Long orderId = jdbc.queryForObject("SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
         jdbc.update("INSERT INTO order_items(order_id, variant_id, owner_id, product_name, " +
                     "unit_price, quantity, line_amount) VALUES(?,?,?,?,?,?,?)",

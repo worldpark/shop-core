@@ -1,5 +1,7 @@
 package com.shop.shop.inventory.repository;
 
+import com.shop.shop.common.crypto.CryptoConfig;
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import com.shop.shop.inventory.spi.StockChangeReason;
 import com.shop.shop.inventory.domain.StockLedgerEntry;
 import org.junit.jupiter.api.DisplayName;
@@ -9,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.TestPropertySource;
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
+@Import({CryptoConfig.class, EnvelopeEncryptionService.class})
 @TestPropertySource(properties = {
         "spring.autoconfigure.exclude=",
         "spring.flyway.enabled=true",

@@ -1,5 +1,6 @@
 package com.shop.shop.order.service;
 
+import com.shop.shop.common.crypto.EnvelopeEncryptionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,9 @@ class ShipmentSellerIdBackfillIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EnvelopeEncryptionService crypto;
 
     // V11 SQL (plan §1.2에서 그대로 복사)
     private static final String V11_SQL =
@@ -214,7 +218,8 @@ class ShipmentSellerIdBackfillIntegrationTest {
                     "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) " +
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 buyerId, orderNumber, "paid", amount, BigDecimal.ZERO, BigDecimal.ZERO, amount,
-                "수령인", "010-0000-0000", "12345", "서울시");
+                crypto.encrypt("수령인"), crypto.encrypt("010-0000-0000"),
+                crypto.encrypt("12345"), crypto.encrypt("서울시"));
         return jdbc.queryForObject("SELECT id FROM orders WHERE order_number=?", Long.class, orderNumber);
     }
 
