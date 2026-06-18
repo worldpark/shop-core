@@ -2,9 +2,12 @@ package com.shop.shop.common.crypto;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.crypto.KeyGenerator;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -15,6 +18,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class EnvelopeEncryptionUtilsTest {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @TempDir
+    Path tempDir;
 
     @Test
     @DisplayName("문자열 암복호화 — KEK로 감싼 DEK를 사용해 원문을 복원한다")
@@ -54,6 +60,20 @@ class EnvelopeEncryptionUtilsTest {
         byte[] decryptedBytes = EnvelopeEncryptionUtils.decryptToBytes(encryptedText, kek);
 
         assertThat(decryptedBytes).isEqualTo(plainBytes);
+    }
+
+    @Test
+    @DisplayName("KEK 파일 암복호화 — 파일 경로에서 Base64 KEK를 읽어 원문을 복원한다")
+    void encryptAndDecryptWithKekFile_restoresPlainText() throws Exception {
+        Path kekFile = tempDir.resolve("shop-core-kek.txt");
+        Files.writeString(kekFile, testKek(), StandardCharsets.UTF_8);
+        String plainText = "sensitive-address";
+
+        String encryptedText = EnvelopeEncryptionUtils.encryptWithKekFile(plainText, kekFile);
+        String decryptedText = EnvelopeEncryptionUtils.decryptWithKekFile(encryptedText, kekFile);
+
+        assertThat(encryptedText).startsWith("v1:");
+        assertThat(decryptedText).isEqualTo(plainText);
     }
 
     @Test

@@ -5,7 +5,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -58,6 +61,34 @@ public final class EnvelopeEncryptionUtils {
     }
 
     /**
+     * KEK 파일 경로에서 Base64 KEK를 읽어 문자열 평문을 암호화한다.
+     */
+    public static String encryptWithKekFile(String plainText, Path kekFile) {
+        return encrypt(plainText, readKek(kekFile));
+    }
+
+    /**
+     * KEK 파일 경로에서 Base64 KEK를 읽어 문자열 암호문을 복호화한다.
+     */
+    public static String decryptWithKekFile(String encryptedText, Path kekFile) {
+        return decrypt(encryptedText, readKek(kekFile));
+    }
+
+    /**
+     * KEK 파일 경로에서 Base64 KEK를 읽어 바이트 배열 평문을 암호화한다.
+     */
+    public static String encryptWithKekFile(byte[] plainBytes, Path kekFile) {
+        return encrypt(plainBytes, readKek(kekFile));
+    }
+
+    /**
+     * KEK 파일 경로에서 Base64 KEK를 읽어 문자열 암호문을 바이트 배열로 복호화한다.
+     */
+    public static byte[] decryptToBytesWithKekFile(String encryptedText, Path kekFile) {
+        return decryptToBytes(encryptedText, readKek(kekFile));
+    }
+
+    /**
      * 바이트 배열 평문을 암호화한다.
      */
     public static String encrypt(byte[] plainBytes, String base64Kek) {
@@ -103,6 +134,18 @@ public final class EnvelopeEncryptionUtils {
             throw e;
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             throw new CryptoException("복호화에 실패했습니다.", e);
+        }
+    }
+
+    private static String readKek(Path kekFile) {
+        Objects.requireNonNull(kekFile, "kekFile must not be null");
+
+        try {
+            String base64Kek = Files.readString(kekFile, StandardCharsets.UTF_8).trim();
+            decodeKek(base64Kek);
+            return base64Kek;
+        } catch (IOException e) {
+            throw new CryptoException("KEK 파일을 읽을 수 없습니다.", e);
         }
     }
 

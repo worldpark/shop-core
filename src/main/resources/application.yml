@@ -173,6 +173,9 @@ shop:
     virtual:
       enabled: false
 
+  crypto:
+    kek-file: ${SHOP_CRYPTO_KEK_FILE}
+
 management:
   endpoints:
     web:
