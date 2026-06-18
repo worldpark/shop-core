@@ -5,6 +5,7 @@ import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
+import com.shop.shop.security.AuthTokenIssuer;
 import com.shop.shop.security.JwtProperties;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.RefreshTokenStore;
@@ -19,8 +20,10 @@ import java.util.List;
  * 인증 REST 응답 조합 전용 ServiceResponse 레이어.
  * View/Scheduler/EventListener에서는 사용하지 않는다 (architecture-rule).
  *
- * <p>비즈니스 로직은 하위 Service(MemberService, JwtTokenProvider, RefreshTokenStore)에 위임.
+ * <p>비즈니스 로직은 하위 Service(MemberService, AuthTokenIssuer, JwtTokenProvider, RefreshTokenStore)에 위임.
  * Entity는 직접 반환하지 않고 DTO(TokenResponse)로 변환.
+ *
+ * <p>토큰 발급은 {@link AuthTokenIssuer} 공용 경로 위임 — View(ViewAuthService)와 중복 없음.
  */
 @Slf4j
 @Service
@@ -31,10 +34,11 @@ public class AuthServiceResponse {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenStore refreshTokenStore;
     private final JwtProperties jwtProperties;
+    private final AuthTokenIssuer authTokenIssuer;
 
     /**
      * 로그인 처리.
-     * 자격증명 검증 → access/refresh 발급 → Redis에 refresh hash 저장 → 로그인 시각 기록 → TokenResponse 반환.
+     * 자격증명 검증 → {@link AuthTokenIssuer}로 access/refresh 발급 → 로그인 시각 기록 → TokenResponse 반환.
      *
      * @param request 로그인 요청(email, password)
      * @return TokenResponse (access, refresh, "Bearer", expiresIn)
@@ -42,17 +46,12 @@ public class AuthServiceResponse {
     public TokenResponse login(LoginRequest request) {
         User user = memberService.authenticate(request.email(), request.password());
 
-        String accessToken = jwtTokenProvider.createAccess(
-                user.getId(), user.getEmail(), List.of(user.getRole().authority()));
-        String refreshToken = jwtTokenProvider.createRefresh(user.getId());
+        List<String> roles = List.of(user.getRole().authority());
+        AuthTokenIssuer.IssuedTokens issued = authTokenIssuer.issue(user.getId(), user.getEmail(), roles);
 
-        refreshTokenStore.storeRefresh(user.getId(), refreshToken, jwtProperties.refreshTtl());
-
-        // REST 로그인 성공 → last_login_at 기록 (formLogin은 LoginActivityRecorder 이벤트 리스너가 담당)
         memberService.recordLoginByEmail(user.getEmail());
 
-        long expiresIn = jwtProperties.accessTtl().toSeconds();
-        return TokenResponse.of(accessToken, refreshToken, expiresIn);
+        return TokenResponse.of(issued.accessToken(), issued.refreshToken(), issued.accessTtlSeconds());
     }
 
     /**

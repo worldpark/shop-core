@@ -6,6 +6,7 @@ import com.shop.shop.member.domain.User;
 import com.shop.shop.member.dto.LoginRequest;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
+import com.shop.shop.security.AuthTokenIssuer;
 import com.shop.shop.security.JwtProperties;
 import com.shop.shop.security.JwtTokenProvider;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
@@ -47,8 +48,9 @@ class AuthServiceResponseTest {
         jwtProperties = new JwtProperties(SECRET, Duration.ofMinutes(30), Duration.ofDays(14), "test");
         jwtTokenProvider = new JwtTokenProvider(jwtProperties);
         refreshTokenStore = new FakeRefreshTokenStore();
+        AuthTokenIssuer authTokenIssuer = new AuthTokenIssuer(jwtTokenProvider, refreshTokenStore, jwtProperties);
         authServiceResponse = new AuthServiceResponse(
-                memberService, jwtTokenProvider, refreshTokenStore, jwtProperties);
+                memberService, jwtTokenProvider, refreshTokenStore, jwtProperties, authTokenIssuer);
 
         testUser = User.of(EMAIL, "hashed_pw", "테스터", null, Role.CONSUMER);
         try {

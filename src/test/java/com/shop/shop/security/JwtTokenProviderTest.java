@@ -148,4 +148,55 @@ class JwtTokenProviderTest {
 
         assertThat(jwtTokenProvider.extractRoles(claims)).containsExactly("ROLE_ADMIN");
     }
+
+    @Test
+    @DisplayName("extractEmail — access token email 클레임에서 이메일 추출 (View principal용)")
+    void extractEmail_returns_email_from_access_token() {
+        String email = "view-user@example.com";
+        String token = jwtTokenProvider.createAccess(1L, email, List.of("ROLE_CONSUMER"));
+        Claims claims = jwtTokenProvider.parse(token);
+
+        assertThat(jwtTokenProvider.extractEmail(claims)).isEqualTo(email);
+    }
+
+    @Test
+    @DisplayName("extractEmail — refresh token에는 email 클레임 없음 → null 반환")
+    void extractEmail_returns_null_for_refresh_token() {
+        String token = jwtTokenProvider.createRefresh(1L);
+        Claims claims = jwtTokenProvider.parse(token);
+
+        assertThat(jwtTokenProvider.extractEmail(claims)).isNull();
+    }
+
+    @Test
+    @DisplayName("parseIgnoreExpiry — 만료된 access token에서도 email/roles 클레임 추출 (무음 refresh용)")
+    void parseIgnoreExpiry_returns_claims_even_for_expired_token() throws InterruptedException {
+        JwtProperties shortTtlProps = new JwtProperties(
+                SECRET,
+                Duration.ofMillis(1),  // 1ms — 즉시 만료
+                Duration.ofDays(14),
+                ISSUER
+        );
+        JwtTokenProvider shortTtlProvider = new JwtTokenProvider(shortTtlProps);
+        String email = "expired@example.com";
+        String token = shortTtlProvider.createAccess(1L, email, List.of("ROLE_CONSUMER"));
+
+        Thread.sleep(10);
+
+        // 만료됐지만 서명 유효 → Claims 반환
+        Claims claims = jwtTokenProvider.parseIgnoreExpiry(token);
+
+        assertThat(claims).isNotNull();
+        assertThat(claims.get("email", String.class)).isEqualTo(email);
+    }
+
+    @Test
+    @DisplayName("parseIgnoreExpiry — 위조 토큰은 null 반환")
+    void parseIgnoreExpiry_returns_null_for_tampered_token() {
+        String tampered = "invalid.tampered.token";
+
+        Claims claims = jwtTokenProvider.parseIgnoreExpiry(tampered);
+
+        assertThat(claims).isNull();
+    }
 }

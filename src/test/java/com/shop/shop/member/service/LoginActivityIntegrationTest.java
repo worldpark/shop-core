@@ -26,25 +26,23 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * 로그인 활동 추적(last_login_at) 통합 테스트 (실 PostgreSQL, Testcontainers).
  *
+ * <p>054 변경사항: formLogin 제거 → View 로그인은 POST /login (CookieLoginViewController).
+ * last_login_at은 ViewAuthService.loginAndSetCookies → recordLoginByEmail 명시 호출로 보장.
+ *
  * <p>검증 항목:
  * <ul>
- *   <li>REST 로그인 성공 후 last_login_at 갱신(non-null, 로그인 직전 >= 기준 시각)</li>
- *   <li>formLogin 성공 후 last_login_at 갱신(InteractiveAuthenticationSuccessEvent → LoginActivityRecorder)</li>
- *   <li>REST 로그인 실패(잘못된 비밀번호) 시 last_login_at 미갱신</li>
- *   <li>formLogin 실패 시 last_login_at 미갱신</li>
- *   <li>REST 로그인 성공 후 302 리다이렉트 비파괴(SecurityConfig 무변경 회귀)</li>
- *   <li>formLogin 성공 후 302 리다이렉트 보존(SecurityConfig 무변경 회귀)</li>
+ *   <li>REST 로그인 성공 후 last_login_at 갱신 (기존 무변경)</li>
+ *   <li>View 폼 로그인(POST /login) 성공 후 last_login_at 갱신 (formLogin 이벤트 대체 회귀 가드)</li>
+ *   <li>REST 로그인 실패 시 last_login_at 미갱신</li>
+ *   <li>View 폼 로그인 실패 시 last_login_at 미갱신</li>
  * </ul>
- *
- * <p>SecurityConfig 무변경: successHandler·requestCache·defaultSuccessUrl 그대로라
- * formLogin 성공은 302 → "/" 리다이렉트를 유지한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -73,9 +71,6 @@ class LoginActivityIntegrationTest {
     private MemberRepository memberRepository;
 
     @Autowired
-    private MemberService memberService;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     private static final String EMAIL = "login-activity@example.com";
@@ -83,7 +78,6 @@ class LoginActivityIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // 매 테스트마다 신선한 사용자 생성 (이메일 충돌 방지)
         memberRepository.deleteAll();
         User user = User.of(EMAIL, passwordEncoder.encode(PASSWORD), "테스터", null, Role.CONSUMER);
         memberRepository.save(user);
@@ -109,15 +103,19 @@ class LoginActivityIntegrationTest {
     }
 
     // ============================================================
-    // formLogin 성공 → last_login_at 갱신 (InteractiveAuthenticationSuccessEvent)
+    // View 폼 로그인 성공 → last_login_at 갱신 (formLogin 이벤트 대체 회귀 가드)
     // ============================================================
 
     @Test
-    @DisplayName("formLogin 성공 후 last_login_at 갱신됨 (InteractiveAuthenticationSuccessEvent 리스너)")
-    void form_login_success_updates_last_login_at() throws Exception {
+    @DisplayName("View 폼 로그인(POST /login) 성공 후 last_login_at 갱신됨 — formLogin 이벤트 대체 회귀 가드")
+    void view_form_login_success_updates_last_login_at() throws Exception {
         Instant before = Instant.now();
 
-        mockMvc.perform(formLogin("/login").user(EMAIL).password(PASSWORD))
+        // ViewAuthService.loginAndSetCookies → recordLoginByEmail 명시 호출
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", EMAIL)
+                        .param("password", PASSWORD))
                 .andExpect(status().is3xxRedirection());
 
         User user = memberRepository.findByEmail(EMAIL).orElseThrow();
@@ -142,13 +140,16 @@ class LoginActivityIntegrationTest {
     }
 
     // ============================================================
-    // formLogin 실패 → last_login_at 미갱신
+    // View 폼 로그인 실패 → last_login_at 미갱신
     // ============================================================
 
     @Test
-    @DisplayName("formLogin 실패(잘못된 비밀번호) 시 last_login_at 미갱신")
-    void form_login_fail_does_not_update_last_login_at() throws Exception {
-        mockMvc.perform(formLogin("/login").user(EMAIL).password("wrong-password"))
+    @DisplayName("View 폼 로그인 실패(잘못된 비밀번호) 시 last_login_at 미갱신")
+    void view_form_login_fail_does_not_update_last_login_at() throws Exception {
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", EMAIL)
+                        .param("password", "wrong-password"))
                 .andExpect(status().is3xxRedirection()); // /login?error 로 리다이렉트
 
         User user = memberRepository.findByEmail(EMAIL).orElseThrow();
@@ -156,13 +157,16 @@ class LoginActivityIntegrationTest {
     }
 
     // ============================================================
-    // 회귀: formLogin 성공 → 302 to "/" 보존 (SecurityConfig 무변경 확인)
+    // View 폼 로그인 성공 → 302 redirect 보존
     // ============================================================
 
     @Test
-    @DisplayName("회귀: formLogin 성공 후 302 리다이렉트 보존 (SecurityConfig·requestCache 무변경)")
-    void form_login_success_preserves_302_redirect() throws Exception {
-        mockMvc.perform(formLogin("/login").user(EMAIL).password(PASSWORD))
+    @DisplayName("회귀: View 폼 로그인(POST /login) 성공 후 302 리다이렉트 보존")
+    void view_form_login_success_preserves_302_redirect() throws Exception {
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", EMAIL)
+                        .param("password", PASSWORD))
                 .andExpect(status().is3xxRedirection());
     }
 }

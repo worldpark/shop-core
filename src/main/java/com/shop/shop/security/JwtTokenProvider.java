@@ -7,6 +7,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -134,6 +135,44 @@ public class JwtTokenProvider {
     /** jti(JWT ID) 추출 */
     public String extractJti(Claims claims) {
         return claims.getId();
+    }
+
+    /**
+     * access token의 email 클레임 추출 (View principal 구성용).
+     * access token에만 email 클레임이 존재한다 (refresh token에는 없음).
+     *
+     * @param claims 검증된 Claims
+     * @return 회원 이메일 또는 null (refresh token 등 email 클레임 미포함 토큰)
+     */
+    public String extractEmail(Claims claims) {
+        return claims.get(CLAIM_EMAIL, String.class);
+    }
+
+    /**
+     * 만료된 토큰에서도 Claims를 추출한다 (무음 refresh 전용).
+     *
+     * <p>access 쿠키 만료 시 {@link SilentRefreshFilter}가 email/roles를 새 access 발급에 재사용한다.
+     * 서명 검증은 수행하되 만료 예외는 무시하고 Claims를 반환한다.
+     * 위조/형식 오류는 null 반환(호출자가 미인증 처리).
+     *
+     * @param token JWT 문자열 (만료됐어도 가능)
+     * @return Claims 또는 null (위조/형식 오류)
+     */
+    @Nullable
+    public Claims parseIgnoreExpiry(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (ExpiredJwtException e) {
+            // 만료됐지만 서명 유효 — Claims 반환
+            return e.getClaims();
+        } catch (JwtException e) {
+            log.debug("토큰 위조/형식 오류 (parseIgnoreExpiry): {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
