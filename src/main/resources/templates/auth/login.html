@@ -43,6 +43,11 @@
             비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.
         </div>
 
+        <!-- 최초 관리자 계정 생성 완료 안내 -->
+        <div class="alert alert-success" th:if="${param.adminCreated}">
+            관리자 계정이 생성되었습니다. 로그인해 주세요.
+        </div>
+
         <!--
             th:action 을 사용하면 Thymeleaf가 _csrf 히든 필드를 자동 주입한다.
             수동으로 _csrf 히든 필드를 추가하지 않는다.

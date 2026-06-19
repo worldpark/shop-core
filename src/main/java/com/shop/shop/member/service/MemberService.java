@@ -1,5 +1,6 @@
 package com.shop.shop.member.service;
 
+import com.shop.shop.common.exception.AdminAlreadyExistsException;
 import com.shop.shop.common.exception.BusinessException;
 import com.shop.shop.common.exception.DuplicateEmailException;
 import com.shop.shop.common.exception.InvalidCredentialsException;
@@ -30,7 +31,7 @@ import java.util.UUID;
 
 /**
  * 회원 도메인 서비스.
- * 로그인 자격증명 검증, 사용자 조회, 검색, 권한 변경 담당.
+ * 로그인 자격증명 검증, 사용자 조회, 검색, 권한 변경, 최초 ADMIN 부트스트랩 담당.
  * Repository는 이 클래스에서만 호출한다.
  */
 @Slf4j
@@ -155,6 +156,70 @@ public class MemberService {
             eventPublisher.publishEvent(new MemberRegisteredEvent(
                     UUID.randomUUID(), Instant.now(),
                     user.getId(), user.getEmail(), user.getName()));
+            return user;
+        } catch (DataIntegrityViolationException e) {
+            // 동시성 경합: 사전 체크 통과 후 INSERT 시 unique 위반 — DuplicateEmailException으로 변환
+            throw new DuplicateEmailException();
+        }
+    }
+
+    /**
+     * ADMIN 계정 존재 여부 확인.
+     *
+     * <p>최초 ADMIN 부트스트랩 게이트({@code GET /login}, {@code GET /setup/admin}) 및
+     * {@link #bootstrapFirstAdmin} 트랜잭션 내 가드에서 사용한다.
+     *
+     * @return ADMIN이 1명 이상이면 true, 0명이면 false
+     */
+    @Transactional(readOnly = true)
+    public boolean adminExists() {
+        return memberRepository.countByRole(Role.ADMIN) > 0;
+    }
+
+    /**
+     * 최초 ADMIN 계정 부트스트랩.
+     *
+     * <p>처리 순서:
+     * <ol>
+     *   <li>트랜잭션 내 {@code countByRole(ADMIN) != 0}이면 {@link AdminAlreadyExistsException}(409) —
+     *       동시 경합·직접 POST 가드(닫힘 불변식의 최종 방어선)</li>
+     *   <li>이메일 정규화(trim) + {@code existsByEmail} → {@link DuplicateEmailException}</li>
+     *   <li>BCrypt 해시 생성 — 원문 DB/로그 미저장</li>
+     *   <li>{@code User.of(normalizedEmail, hash, name.trim(), null, Role.ADMIN)} 저장 — phone 없음</li>
+     *   <li>동시성 경합 unique 위반 흡수 — {@link org.springframework.dao.DataIntegrityViolationException}
+     *       → {@link DuplicateEmailException}</li>
+     * </ol>
+     *
+     * <p>{@code MemberRegisteredEvent} 미발행 (확정 결정 — 부트스트랩은 시스템 행위, 환영 이메일 부적절).
+     *
+     * @param email       ADMIN 이메일
+     * @param rawPassword ADMIN 비밀번호 원문
+     * @param name        ADMIN 이름
+     * @return 저장된 User (role=ADMIN)
+     * @throws AdminAlreadyExistsException ADMIN이 이미 존재함 (409)
+     * @throws DuplicateEmailException     이메일 중복 또는 동시성 경합 unique 위반
+     */
+    @Transactional
+    public User bootstrapFirstAdmin(String email, String rawPassword, String name) {
+        // 1. 트랜잭션 내 ADMIN 재확인 — 동시 경합·직접 POST 최종 방어선
+        if (memberRepository.countByRole(Role.ADMIN) != 0) {
+            throw new AdminAlreadyExistsException();
+        }
+
+        String normalizedEmail = email.trim();   // 정규화: 앞뒤 공백 제거
+
+        // 2. 이메일 중복 사전 체크
+        if (memberRepository.existsByEmail(normalizedEmail)) {
+            throw new DuplicateEmailException();
+        }
+
+        String hash = passwordEncoder.encode(rawPassword);   // BCrypt 해시 — 원문 미저장
+
+        try {
+            User user = memberRepository.save(
+                    User.of(normalizedEmail, hash, name.trim(), null, Role.ADMIN));
+            log.info("최초 ADMIN 부트스트랩 완료: userId={}", user.getId());   // 원문/해시 로그 금지
+            // MemberRegisteredEvent 미발행 (확정 결정 — 부트스트랩은 시스템 행위)
             return user;
         } catch (DataIntegrityViolationException e) {
             // 동시성 경합: 사전 체크 통과 후 INSERT 시 unique 위반 — DuplicateEmailException으로 변환

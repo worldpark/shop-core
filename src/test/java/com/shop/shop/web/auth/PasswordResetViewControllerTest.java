@@ -4,6 +4,7 @@ import com.shop.shop.cart.repository.CartItemRepository;
 import com.shop.shop.cart.repository.CartRepository;
 import com.shop.shop.common.exception.InvalidPasswordResetTokenException;
 import com.shop.shop.inventory.repository.InventoryStockRepository;
+import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
@@ -22,6 +23,7 @@ import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.security.support.FakePasswordResetTokenStore;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import com.shop.shop.support.MockSharedRepositories;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -142,6 +144,12 @@ class PasswordResetViewControllerTest {
 
     @MockitoBean
     private ReviewRepository reviewRepository;
+
+    @BeforeEach
+    void setUp() {
+        // LoginViewController는 adminExists()를 호출한다 — ADMIN이 존재하는 정상 상태를 설정
+        when(memberRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+    }
 
     // ============================================================
     // GET /password-reset

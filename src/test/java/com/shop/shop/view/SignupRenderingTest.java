@@ -3,6 +3,7 @@ package com.shop.shop.view;
 import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
+import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.spi.MemberSignupFacade;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
@@ -20,6 +21,7 @@ import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
 import com.shop.shop.support.MockSharedRepositories;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -124,6 +127,12 @@ class SignupRenderingTest {
 
     /** footer 프래그먼트 식별 마커 */
     static final String FOOTER_MARKER = "2026 shop-core. All rights reserved.";
+
+    @BeforeEach
+    void setUp() {
+        // LoginViewController는 adminExists()를 호출한다 — ADMIN이 존재하는 정상 상태를 설정
+        when(memberRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+    }
 
     @Test
     @DisplayName("(S1) GET /signup — 익명 접근 → 200, 폼 action/필드/csrf/_csrf/로그인 링크/footer 포함")

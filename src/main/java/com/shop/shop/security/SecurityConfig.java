@@ -178,6 +178,9 @@ public class SecurityConfig {
                     // POST /logout — CookieLoginViewController (CSRF 보호 유지)
                     .requestMatchers(HttpMethod.POST, "/logout").permitAll()
                     .requestMatchers("/css/**", "/js/**", "/images/**", "/assets/**", "/favicon.ico", "/error").permitAll()
+                    // 최초 ADMIN 부트스트랩 화면 공개 (ADMIN 0명 상태에서만 유효 — Service 레벨 가드)
+                    .requestMatchers(HttpMethod.GET, "/setup/admin").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/setup/admin").permitAll()
                     // 회원가입 화면 공개
                     .requestMatchers(HttpMethod.GET, "/signup").permitAll()
                     .requestMatchers(HttpMethod.POST, "/signup").permitAll()

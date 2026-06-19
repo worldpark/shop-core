@@ -133,6 +133,9 @@ class SecurityConfigTest {
         // ViewAuthService.loginAndSetCookies → memberService.authenticate 호출
         // 기본 mock은 null 반환 → NPE 방지: 항상 InvalidCredentialsException 던지도록 stub
         when(memberService.authenticate(any(), any())).thenThrow(new InvalidCredentialsException());
+        // AdminBootstrapFacadeImpl → memberService.adminExists() 위임
+        // ADMIN이 존재하는 것으로 stub → GET /login이 redirect:/setup/admin 대신 auth/login을 반환
+        when(memberService.adminExists()).thenReturn(true);
     }
 
     @Test

@@ -18,7 +18,9 @@ import com.shop.shop.order.repository.ShipmentRepository;
 import com.shop.shop.payment.repository.PaymentRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.security.support.FakeRefreshTokenStore;
+import com.shop.shop.member.domain.Role;
 import com.shop.shop.support.MockSharedRepositories;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -121,6 +124,12 @@ class LayoutRenderingTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        // LoginViewController는 adminExists()를 호출한다 — ADMIN이 존재하는 정상 상태를 설정
+        when(memberRepository.countByRole(Role.ADMIN)).thenReturn(1L);
+    }
 
     @Test
     @DisplayName("(T1) GET /login → 200, footer 마커·name=username·_csrf 히든 포함")
