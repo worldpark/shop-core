@@ -73,7 +73,7 @@
                     <td th:text="${m.email}"></td>
                     <td th:text="${m.name}"></td>
                     <td th:text="${m.role}"></td>
-                    <td th:text="${m.createdAt}"></td>
+                    <td th:text="${#temporals.format(m.createdAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}"></td>
                     <td>
                         <!--
                             권한 변경 폼 (POST — th:action 사용 시 _csrf 자동 주입).

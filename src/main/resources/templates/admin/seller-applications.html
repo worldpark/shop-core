@@ -89,7 +89,7 @@
                                   style="color: #721c24; font-weight: 600;"
                                   th:text="${app.status}"></span>
                         </td>
-                        <td th:text="${app.createdAt}"></td>
+                        <td th:text="${#temporals.format(app.createdAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}"></td>
                         <td>
                             <!-- PENDING 행에만 승인/반려 폼 노출 -->
                             <div th:if="${app.status == 'PENDING'}" style="display: flex; flex-direction: column; gap: 8px;">
@@ -120,7 +120,7 @@
                                 <span style="color: #888; font-size: 13px;">처리 완료</span>
                                 <div th:if="${app.decidedAt != null}"
                                      style="font-size: 12px; color: #aaa; margin-top: 2px;"
-                                     th:text="${app.decidedAt}"></div>
+                                     th:text="${#temporals.format(app.decidedAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm:ss')}"></div>
                             </div>
                         </td>
                     </tr>
