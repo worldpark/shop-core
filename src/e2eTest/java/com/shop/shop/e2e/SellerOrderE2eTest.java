@@ -1,5 +1,6 @@
 package com.shop.shop.e2e;
 
+import com.shop.shop.e2e.support.E2ePii;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -192,8 +193,9 @@ class SellerOrderE2eTest extends AbstractE2eTest {
 
     private long insertConsumer(Connection conn, String email) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO users (email, password_hash, name, role) VALUES (?, 'x', '구매자E2E', 'CONSUMER')")) {
+                "INSERT INTO users (email, password_hash, name, role) VALUES (?, 'x', ?, 'CONSUMER')")) {
             ps.setString(1, email);
+            ps.setString(2, E2ePii.enc("구매자E2E"));
             ps.executeUpdate();
         }
         return scalarLong(conn, "SELECT id FROM users WHERE email=" + q(email));

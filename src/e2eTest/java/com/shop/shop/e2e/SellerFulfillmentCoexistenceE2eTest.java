@@ -7,6 +7,8 @@ import com.microsoft.playwright.options.AriaRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.shop.shop.e2e.support.E2ePii;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -313,8 +315,9 @@ class SellerFulfillmentCoexistenceE2eTest extends AbstractE2eTest {
     private long insertConsumer(Connection conn, String email) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO users (email, password_hash, name, role) "
-                + "VALUES (?, 'x', '구매자E2E050', 'CONSUMER')")) {
+                + "VALUES (?, 'x', ?, 'CONSUMER')")) {
             ps.setString(1, email);
+            ps.setString(2, E2ePii.enc("구매자E2E050"));
             ps.executeUpdate();
         }
         return scalarLong(conn, "SELECT id FROM users WHERE email=" + q(email));
@@ -355,10 +358,14 @@ class SellerFulfillmentCoexistenceE2eTest extends AbstractE2eTest {
                 "INSERT INTO orders "
                 + "(user_id, order_number, status, items_amount, discount_amount, "
                 + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                + "VALUES (?, ?, ?, 20000, 0, 0, 20000, '수령인E2E', '010-0000-0000', '12345', '서울시')")) {
+                + "VALUES (?, ?, ?, 20000, 0, 0, 20000, ?, ?, ?, ?)")) {
             ps.setLong(1, buyerId);
             ps.setString(2, orderNumber);
             ps.setString(3, status);
+            ps.setString(4, E2ePii.enc("수령인E2E"));
+            ps.setString(5, E2ePii.enc("010-0000-0000"));
+            ps.setString(6, E2ePii.enc("12345"));
+            ps.setString(7, E2ePii.enc("서울시"));
             ps.executeUpdate();
         }
         return scalarLong(conn, "SELECT id FROM orders WHERE order_number=" + q(orderNumber));

@@ -6,6 +6,8 @@ import com.microsoft.playwright.options.AriaRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.shop.shop.e2e.support.E2ePii;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -173,8 +175,9 @@ class SellerApplicationE2eTest extends AbstractE2eTest {
 
     private long insertConsumer(Connection conn, String email) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO users (email, password_hash, name, role) VALUES (?, 'x', '판매신청E2E', 'CONSUMER')")) {
+                "INSERT INTO users (email, password_hash, name, role) VALUES (?, 'x', ?, 'CONSUMER')")) {
             ps.setString(1, email);
+            ps.setString(2, E2ePii.enc("판매신청E2E"));
             ps.executeUpdate();
         }
         return scalarLong(conn, "SELECT id FROM users WHERE email='" + email + "'");
@@ -187,22 +190,24 @@ class SellerApplicationE2eTest extends AbstractE2eTest {
                 "INSERT INTO seller_application "
                         + "(user_id, status, business_name, business_registration_number, contact_phone, "
                         + " reject_reason, reviewed_by, decided_at) "
-                        + "VALUES (?, ?, ?, '1234567890', '010-1234-5678', ?, ?, "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, "
                         + " CASE WHEN ?='PENDING' THEN NULL ELSE now() END)")) {
             ps.setLong(1, userId);
             ps.setString(2, status);
-            ps.setString(3, businessName);
+            ps.setString(3, E2ePii.enc(businessName));
+            ps.setString(4, E2ePii.enc("1234567890"));
+            ps.setString(5, E2ePii.enc("010-1234-5678"));
             if (rejectReason != null) {
-                ps.setString(4, rejectReason);
+                ps.setString(6, rejectReason);
             } else {
-                ps.setNull(4, java.sql.Types.VARCHAR);
+                ps.setNull(6, java.sql.Types.VARCHAR);
             }
             if (reviewedBy != null) {
-                ps.setLong(5, reviewedBy);
+                ps.setLong(7, reviewedBy);
             } else {
-                ps.setNull(5, java.sql.Types.BIGINT);
+                ps.setNull(7, java.sql.Types.BIGINT);
             }
-            ps.setString(6, status);
+            ps.setString(8, status);
             ps.executeUpdate();
         }
         return scalarLong(conn, "SELECT id FROM seller_application WHERE user_id=" + userId + " ORDER BY id DESC LIMIT 1");

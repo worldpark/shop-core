@@ -5,6 +5,8 @@ import com.microsoft.playwright.options.AriaRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.shop.shop.e2e.support.E2ePii;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -176,9 +178,13 @@ class ReviewE2eTest extends AbstractE2eTest {
         try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO orders (user_id, order_number, status, items_amount, discount_amount, "
                         + "shipping_fee, final_amount, ship_recipient, ship_phone, ship_postcode, ship_address1) "
-                        + "VALUES (?, ?, 'delivered', 10000, 0, 0, 10000, '수령인', '010-9999-8888', '12345', '서울시 강남구')")) {
+                        + "VALUES (?, ?, 'delivered', 10000, 0, 0, 10000, ?, ?, ?, ?)")) {
             ps.setLong(1, userId);
             ps.setString(2, orderNumber);
+            ps.setString(3, E2ePii.enc("수령인"));
+            ps.setString(4, E2ePii.enc("010-9999-8888"));
+            ps.setString(5, E2ePii.enc("12345"));
+            ps.setString(6, E2ePii.enc("서울시 강남구"));
             ps.executeUpdate();
         }
         long orderId = scalarLong(conn, "SELECT id FROM orders WHERE order_number='" + orderNumber + "'");
