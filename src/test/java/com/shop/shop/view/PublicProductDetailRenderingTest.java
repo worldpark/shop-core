@@ -281,9 +281,9 @@ class PublicProductDetailRenderingTest {
     @DisplayName("(D6) GET /products/{id} — 활성 variant 가격·구매가능 표시 렌더링")
     void getProductDetail_rendersVariants() throws Exception {
         PublicProductVariantResponse availableVariant = new PublicProductVariantResponse(
-                300L, new BigDecimal("12000"), List.of(), true);
+                300L, new BigDecimal("12000"), List.of(), "색상: 빨강", true);
         PublicProductVariantResponse unavailableVariant = new PublicProductVariantResponse(
-                301L, new BigDecimal("15000"), List.of(), false);
+                301L, new BigDecimal("15000"), List.of(), "색상: 파랑", false);
         PublicProductDetailResponse detail = new PublicProductDetailResponse(
                 PRODUCT_ID, "테스트 상품", "설명",
                 new BigDecimal("12000"), false,
@@ -301,6 +301,9 @@ class PublicProductDetailRenderingTest {
         assertThat(body).as("variant 가격 15,000이 있어야 함").contains("15,000");
         assertThat(body).as("구매 가능 배지가 있어야 함").contains("구매 가능");
         assertThat(body).as("구매 불가 배지가 있어야 함").contains("구매 불가");
+        // 구매 옵션 선택에 옵션 조합 라벨이 가격과 함께 노출되어야 함
+        assertThat(body).as("variant 옵션 라벨(색상: 빨강)이 있어야 함").contains("색상: 빨강");
+        assertThat(body).as("variant 옵션 라벨(색상: 파랑)이 있어야 함").contains("색상: 파랑");
     }
 
     // ============================================================
@@ -444,7 +447,7 @@ class PublicProductDetailRenderingTest {
         PublicProductOptionResponse option = new PublicProductOptionResponse(
                 50L, "색상", List.of(new PublicOptionValueResponse(10L, "빨강")));
         PublicProductVariantResponse variant = new PublicProductVariantResponse(
-                300L, new BigDecimal("10000"), List.of(), !soldOut);
+                300L, new BigDecimal("10000"), List.of(), "", !soldOut);
         return new PublicProductDetailResponse(
                 productId, "테스트 상품", "상세 설명 텍스트",
                 new BigDecimal("10000"), soldOut,

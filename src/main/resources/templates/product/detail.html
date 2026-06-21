@@ -131,6 +131,9 @@
                     <div class="variant-list">
                         <div class="variant-item" th:each="variant : ${product.variants}"
                              th:classappend="${variant.available} ? '' : ' variant-unavailable'">
+                            <span class="variant-option"
+                                  th:if="${variant.optionLabel != null and !variant.optionLabel.isEmpty()}"
+                                  th:text="${variant.optionLabel}">옵션 조합</span>
                             <span class="variant-price"
                                   th:text="${#numbers.formatDecimal(variant.price, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
                             <span class="variant-available-badge" th:if="${variant.available}">구매 가능</span>
@@ -186,6 +189,9 @@
                                                th:checked="${varStat.first and variant.available}">
                                         <label th:for="'variant-' + ${variant.variantId}"
                                                th:classappend="${!variant.available} ? ' label-disabled' : ''">
+                                            <span class="variant-radio-option"
+                                                  th:if="${variant.optionLabel != null and !variant.optionLabel.isEmpty()}"
+                                                  th:text="${variant.optionLabel}">옵션 조합</span>
                                             <span class="variant-radio-price"
                                                   th:text="${#numbers.formatDecimal(variant.price, 1, 'COMMA', 0, 'POINT')} + '원'">0원</span>
                                             <span class="variant-radio-status badge-unavailable"

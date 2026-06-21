@@ -24,6 +24,18 @@ public interface ReviewFacade {
     ProductReviewSummaryResponse getProductReviews(long productId, int page, int size);
 
     /**
+     * 상품 상세 화면에서 현재 사용자가 리뷰를 작성할 수 있는 주문 항목 id 조회 (View 경로 — email로 userId 해석).
+     *
+     * <p>배송 완료했고 아직 리뷰를 쓰지 않은 항목이 있으면 그 id를, 없으면 null을 반환한다.
+     * 컨트롤러는 이 값으로 "리뷰 작성" 버튼 노출 여부와 {@code ?orderItemId=} 링크를 구성한다.
+     *
+     * @param email     인증 세션 email
+     * @param productId 상품 ID
+     * @return 작성 가능한 order_item id (없으면 null)
+     */
+    Long findWritableOrderItemId(String email, long productId);
+
+    /**
      * 리뷰 작성 (View 경로 — email로 userId 해석).
      *
      * @param email       인증 세션 email

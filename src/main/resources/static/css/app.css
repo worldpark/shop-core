@@ -255,6 +255,55 @@ footer {
     color: #1a4971;
 }
 
+/* ── 토스트 알림 (flash 메시지를 app.js가 우측 상단 토스트로 변환) ── */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 360px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    border: 1px solid transparent;
+    opacity: 0;
+    transform: translateX(16px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.toast-show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-hide {
+    opacity: 0;
+    transform: translateX(16px);
+}
+
+.toast-success {
+    background-color: #f0fff4;
+    border-color: #9ae6b4;
+    color: #276749;
+}
+
+.toast-error {
+    background-color: #fdf2f2;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
 /* ── 상품 등록/수정 폼 컨테이너 (장바구니 카드 스타일 적용) ── */
 .product-form-container {
     background: #fff;
@@ -1648,6 +1697,13 @@ input[type="email"]:focus {
     opacity: 0.6;
 }
 
+.variant-option {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-right: auto;
+}
+
 .variant-price {
     font-size: 15px;
     font-weight: 600;
@@ -1754,6 +1810,11 @@ input[type="email"]:focus {
 
 .label-disabled {
     cursor: not-allowed;
+}
+
+.variant-radio-option {
+    font-weight: 600;
+    color: #333;
 }
 
 .variant-radio-price {

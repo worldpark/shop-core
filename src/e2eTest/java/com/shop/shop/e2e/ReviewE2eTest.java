@@ -141,6 +141,36 @@ class ReviewE2eTest extends AbstractE2eTest {
         }
     }
 
+    @Test
+    @DisplayName("실구매(delivered) → 상품 상세에 '리뷰 작성' 버튼 노출 + 클릭 시 작성 폼 진입")
+    void deliveredPurchase_showsWriteReviewButtonOnProductDetail() throws Exception {
+        // 1. 신규 CONSUMER 가입·로그인
+        String email = signupAndLogin();
+
+        // 2. JDBC 시드: delivered 주문 + product/variant/order_item
+        long orderItemId;
+        long productId;
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            long userId = scalarLong(conn, "SELECT id FROM users WHERE email='" + email + "'");
+            long[] ids = insertDeliveredOrderWithItem(conn, userId);
+            orderItemId = ids[0];
+            productId = ids[1];
+        }
+
+        // 3. 상품 상세 진입 → 리뷰 섹션의 '리뷰 작성' 버튼 노출 + href에 orderItemId 포함
+        page.navigate(BASE_URL + "/products/" + productId);
+        Locator writeBtn = page.locator(".product-review-section")
+                .getByRole(AriaRole.LINK, new Locator.GetByRoleOptions().setName("리뷰 작성"));
+        assertThat(writeBtn).isVisible();
+        assertThat(writeBtn).hasAttribute("href", Pattern.compile(".*/reviews/new\\?orderItemId=" + orderItemId + ".*"));
+
+        // 4. 클릭 → 작성 폼 진입(평점/내용 입력칸 노출)
+        writeBtn.click();
+        assertThat(page).hasURL(Pattern.compile(".*/reviews/new\\?orderItemId=" + orderItemId + ".*"));
+        assertThat(page.locator("#rating-5")).isVisible();
+        assertThat(page.locator("#content")).isVisible();
+    }
+
     // =============================================================================
     // JDBC 시드 헬퍼
     // =============================================================================

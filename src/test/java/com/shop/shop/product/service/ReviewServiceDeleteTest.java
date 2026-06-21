@@ -2,6 +2,7 @@ package com.shop.shop.product.service;
 
 import com.shop.shop.common.exception.ReviewNotFoundException;
 import com.shop.shop.product.domain.Review;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.product.spi.PurchaseVerificationPort;
 import com.shop.shop.product.spi.ReviewerDirectory;
@@ -34,6 +35,8 @@ class ReviewServiceDeleteTest {
     @Mock
     private ReviewRepository reviewRepository;
     @Mock
+    private ProductVariantRepository productVariantRepository;
+    @Mock
     private PurchaseVerificationPort purchaseVerificationPort;
     @Mock
     private ReviewerDirectory reviewerDirectory;
@@ -48,7 +51,7 @@ class ReviewServiceDeleteTest {
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewService(reviewRepository, purchaseVerificationPort, reviewerDirectory, reviewDtoMapper);
+        reviewService = new ReviewService(reviewRepository, productVariantRepository, purchaseVerificationPort, reviewerDirectory, reviewDtoMapper);
     }
 
     @Test

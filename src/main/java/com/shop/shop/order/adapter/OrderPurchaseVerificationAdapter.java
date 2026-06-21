@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -53,6 +54,20 @@ public class OrderPurchaseVerificationAdapter implements PurchaseVerificationPor
                     return new PurchaseVerification(true, delivered, productId);
                 })
                 .orElse(new PurchaseVerification(false, false, null));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>variantIds가 비면 IN 조회를 생략하고 빈 목록을 반환한다(불필요 쿼리 회피).
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> findDeliveredOrderItemIds(long userId, Collection<Long> variantIds) {
+        if (variantIds == null || variantIds.isEmpty()) {
+            return List.of();
+        }
+        return orderItemQueryRepository.findDeliveredOrderItemIds(userId, variantIds);
     }
 
     /**

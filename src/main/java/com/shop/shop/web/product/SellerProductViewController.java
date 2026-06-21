@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 
@@ -128,7 +129,8 @@ public class SellerProductViewController {
             @Valid @ModelAttribute("productForm") ProductForm form,
             BindingResult bindingResult,
             Authentication auth,
-            Model model) {
+            Model model,
+            RedirectAttributes ra) {
 
         if (bindingResult.hasErrors()) {
             populateFormModel(model);
@@ -144,6 +146,7 @@ public class SellerProductViewController {
                 form.getBasePrice()
         );
 
+        ra.addFlashAttribute("flashSuccess", "상품이 등록되었습니다.");
         return "redirect:/seller/products/" + id + "/edit";
     }
 
@@ -195,7 +198,8 @@ public class SellerProductViewController {
             @Valid @ModelAttribute("productForm") ProductForm form,
             BindingResult bindingResult,
             Authentication auth,
-            Model model) {
+            Model model,
+            RedirectAttributes ra) {
 
         // 수정 경로: status 누락은 검증 실패로 처리(기존 상태를 DRAFT로 덮지 않음)
         if (form.getStatus() == null) {
@@ -220,6 +224,7 @@ public class SellerProductViewController {
                 form.getStatus()
         );
 
+        ra.addFlashAttribute("flashSuccess", "상품이 수정되었습니다.");
         return "redirect:/seller/products/" + id + "/edit";
     }
 

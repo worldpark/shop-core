@@ -128,6 +128,20 @@
     </div>
 
     <!-- ====================================================
+         리뷰 작성 진입점 (로그인 사용자)
+         reviewableOrderItemId(컨트롤러 주입): 배송완료 + 미작성 주문항목이 있으면 그 id, 없으면 null.
+         null이면 작성 자격이 없음을 안내한다(버튼 미노출).
+         ==================================================== -->
+    <div sec:authorize="hasRole('CONSUMER')" style="margin-top: 16px;">
+        <a th:if="${reviewableOrderItemId != null}"
+           th:href="@{/reviews/new(orderItemId=${reviewableOrderItemId})}"
+           class="btn btn-primary btn-sm">리뷰 작성</a>
+        <p th:if="${reviewableOrderItemId == null}" style="font-size: 13px; color: #888;">
+            배송이 완료된 구매 상품에만 리뷰를 작성할 수 있습니다.
+        </p>
+    </div>
+
+    <!-- ====================================================
          리뷰 작성 진입 안내 (비로그인 사용자)
          ==================================================== -->
     <div sec:authorize="!isAuthenticated()" style="margin-top: 16px;">

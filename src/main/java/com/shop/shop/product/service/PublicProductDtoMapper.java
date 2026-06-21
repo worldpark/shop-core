@@ -16,8 +16,10 @@ import com.shop.shop.product.dto.PublicProductVariantResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -81,8 +83,12 @@ class PublicProductDtoMapper {
 
         List<PublicProductOptionResponse> options = buildOptionResponses(aggregate.options(), aggregate.optionValues());
 
+        // optionValueId → OptionValue(옵션 로딩됨) 맵: variant 라벨 조립에 사용(variant 측 lazy option 회피).
+        Map<Long, OptionValue> optionValueById = aggregate.optionValues().stream()
+                .collect(Collectors.toMap(OptionValue::getId, ov -> ov));
+
         List<PublicProductVariantResponse> variants = activeVariants.stream()
-                .map(v -> toVariantResponse(v, product.getStatus()))
+                .map(v -> toVariantResponse(v, product.getStatus(), optionValueById))
                 .toList();
 
         return new PublicProductDetailResponse(
@@ -117,16 +123,36 @@ class PublicProductDtoMapper {
     }
 
     private PublicProductVariantResponse toVariantResponse(
-            ProductVariant variant, com.shop.shop.product.domain.ProductStatus productStatus) {
+            ProductVariant variant, com.shop.shop.product.domain.ProductStatus productStatus,
+            Map<Long, OptionValue> optionValueById) {
         boolean available = publicProductService.isVariantAvailable(productStatus, variant.getStock());
         List<Long> optionValueIds = variant.getOptionValues().stream()
                 .map(OptionValue::getId)
                 .toList();
+        String optionLabel = buildVariantOptionLabel(optionValueIds, optionValueById);
         return new PublicProductVariantResponse(
                 variant.getId(),
                 variant.getPrice(),
                 optionValueIds,
+                optionLabel,
                 available
         );
+    }
+
+    /**
+     * variant의 옵션 조합을 "옵션명: 값 / 옵션명: 값" 형태의 사람이 읽는 라벨로 조립한다.
+     *
+     * <p>옵션 순서(optionId 오름차순)로 정렬해 동일 상품 내 표기를 일관시킨다.
+     * 옵션이 없는 variant(optionValueIds 비어 있음)는 빈 문자열을 반환한다.
+     * lazy 회피를 위해 옵션이 로딩된 {@code optionValueById} 맵으로만 해석한다.
+     */
+    private String buildVariantOptionLabel(
+            List<Long> optionValueIds, Map<Long, OptionValue> optionValueById) {
+        return optionValueIds.stream()
+                .map(optionValueById::get)
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingLong(ov -> ov.getOption().getId()))
+                .map(ov -> ov.getOption().getName() + ": " + ov.getValue())
+                .collect(Collectors.joining(" / "));
     }
 }

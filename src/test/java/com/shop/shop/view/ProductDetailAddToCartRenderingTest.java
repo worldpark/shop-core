@@ -273,9 +273,9 @@ class ProductDetailAddToCartRenderingTest {
     @WithMockUser(roles = "CONSUMER", username = "user@example.com")
     void getProductDetail_unavailableVariant_rendersDisabled() throws Exception {
         PublicProductVariantResponse unavailableVariant = new PublicProductVariantResponse(
-                300L, new BigDecimal("12000"), List.of(), false);
+                300L, new BigDecimal("12000"), List.of(), "", false);
         PublicProductVariantResponse availableVariant = new PublicProductVariantResponse(
-                301L, new BigDecimal("15000"), List.of(), true);
+                301L, new BigDecimal("15000"), List.of(), "", true);
         PublicProductDetailResponse detail = new PublicProductDetailResponse(
                 PRODUCT_ID, "테스트 상품", "설명",
                 new BigDecimal("12000"), false,
@@ -317,7 +317,7 @@ class ProductDetailAddToCartRenderingTest {
         PublicProductOptionResponse option = new PublicProductOptionResponse(
                 50L, "색상", List.of());
         PublicProductVariantResponse variant = new PublicProductVariantResponse(
-                300L, new BigDecimal("10000"), List.of(), !soldOut);
+                300L, new BigDecimal("10000"), List.of(), "", !soldOut);
         return new PublicProductDetailResponse(
                 productId, "테스트 상품", "상세 설명",
                 new BigDecimal("10000"), soldOut,

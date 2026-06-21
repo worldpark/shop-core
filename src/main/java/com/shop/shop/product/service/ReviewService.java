@@ -6,6 +6,8 @@ import com.shop.shop.common.exception.ReviewNotPurchasedException;
 import com.shop.shop.common.exception.ReviewTargetNotFoundException;
 import com.shop.shop.common.exception.ReviewableProductMissingException;
 import com.shop.shop.product.domain.Review;
+import com.shop.shop.product.domain.ProductVariant;
+import com.shop.shop.product.repository.ProductVariantRepository;
 import com.shop.shop.product.repository.ReviewRepository;
 import com.shop.shop.product.spi.PurchaseVerificationPort;
 import com.shop.shop.product.spi.ReviewerDirectory;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 public class ReviewService {
 
     private final ReviewRepository reviewRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final PurchaseVerificationPort purchaseVerificationPort;
     private final ReviewerDirectory reviewerDirectory;
     private final ReviewDtoMapper reviewDtoMapper;
@@ -184,6 +187,41 @@ public class ReviewService {
                 reviewPage.getTotalPages(),
                 rows
         );
+    }
+
+    /**
+     * 상품 상세 화면에서 사용자가 새로 리뷰를 작성할 수 있는 주문 항목 id 1건 조회.
+     *
+     * <p>판정 흐름:
+     * <ol>
+     *   <li>productId → variantIds 해석(상품에 variant가 없으면 작성 불가 → null)</li>
+     *   <li>{@link PurchaseVerificationPort#findDeliveredOrderItemIds}로 소유·배송완료 항목 조회</li>
+     *   <li>이미 리뷰가 작성된 항목 제외(중복 작성 불가) → 첫 미작성 항목 반환</li>
+     * </ol>
+     *
+     * <p>여러 건을 구매·배송완료했어도 화면에는 진입점 1개만 노출하면 충분하므로 첫 미작성 항목만 반환한다.
+     * 작성 가능 항목이 없으면 null(버튼 미노출).
+     *
+     * @param userId    조회 사용자 userId
+     * @param productId 상품 ID
+     * @return 작성 가능한 order_item id (없으면 null)
+     */
+    @Transactional(readOnly = true)
+    public Long findWritableOrderItemId(long userId, long productId) {
+        List<Long> variantIds = productVariantRepository.findByProductId(productId).stream()
+                .map(ProductVariant::getId)
+                .toList();
+        if (variantIds.isEmpty()) {
+            return null;
+        }
+
+        List<Long> deliveredOrderItemIds =
+                purchaseVerificationPort.findDeliveredOrderItemIds(userId, variantIds);
+
+        return deliveredOrderItemIds.stream()
+                .filter(orderItemId -> !reviewRepository.existsByOrderItemId(orderItemId))
+                .findFirst()
+                .orElse(null);
     }
 
     // =========================================================

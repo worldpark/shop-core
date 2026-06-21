@@ -344,7 +344,7 @@ class PublicProductRestControllerSecurityTest {
         PublicProductOptionResponse option = new PublicProductOptionResponse(
                 50L, "색상", List.of());
         PublicProductVariantResponse variant = new PublicProductVariantResponse(
-                300L, new BigDecimal("10000"), List.of(), true);
+                300L, new BigDecimal("10000"), List.of(), "", true);
         return new PublicProductDetailResponse(
                 productId, "테스트 상품", "설명",
                 new BigDecimal("10000"), false,

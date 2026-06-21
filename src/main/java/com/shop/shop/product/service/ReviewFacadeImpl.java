@@ -43,6 +43,18 @@ class ReviewFacadeImpl implements ReviewFacade {
     /**
      * {@inheritDoc}
      *
+     * <p>email → userId 변환 후 ReviewService.findWritableOrderItemId에 위임한다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Long findWritableOrderItemId(String email, long productId) {
+        long userId = userDirectory.findUserIdByEmail(email);
+        return reviewService.findWritableOrderItemId(userId, productId);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
      * <p>email → userId 변환 후 ReviewService.create에 위임한다.
      */
     @Override

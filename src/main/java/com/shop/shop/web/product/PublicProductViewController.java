@@ -6,6 +6,8 @@ import com.shop.shop.product.dto.PublicProductDetailResponse;
 import com.shop.shop.product.spi.PublicProductFacade;
 import com.shop.shop.product.spi.ReviewFacade;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -110,6 +112,7 @@ public class PublicProductViewController {
             @PathVariable long productId,
             @RequestParam(defaultValue = "0") int reviewPage,
             @RequestParam(defaultValue = "10") int reviewSize,
+            Authentication auth,
             Model model) {
 
         PublicProductDetailResponse product = publicProductFacade.getProductDetail(productId);
@@ -122,6 +125,25 @@ public class PublicProductViewController {
         model.addAttribute("reviewSummary", reviewSummary);
         model.addAttribute("productReviews", reviewSummary.reviews());
 
+        // 리뷰 작성 진입점: 로그인 사용자가 이 상품을 배송완료 구매했고 아직 리뷰가 없으면 작성 가능 order_item id 주입.
+        // 비로그인/익명은 null(템플릿은 sec:authorize로 비로그인 안내만 노출). 키는 항상 모델에 존재시킨다.
+        Long reviewableOrderItemId = null;
+        if (isAuthenticated(auth)) {
+            reviewableOrderItemId = reviewFacade.findWritableOrderItemId(auth.getName(), productId);
+        }
+        model.addAttribute("reviewableOrderItemId", reviewableOrderItemId);
+
         return DETAIL_VIEW;
+    }
+
+    /**
+     * 인증된(익명이 아닌) 사용자인지 판별한다.
+     *
+     * <p>permitAll 경로이므로 비로그인 요청은 {@link AnonymousAuthenticationToken}으로 들어온다.
+     */
+    private boolean isAuthenticated(Authentication auth) {
+        return auth != null
+                && auth.isAuthenticated()
+                && !(auth instanceof AnonymousAuthenticationToken);
     }
 }
