@@ -80,4 +80,23 @@
     } else {
         convertFlashMessagesToToasts();
     }
+
+    /*
+     * 상품 상세 이미지 갤러리: 썸네일 클릭 → 메인 이미지 교체 + active 표시 이동.
+     *
+     * 썸네일(.gallery-thumb)에는 서버가 data-src(원본 이미지 URL)를 심어둔다.
+     * 클릭 위임으로 처리하므로 갤러리가 없는 페이지에서는 자동으로 무동작이다.
+     */
+    document.addEventListener('click', function (e) {
+        var thumb = e.target.closest('.gallery-thumb');
+        if (!thumb) { return; }
+
+        var main = document.getElementById('main-product-image');
+        var src = thumb.getAttribute('data-src');
+        if (main && src) { main.src = src; }
+
+        document.querySelectorAll('.gallery-thumb').forEach(function (t) {
+            t.classList.toggle('thumb-active', t === thumb);
+        });
+    });
 })();
