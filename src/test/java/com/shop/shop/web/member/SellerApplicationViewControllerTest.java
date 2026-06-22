@@ -34,6 +34,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -226,6 +227,9 @@ class SellerApplicationViewControllerTest {
     void me_with_application_returns_200_with_application_model() throws Exception {
         SellerApplication app = SellerApplication.submit(10L, "상호", "1234567890", "010-0000-0000");
         setId(app, 100L);
+        // 영속 전 엔티티라 BaseEntity.createdAt(@CreatedDate)이 null — 실DB에선 항상 채워지는 NOT NULL 감사 컬럼이다.
+        // me.html 신청일 렌더(createdAt.atZone)는 createdAt 존재를 전제하므로 픽스처도 현실대로 세팅한다(id 세팅과 동형).
+        setCreatedAt(app, Instant.parse("2026-01-01T00:00:00Z"));
         SellerApplicationResponse response = SellerApplicationResponse.from(app);
         when(sellerApplicationFacade.findMyApplication("consumer@test.com"))
                 .thenReturn(Optional.of(response));
@@ -270,5 +274,22 @@ class SellerApplicationViewControllerTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /** BaseEntity.createdAt(@CreatedDate, 상위 클래스 private)을 리플렉션으로 세팅한다. */
+    private void setCreatedAt(SellerApplication app, Instant ts) {
+        for (Class<?> c = app.getClass(); c != null; c = c.getSuperclass()) {
+            try {
+                var field = c.getDeclaredField("createdAt");
+                field.setAccessible(true);
+                field.set(app, ts);
+                return;
+            } catch (NoSuchFieldException ignored) {
+                // 상위 클래스(BaseEntity)에서 계속 탐색
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        throw new IllegalStateException("createdAt 필드를 찾지 못했습니다");
     }
 }
