@@ -10,8 +10,12 @@
       - 항목 표시: productName, optionLabel, unitPrice, quantity, lineAmount
       - stock 수치·ownerId·Entity·로컬 절대경로 미표시
       - checkout.itemsAmount / discountAmount / shippingFee / finalAmount 금액 표시
-      - 배송지 폼: POST /orders, 필드 recipient/phone/postcode/address1/address2, CSRF 자동
-      - checkout.hasItems=false 이면 빈 안내·주문 버튼 비활성
+      - checkout.applicableCoupons: 적용 가능 쿠폰 목록 (ApplicableCouponResponse)
+        - applicable=true → 선택 가능, expectedDiscount 표기
+        - applicable=false → disabled + reason 표기
+        - 쿠폰 미선택 옵션 value="" (빈 문자열 → Long null 바인딩) → checked 기본
+      - 배송지 폼: POST /orders, 필드 recipient/phone/postcode/address1/address2/userCouponId, CSRF 자동
+      - checkout.hasItems=false 이면 빈 안내·주문 버튼 비활성, 쿠폰 영역 미표시
 -->
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
@@ -100,6 +104,59 @@
             <section class="checkout-shipping-section">
                 <h2 class="section-title">배송지 정보</h2>
                 <form th:action="@{/orders}" method="post" class="checkout-form">
+
+                    <!-- 쿠폰 선택 (배송지 폼 안에 위치 — 단일 폼 제출) -->
+                    <div class="form-group checkout-coupon-select"
+                         th:if="${checkout.applicableCoupons != null and !checkout.applicableCoupons.isEmpty()}"
+                         style="margin-bottom: 20px; padding: 16px; border: 1px solid #dee2e6; border-radius: 4px; background: #f8f9fa;">
+                        <fieldset style="border: none; padding: 0; margin: 0;">
+                            <legend style="font-weight: 600; margin-bottom: 10px; color: #333;">쿠폰 선택</legend>
+
+                            <!-- 쿠폰 미적용 옵션 (기본 checked) -->
+                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                                <input type="radio"
+                                       name="userCouponId"
+                                       value=""
+                                       checked
+                                       data-testid="coupon-none">
+                                <span>쿠폰 미적용</span>
+                            </label>
+
+                            <!-- 보유 쿠폰 목록 -->
+                            <label th:each="cp : ${checkout.applicableCoupons}"
+                                   style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;"
+                                   th:classappend="${!cp.applicable} ? ' coupon-disabled' : ''"
+                                   th:style="${!cp.applicable} ? 'cursor: not-allowed; color: #999;' : 'cursor: pointer;'">
+
+                                <input type="radio"
+                                       name="userCouponId"
+                                       th:value="${cp.userCouponId}"
+                                       th:disabled="${!cp.applicable}"
+                                       data-testid="coupon-option">
+
+                                <span>
+                                    <!-- 쿠폰명 + 코드 -->
+                                    <strong th:text="${cp.name}" data-testid="coupon-option-name"></strong>
+                                    <span style="color: #666; font-size: 12px;"
+                                          th:text="'(' + ${cp.code} + ')'"></span>
+
+                                    <!-- 적용가능 쿠폰: 예상 할인 표기 -->
+                                    <span th:if="${cp.applicable}"
+                                          style="color: #28a745; font-size: 13px; margin-left: 6px;"
+                                          data-testid="expected-discount">
+                                        예상 할인: <span th:text="${#numbers.formatDecimal(cp.expectedDiscount, 1, 'COMMA', 0, 'POINT')} + '원'"></span>
+                                    </span>
+
+                                    <!-- 적용불가 쿠폰: 사유 표기 -->
+                                    <span th:if="${!cp.applicable}"
+                                          style="color: #dc3545; font-size: 12px; margin-left: 6px;"
+                                          data-testid="coupon-reason">
+                                        (<span th:text="${cp.reason}"></span>)
+                                    </span>
+                                </span>
+                            </label>
+                        </fieldset>
+                    </div>
 
                     <div class="form-group">
                         <label for="recipient">수령인 <span class="required">*</span></label>

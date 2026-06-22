@@ -32,6 +32,9 @@ public class NavActiveControllerAdvice {
         if (uri.startsWith("/cart")) {
             return "cart";
         }
+        if (uri.startsWith("/coupons")) {
+            return "coupons";
+        }
         if (uri.startsWith("/products")) {
             return "products";
         }
@@ -43,6 +46,9 @@ public class NavActiveControllerAdvice {
         }
         if (uri.startsWith("/admin/categories")) {
             return "admin-categories";
+        }
+        if (uri.startsWith("/admin/coupons")) {
+            return "admin-coupons";
         }
         if (uri.startsWith("/admin/dashboard")) {
             return "admin-dashboard";

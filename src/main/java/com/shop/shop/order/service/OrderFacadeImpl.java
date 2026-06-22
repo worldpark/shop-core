@@ -4,6 +4,7 @@ import com.shop.shop.cart.spi.CartCheckoutReader;
 import com.shop.shop.cart.spi.CartCheckoutReader.CartCheckout;
 import com.shop.shop.cart.spi.CartCheckoutReader.CartCheckoutItem;
 import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.order.dto.ApplicableCouponResponse;
 import com.shop.shop.order.dto.OrderCheckoutResponse;
 import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderItemOptionValueResponse;
@@ -48,6 +49,8 @@ class OrderFacadeImpl implements OrderFacade {
     private final ProductOrderCatalog productOrderCatalog;
     private final OrderFulfillmentService orderFulfillmentService;
     private final OrderDtoMapper dtoMapper;
+    private final CouponService couponService;
+    private final CouponDtoMapper couponDtoMapper;
 
     /**
      * {@inheritDoc}
@@ -64,8 +67,10 @@ class OrderFacadeImpl implements OrderFacade {
         CartCheckout checkout = cartCheckoutReader.getCheckoutCart(userId);
         if (checkout.items().isEmpty()) {
             // 빈 장바구니 주문서 — 빈 OrderCheckoutResponse 반환 (예외 아님, View가 안내 표시)
+            // applicableCoupons: 빈 장바구니 early-return 경로는 getApplicable 미호출, List.of() 고정
             return new OrderCheckoutResponse(
-                    List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false);
+                    List.of(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false,
+                    List.of());
         }
 
         List<Long> variantIds = checkout.items().stream()
@@ -109,7 +114,14 @@ class OrderFacadeImpl implements OrderFacade {
         BigDecimal shippingFee = BigDecimal.ZERO;
         BigDecimal finalAmount = itemsAmount.subtract(discountAmount).add(shippingFee);
 
-        return new OrderCheckoutResponse(items, itemsAmount, discountAmount, shippingFee, finalAmount, !items.isEmpty());
+        // 정상 경로: CouponService.getApplicable(userId) 합성 — 같은 order 모듈 internal, cross-module 의존 0
+        List<ApplicableCouponResponse> applicableCoupons = couponService.getApplicable(userId).stream()
+                .map(couponDtoMapper::toApplicableCouponResponse)
+                .collect(Collectors.toList());
+
+        return new OrderCheckoutResponse(
+                items, itemsAmount, discountAmount, shippingFee, finalAmount, !items.isEmpty(),
+                applicableCoupons);
     }
 
     /**

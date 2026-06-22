@@ -4,6 +4,7 @@ import com.shop.shop.cart.spi.CartCheckoutReader;
 import com.shop.shop.cart.spi.CartCheckoutReader.CartCheckout;
 import com.shop.shop.cart.spi.CartCheckoutReader.CartCheckoutItem;
 import com.shop.shop.member.spi.MemberDirectory;
+import com.shop.shop.order.dto.ApplicableCouponResponse;
 import com.shop.shop.order.dto.OrderCheckoutResponse;
 import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
@@ -59,6 +60,12 @@ class OrderFacadeImplTest {
     @Mock
     private OrderDtoMapper dtoMapper;
 
+    @Mock
+    private CouponService couponService;
+
+    @Mock
+    private CouponDtoMapper couponDtoMapper;
+
     private OrderFacadeImpl orderFacadeImpl;
 
     private static final String EMAIL = "consumer@example.com";
@@ -68,7 +75,7 @@ class OrderFacadeImplTest {
     void setUp() {
         orderFacadeImpl = new OrderFacadeImpl(
                 orderService, memberDirectory, cartCheckoutReader, productOrderCatalog,
-                orderFulfillmentService, dtoMapper);
+                orderFulfillmentService, dtoMapper, couponService, couponDtoMapper);
     }
 
     @Test
@@ -90,6 +97,7 @@ class OrderFacadeImplTest {
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
         when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(cartCheckout);
         when(productOrderCatalog.getOrderableSnapshots(List.of(variantId))).thenReturn(List.of(snapshot));
+        when(couponService.getApplicable(USER_ID)).thenReturn(List.of()); // 057: 정상 경로 스텁
 
         OrderCheckoutResponse result = orderFacadeImpl.getCheckout(EMAIL);
 
@@ -103,6 +111,7 @@ class OrderFacadeImplTest {
         assertThat(result.shippingFee()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.finalAmount()).isEqualByComparingTo(expectedLineAmount);
         assertThat(result.hasItems()).isTrue();
+        assertThat(result.applicableCoupons()).isNotNull(); // 057: applicableCoupons 필드 존재 확인
 
         verify(memberDirectory).findUserIdByEmail(EMAIL);
         verify(cartCheckoutReader).getCheckoutCart(USER_ID);
@@ -122,6 +131,7 @@ class OrderFacadeImplTest {
         assertThat(result.items()).isEmpty();
         assertThat(result.hasItems()).isFalse();
         assertThat(result.itemsAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.applicableCoupons()).isEmpty(); // 057: 빈 장바구니 early-return은 List.of()
     }
 
     @Test
@@ -139,12 +149,43 @@ class OrderFacadeImplTest {
         when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
         when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(emptyCart(cartCheckout));
         when(productOrderCatalog.getOrderableSnapshots(List.of(variantId))).thenReturn(List.of(notPurchasable));
+        when(couponService.getApplicable(USER_ID)).thenReturn(List.of()); // 057: 정상 경로(장바구니 비어있지 않음) 스텁
 
         OrderCheckoutResponse result = orderFacadeImpl.getCheckout(EMAIL);
 
         assertThat(result.items()).isEmpty();
         assertThat(result.hasItems()).isFalse();
         assertThat(result.itemsAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.applicableCoupons()).isNotNull(); // 057: applicableCoupons 필드 존재
+    }
+
+    @Test
+    @DisplayName("getCheckout: 정상 경로에서 CouponService.getApplicable(userId) 호출")
+    void getCheckout_normalPath_callsGetApplicable() {
+        long variantId = 10L;
+        CartCheckoutItem cartItem = new CartCheckoutItem(1L, variantId, 1);
+        CartCheckout cartCheckout = new CartCheckout(1L, List.of(cartItem));
+
+        OrderableVariantSnapshot snapshot = new OrderableVariantSnapshot(
+                variantId, 20L, "테스트 상품", "", List.of(),
+                new BigDecimal("5000"), true, 10, "ON_SALE", true, null
+        );
+        ApplicableCouponResponse couponResp = new ApplicableCouponResponse(
+                1L, 2L, "TEST10", "테스트쿠폰", true, new BigDecimal("500"), null);
+        CouponService.ApplicableCouponView view = new CouponService.ApplicableCouponView(
+                1L, 2L, "TEST10", "테스트쿠폰", true, new BigDecimal("500"), null);
+
+        when(memberDirectory.findUserIdByEmail(EMAIL)).thenReturn(USER_ID);
+        when(cartCheckoutReader.getCheckoutCart(USER_ID)).thenReturn(cartCheckout);
+        when(productOrderCatalog.getOrderableSnapshots(List.of(variantId))).thenReturn(List.of(snapshot));
+        when(couponService.getApplicable(USER_ID)).thenReturn(List.of(view));
+        when(couponDtoMapper.toApplicableCouponResponse(view)).thenReturn(couponResp);
+
+        OrderCheckoutResponse result = orderFacadeImpl.getCheckout(EMAIL);
+
+        assertThat(result.applicableCoupons()).hasSize(1);
+        assertThat(result.applicableCoupons().get(0).code()).isEqualTo("TEST10");
+        verify(couponService).getApplicable(USER_ID);
     }
 
     @Test

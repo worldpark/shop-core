@@ -390,7 +390,8 @@ class OrderViewRenderingTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 new BigDecimal("30000"),
-                true
+                true,
+                List.of() // 057: applicableCoupons — 테스트 픽스처에는 빈 목록
         );
     }
 
@@ -401,7 +402,8 @@ class OrderViewRenderingTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
-                false
+                false,
+                List.of() // 057: applicableCoupons — 빈 장바구니
         );
     }
 

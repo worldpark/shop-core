@@ -10,6 +10,7 @@ import com.shop.shop.member.repository.MemberRepository;
 import com.shop.shop.member.repository.SellerApplicationRepository;
 import com.shop.shop.member.service.MemberUserDetailsService;
 import com.shop.shop.order.dto.OrderCheckoutResponse;
+import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderItemOptionValueResponse;
 import com.shop.shop.order.dto.OrderItemResponse;
 import com.shop.shop.order.dto.OrderResponse;
@@ -52,6 +53,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -312,6 +314,39 @@ class OrderViewControllerTest {
         verify(orderFacade).createOrder(eq(USER_EMAIL), any());
     }
 
+    @Test
+    @DisplayName("POST /orders — userCouponId 미선택 시 null 전달 (회귀)")
+    @WithMockUser(roles = "CONSUMER", username = USER_EMAIL)
+    void createOrder_noUserCouponId_passesNullToRequest() throws Exception {
+        mockMvc.perform(post("/orders")
+                        .with(csrf())
+                        .param("recipient", "홍길동")
+                        .param("phone", "010-1234-5678")
+                        .param("postcode", "12345")
+                        .param("address1", "서울시 강남구"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(orderFacade).createOrder(eq(USER_EMAIL),
+                argThat(req -> req.userCouponId() == null));
+    }
+
+    @Test
+    @DisplayName("POST /orders — userCouponId 선택 시 해당 값이 OrderCreateRequest에 전달됨")
+    @WithMockUser(roles = "CONSUMER", username = USER_EMAIL)
+    void createOrder_withUserCouponId_passesIdToRequest() throws Exception {
+        mockMvc.perform(post("/orders")
+                        .with(csrf())
+                        .param("recipient", "홍길동")
+                        .param("phone", "010-1234-5678")
+                        .param("postcode", "12345")
+                        .param("address1", "서울시 강남구")
+                        .param("userCouponId", "42"))
+                .andExpect(status().is3xxRedirection());
+
+        verify(orderFacade).createOrder(eq(USER_EMAIL),
+                argThat(req -> Long.valueOf(42L).equals(req.userCouponId())));
+    }
+
     // ============================================================
     // GET /orders — 주문 목록
     // ============================================================
@@ -419,7 +454,8 @@ class OrderViewControllerTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 new BigDecimal("30000"),
-                true
+                true,
+                List.of() // 057: applicableCoupons — 테스트 픽스처에는 빈 목록
         );
     }
 

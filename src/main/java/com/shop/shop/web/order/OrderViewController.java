@@ -121,7 +121,7 @@ public class OrderViewController {
                     form.getPostcode(),
                     form.getAddress1(),
                     form.getAddress2(),
-                    null // View 쿠폰 선택 UI는 후속 Task 범위 — 고정 null
+                    form.getUserCouponId() // 057: 체크아웃 쿠폰 선택값 전달 (미선택 시 null — 031 기존 흐름)
             );
             OrderResponse created = orderFacade.createOrder(actor.email(), request);
             return "redirect:/orders/" + created.orderId();

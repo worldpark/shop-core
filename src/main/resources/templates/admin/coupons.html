@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<!--
+    관리자 쿠폰 관리 화면.
+    view name: admin/coupons
+    레이아웃: layout/base :: layout(title, content)
+
+    모델 키:
+      - coupons (List<AdminCouponResponse>): 쿠폰 전체 목록 (사용현황·활성여부 포함)
+      - couponForm (AdminCouponCreateForm): 등록 폼 Backing Object
+
+    보존 계약:
+      - 등록 폼: method="post" th:action="@{/admin/coupons}" th:object="${couponForm}"
+      - CSRF: th:action 자동 주입 (_csrf 수동 금지)
+      - usageLimit null → "무제한" 표기
+      - 날짜: KST 표현 (Asia/Seoul)
+      - flash.flashSuccess / flash.flashError: layout/base 경유 자동 표시
+      - 구조: 041 admin/categories.html 패턴 복제
+-->
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      lang="ko"
+      th:replace="~{layout/base :: layout(title=~{::title}, content=~{::main})}">
+<head>
+    <title>쿠폰 관리</title>
+</head>
+<body>
+<main>
+    <div class="admin-members-container">
+        <h1 class="page-title">쿠폰 관리</h1>
+
+        <!-- flash 메시지는 layout/base가 fragments/messages를 포함하므로 자동 표시 -->
+
+        <!-- 쿠폰 목록 테이블 -->
+        <div class="table-wrapper">
+            <table class="members-table">
+                <thead>
+                <tr>
+                    <th>코드</th>
+                    <th>쿠폰명</th>
+                    <th>할인</th>
+                    <th>최소주문금액</th>
+                    <th>유효기간(KST)</th>
+                    <th>사용현황</th>
+                    <th>활성</th>
+                </tr>
+                </thead>
+                <tbody>
+                <!-- 목록 없음 안내 -->
+                <tr th:if="${coupons.isEmpty()}">
+                    <td colspan="7" class="empty-msg">등록된 쿠폰이 없습니다.</td>
+                </tr>
+                <!-- 쿠폰 행 반복 -->
+                <tr th:each="c : ${coupons}" data-testid="coupon-row">
+                    <td>
+                        <code th:text="${c.code}" data-testid="coupon-code"></code>
+                    </td>
+                    <td th:text="${c.name}" data-testid="coupon-name"></td>
+                    <td>
+                        <!-- fixed: 금액 할인, percent: 퍼센트 할인 -->
+                        <span th:if="${c.discountType == 'fixed'}"
+                              th:text="${#numbers.formatDecimal(c.value, 1, 'COMMA', 0, 'POINT')} + '원'"></span>
+                        <span th:if="${c.discountType == 'percent'}"
+                              th:text="${c.value} + '%'"></span>
+                        <!-- percent 시 최대 할인 병기 -->
+                        <span th:if="${c.discountType == 'percent' and c.maxDiscount != null}"
+                              style="color: #666; font-size: 12px;"
+                              th:text="'(최대 ' + ${#numbers.formatDecimal(c.maxDiscount, 1, 'COMMA', 0, 'POINT')} + '원)'"></span>
+                    </td>
+                    <td>
+                        <span th:if="${c.minOrderAmount != null and c.minOrderAmount.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
+                              th:text="${#numbers.formatDecimal(c.minOrderAmount, 1, 'COMMA', 0, 'POINT')} + '원'"></span>
+                        <span th:if="${c.minOrderAmount == null or c.minOrderAmount.compareTo(T(java.math.BigDecimal).ZERO) <= 0}">-</span>
+                    </td>
+                    <td>
+                        <span th:text="${#temporals.format(c.startsAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm')}"></span>
+                        ~
+                        <span th:text="${#temporals.format(c.endsAt.atZone(T(java.time.ZoneId).of('Asia/Seoul')), 'yyyy-MM-dd HH:mm')}"></span>
+                    </td>
+                    <td data-testid="coupon-usage">
+                        <span th:text="${c.usedCount}"></span>
+                        /
+                        <span th:if="${c.usageLimit != null}" th:text="${c.usageLimit}"></span>
+                        <span th:if="${c.usageLimit == null}">무제한</span>
+                    </td>
+                    <td>
+                        <span th:if="${c.isActive}"
+                              style="color: #28a745; font-weight: 600;"
+                              data-testid="badge-active">활성</span>
+                        <span th:if="${!c.isActive}"
+                              style="color: #6c757d;"
+                              data-testid="badge-inactive">비활성</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 쿠폰 등록 폼 -->
+        <div class="form-section" style="margin-top: 32px;">
+            <h2 class="section-title" style="font-size: 1.1rem; margin-bottom: 16px; color: #333;">쿠폰 등록</h2>
+            <form method="post"
+                  th:action="@{/admin/coupons}"
+                  th:object="${couponForm}"
+                  class="coupon-form"
+                  style="display: flex; flex-direction: column; gap: 12px; max-width: 520px;">
+
+                <!-- 쿠폰 코드 -->
+                <div class="form-group">
+                    <label for="code">쿠폰 코드 <span style="color: #d00;">*</span></label>
+                    <input type="text"
+                           id="code"
+                           th:field="*{code}"
+                           placeholder="예: SUMMER2026"
+                           class="form-control"
+                           data-testid="form-code">
+                    <span th:if="${#fields.hasErrors('code')}"
+                          th:errors="*{code}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 쿠폰 이름 -->
+                <div class="form-group">
+                    <label for="name">쿠폰 이름 <span style="color: #d00;">*</span></label>
+                    <input type="text"
+                           id="name"
+                           th:field="*{name}"
+                           placeholder="예: 여름 할인 쿠폰"
+                           class="form-control"
+                           data-testid="form-name">
+                    <span th:if="${#fields.hasErrors('name')}"
+                          th:errors="*{name}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 할인 유형 -->
+                <div class="form-group">
+                    <label for="discountType">할인 유형 <span style="color: #d00;">*</span></label>
+                    <select id="discountType"
+                            th:field="*{discountType}"
+                            class="form-control"
+                            style="max-width: 200px;"
+                            data-testid="form-discount-type">
+                        <option value="">선택하세요</option>
+                        <option value="fixed">정액 (fixed)</option>
+                        <option value="percent">정률 (percent)</option>
+                    </select>
+                    <span th:if="${#fields.hasErrors('discountType')}"
+                          th:errors="*{discountType}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 할인 값 -->
+                <div class="form-group">
+                    <label for="value">할인 값 <span style="color: #d00;">*</span>
+                        <span style="color: #666; font-size: 12px;">(fixed: 금액, percent: 퍼센트)</span>
+                    </label>
+                    <input type="number"
+                           id="value"
+                           th:field="*{value}"
+                           min="0.01"
+                           step="0.01"
+                           placeholder="예: 1000 또는 10"
+                           class="form-control"
+                           style="width: 180px;"
+                           data-testid="form-value">
+                    <span th:if="${#fields.hasErrors('value')}"
+                          th:errors="*{value}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 최소 주문 금액 -->
+                <div class="form-group">
+                    <label for="minOrderAmount">최소 주문 금액
+                        <span style="color: #666; font-size: 12px;">(선택 — 미입력 시 제한 없음)</span>
+                    </label>
+                    <input type="number"
+                           id="minOrderAmount"
+                           th:field="*{minOrderAmount}"
+                           min="0"
+                           step="1"
+                           placeholder="예: 10000"
+                           class="form-control"
+                           style="width: 180px;">
+                </div>
+
+                <!-- 최대 할인 금액 (percent 전용) -->
+                <div class="form-group">
+                    <label for="maxDiscount">최대 할인 금액
+                        <span style="color: #666; font-size: 12px;">(percent 유형 시 선택)</span>
+                    </label>
+                    <input type="number"
+                           id="maxDiscount"
+                           th:field="*{maxDiscount}"
+                           min="0"
+                           step="1"
+                           placeholder="예: 5000"
+                           class="form-control"
+                           style="width: 180px;">
+                </div>
+
+                <!-- 시작일 (KST datetime-local) -->
+                <div class="form-group">
+                    <label for="startsAt">시작일시 (KST) <span style="color: #d00;">*</span></label>
+                    <input type="datetime-local"
+                           id="startsAt"
+                           th:field="*{startsAt}"
+                           class="form-control"
+                           style="width: 220px;"
+                           data-testid="form-starts-at">
+                    <span th:if="${#fields.hasErrors('startsAt')}"
+                          th:errors="*{startsAt}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 종료일 (KST datetime-local) -->
+                <div class="form-group">
+                    <label for="endsAt">종료일시 (KST) <span style="color: #d00;">*</span></label>
+                    <input type="datetime-local"
+                           id="endsAt"
+                           th:field="*{endsAt}"
+                           class="form-control"
+                           style="width: 220px;"
+                           data-testid="form-ends-at">
+                    <span th:if="${#fields.hasErrors('endsAt')}"
+                          th:errors="*{endsAt}"
+                          class="field-error"
+                          style="color: #d00; font-size: 13px;"></span>
+                </div>
+
+                <!-- 사용 한도 -->
+                <div class="form-group">
+                    <label for="usageLimit">사용 한도
+                        <span style="color: #666; font-size: 12px;">(선택 — 미입력 시 무제한)</span>
+                    </label>
+                    <input type="number"
+                           id="usageLimit"
+                           th:field="*{usageLimit}"
+                           min="1"
+                           step="1"
+                           placeholder="예: 100 (미입력=무제한)"
+                           class="form-control"
+                           style="width: 180px;">
+                </div>
+
+                <!-- 활성 여부 -->
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox"
+                               id="isActive"
+                               th:field="*{isActive}"
+                               data-testid="form-is-active">
+                        활성화 (즉시 사용 가능)
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary" data-testid="coupon-submit-btn">등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

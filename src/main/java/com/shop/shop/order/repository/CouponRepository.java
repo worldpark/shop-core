@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -20,6 +21,15 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
      * 코드로 쿠폰 조회.
      */
     Optional<Coupon> findByCode(String code);
+
+    /**
+     * 전체 쿠폰 정의 목록 조회 — 종료일 내림차순.
+     *
+     * <p>admin 쿠폰 관리 화면 전용. 읽기 전용.
+     *
+     * @return 전체 쿠폰 목록 (endsAt DESC)
+     */
+    List<Coupon> findAllByOrderByEndsAtDesc();
 
     /**
      * 사용 총 한도 범위 내에서 used_count 증가 (조건부 UPDATE).

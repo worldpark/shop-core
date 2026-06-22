@@ -208,6 +208,8 @@ public class SecurityConfig {
                     .requestMatchers("/orders/*/payment").hasRole("CONSUMER")
                     // 취소 경로
                     .requestMatchers("/orders/*/cancel").hasRole("CONSUMER")
+                    // 쿠폰함 View 경로 — 최소 ROLE_CONSUMER (057)
+                    .requestMatchers("/coupons", "/coupons/**").hasRole("CONSUMER")
                     // 주문/체크아웃 View 경로 — 최소 ROLE_CONSUMER
                     .requestMatchers("/checkout", "/orders", "/orders/**").hasRole("CONSUMER")
                     // 그 외 모든 경로는 인증 필요

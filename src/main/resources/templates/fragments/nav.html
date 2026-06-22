@@ -36,6 +36,11 @@
                class="nav-link"
                th:classappend="${active == 'admin-categories'} ? ' nav-link-active' : ''">카테고리 관리</a>
         </li>
+        <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+            <a th:href="@{/admin/coupons}"
+               class="nav-link"
+               th:classappend="${active == 'admin-coupons'} ? ' nav-link-active' : ''">쿠폰 관리</a>
+        </li>
         <li class="nav-item" sec:authorize="hasRole('SELLER')">
             <a th:href="@{/seller/products}"
                class="nav-link"
@@ -60,6 +65,11 @@
             <a th:href="@{/orders}"
                class="nav-link"
                th:classappend="${active == 'orders'} ? ' nav-link-active' : ''">주문 내역</a>
+        </li>
+        <li class="nav-item" sec:authorize="hasRole('CONSUMER')">
+            <a th:href="@{/coupons}"
+               class="nav-link"
+               th:classappend="${active == 'coupons'} ? ' nav-link-active' : ''">쿠폰함</a>
         </li>
         <li class="nav-item" sec:authorize="hasRole('CONSUMER') and !hasRole('SELLER')">
             <a th:href="@{/seller-applications/apply}"
