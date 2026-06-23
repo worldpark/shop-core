@@ -13,16 +13,25 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
-import lombok.RequiredArgsConstructor;
+import com.shop.shop.product.search.ProductSearchHits;
+import com.shop.shop.product.search.ProductSearchPort;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +42,7 @@ import java.util.stream.Collectors;
  *
  * <p>책임:
  * <ul>
- *   <li>findPublicProducts: 목록 페이지 집계 쿼리 + 정렬별 메서드 선택</li>
+ *   <li>findPublicProducts: keyword 존재 시 ES 경로 → PG 재투영 / 폴백 시 기존 pg_trgm 경로</li>
  *   <li>findPrimaryImages: IN 배치 조회 (N+1 회피)</li>
  *   <li>getPublicProductDetail: 상세 단건 집계 (화이트리스트 + 활성 variant 전용)</li>
  *   <li>soldOut/available/displayPrice 판정 헬퍼</li>
@@ -41,9 +50,17 @@ import java.util.stream.Collectors;
  *
  * <p>레이어: PublicProductRestController → PublicProductServiceResponse → PublicProductService → *Repository
  *           PublicProductFacadeImpl → PublicProductService → *Repository
+ *
+ * <p><b>ES 읽기 경로 (T5+6)</b>: keyword != null 且 ProductSearchPort 빈 존재 且 쿨다운 비활성 →
+ * ES 검색(상품 ID 랭킹+totalHits) → PG 재투영(드리프트 status 제거) → ES 랭킹 순서 보존.
+ * ES 비가용/실패/ObjectProvider empty → 기존 findPublicProducts*(pg_trgm) 폴백(계약 동일).
+ *
+ * <p><b>totalElements 정합 note</b>: ES 경로에서 totalElements=ES totalHits로 둔다.
+ * 드리프트로 페이지 내용이 size보다 줄 수 있으나(ES term 필터로 1차 차단 후 PG 재투영 2차),
+ * 재카운트는 연관도 페이징 의미를 깨므로 ES totalHits 채택(ADR-011 결정 5(c)).
  */
+@Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PublicProductService {
 
@@ -53,11 +70,44 @@ public class PublicProductService {
     /** page size 상한 (클라이언트 임의 과대값 방지). */
     private static final int MAX_SIZE = 100;
 
+    /**
+     * ES deep-paging 가드: (page+1)*size 가 이 값 이하여야 ES 경로를 사용한다.
+     * ES max_result_window 기본 10000.
+     */
+    private static final int ES_MAX_RESULT_WINDOW = 10_000;
+
+    /** keyword 최대 허용 길이 — 이를 초과하면 절단 후 ES 전달 (PII 길이 방어). */
+    private static final int MAX_KEYWORD_LENGTH = 100;
+
+    private static final String COUNTER_SEARCH_REQUESTS = "product.search.requests";
+    private static final String TAG_PATH = "path";
+    private static final String PATH_ES = "es";
+    private static final String PATH_FALLBACK = "fallback";
+
     private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductOptionRepository productOptionRepository;
     private final OptionValueRepository optionValueRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ObjectProvider<ProductSearchPort> searchPortProvider;
+    private final MeterRegistry meterRegistry;
+
+    public PublicProductService(
+            ProductRepository productRepository,
+            ProductImageRepository productImageRepository,
+            ProductOptionRepository productOptionRepository,
+            OptionValueRepository optionValueRepository,
+            ProductVariantRepository productVariantRepository,
+            ObjectProvider<ProductSearchPort> searchPortProvider,
+            MeterRegistry meterRegistry) {
+        this.productRepository = productRepository;
+        this.productImageRepository = productImageRepository;
+        this.productOptionRepository = productOptionRepository;
+        this.optionValueRepository = optionValueRepository;
+        this.productVariantRepository = productVariantRepository;
+        this.searchPortProvider = searchPortProvider;
+        this.meterRegistry = meterRegistry;
+    }
 
     // =============================================================
     // 목록 조회
@@ -67,9 +117,11 @@ public class PublicProductService {
      * 공개 상품 목록 집계 쿼리.
      *
      * <p>status 화이트리스트 [ON_SALE, SOLD_OUT] 적용.
-     * sort별 repository 메서드 선택(JPQL 정적 ORDER BY — 클라이언트 임의 정렬 차단).
-     * displayPrice = COALESCE(MIN(활성 v.price), p.basePrice) — DB 단계 계산, 메모리 정렬 금지.
-     * size는 1~MAX_SIZE 범위로 클램프.
+     * keyword 존재 시 ES 경로 우선 → ES 비가용/실패 시 pg_trgm 폴백.
+     * keyword 없으면 기존 PG 집계 switch 그대로(회귀 0).
+     *
+     * <p>deep-paging 가드: (page+1)*size > ES_MAX_RESULT_WINDOW이면 ES 스킵 → PG 폴백.
+     * keyword 길이 가드: MAX_KEYWORD_LENGTH 초과 시 절단.
      *
      * @param keyword    상품명 부분 일치 검색어 (null이면 전체)
      * @param categoryId 카테고리 ID 필터 (null이면 전체)
@@ -86,6 +138,27 @@ public class PublicProductService {
 
         String normalizedKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
 
+        // keyword 길이 가드
+        if (normalizedKeyword != null && normalizedKeyword.length() > MAX_KEYWORD_LENGTH) {
+            normalizedKeyword = normalizedKeyword.substring(0, MAX_KEYWORD_LENGTH);
+        }
+
+        // ES 경로 시도 (keyword 존재 시에만)
+        if (normalizedKeyword != null) {
+            // deep-paging 가드: (page+1)*size > 10000이면 폴백
+            if ((long) (page + 1) * clampedSize <= ES_MAX_RESULT_WINDOW) {
+                Optional<Page<ProductSummaryProjection>> esResult =
+                        tryEsPath(normalizedKeyword, categoryId, sort, page, clampedSize, clamped);
+                if (esResult.isPresent()) {
+                    incrementCounter(PATH_ES);
+                    return esResult.get();
+                }
+            }
+            // ES 비가용 또는 deep-paging → PG 폴백 (pg_trgm)
+            incrementCounter(PATH_FALLBACK);
+        }
+
+        // keyword 없거나 폴백: 기존 PG 집계 switch
         return switch (sort) {
             case PRICE_ASC -> productRepository.findPublicProductsPriceAsc(
                     PUBLIC_STATUSES, normalizedKeyword, categoryId, clamped);
@@ -94,6 +167,71 @@ public class PublicProductService {
             default -> productRepository.findPublicProductsLatest(
                     PUBLIC_STATUSES, normalizedKeyword, categoryId, clamped);
         };
+    }
+
+    /**
+     * ES 경로 시도.
+     *
+     * <p>ObjectProvider empty → empty. 어댑터의 Optional empty → empty. 성공 → PG 재투영 후 반환.
+     * 재투영 중 예외는 이 메서드에서 흡수(empty 반환) → 호출자가 PG 폴백.
+     */
+    private Optional<Page<ProductSummaryProjection>> tryEsPath(
+            String keyword, Long categoryId, PublicProductSort sort,
+            int page, int clampedSize, Pageable clamped) {
+        ProductSearchPort port = searchPortProvider.getIfAvailable();
+        if (port == null) {
+            return Optional.empty();
+        }
+
+        try {
+            Optional<ProductSearchHits> hitsOpt = port.search(
+                    keyword, categoryId, PUBLIC_STATUSES, sort, page, clampedSize);
+
+            if (hitsOpt.isEmpty()) {
+                // ES 비가용 신호 → 폴백
+                return Optional.empty();
+            }
+
+            ProductSearchHits hits = hitsOpt.get();
+
+            if (hits.ids().isEmpty()) {
+                // 검색 결과 없음 — 빈 페이지 반환 (폴백 불필요)
+                return Optional.of(new PageImpl<>(List.of(), clamped, hits.totalHits()));
+            }
+
+            // PG SoT 재투영 (드리프트 status 이중 필터)
+            List<ProductSummaryProjection> projected =
+                    productRepository.findPublicProductSummariesByIds(hits.ids(), PUBLIC_STATUSES);
+
+            // ES 랭킹 순서 보존: Map<id, projection> → ES id 순서로 재조립 (드리프트 제거된 id는 드롭)
+            Map<Long, ProductSummaryProjection> projMap = projected.stream()
+                    .collect(Collectors.toMap(ProductSummaryProjection::productId, Function.identity()));
+
+            List<ProductSummaryProjection> ordered = new ArrayList<>(hits.ids().size());
+            for (Long id : hits.ids()) {
+                ProductSummaryProjection proj = projMap.get(id);
+                if (proj != null) {
+                    ordered.add(proj);
+                }
+                // 드리프트(ES ON_SALE이나 PG HIDDEN/DRAFT): 제거됨 — totalHits는 ES 기준 유지
+            }
+
+            return Optional.of(new PageImpl<>(ordered, clamped, hits.totalHits()));
+
+        } catch (Exception e) {
+            // 재투영 중 예외(DB 장애 등) — 로그 후 폴백
+            log.warn("[ProductSearch] ES path failed during re-projection (reason={}) — falling back to PG",
+                    e.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
+    private void incrementCounter(String path) {
+        Counter.builder(COUNTER_SEARCH_REQUESTS)
+                .tag(TAG_PATH, path)
+                .description("Product search request count by path (es|fallback)")
+                .register(meterRegistry)
+                .increment();
     }
 
     /**

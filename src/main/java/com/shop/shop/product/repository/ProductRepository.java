@@ -214,6 +214,44 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 색인 스냅샷 — 검색 색인 문서 산출 (displayPrice/purchasable SoT)
     // =============================================================
 
+    // =============================================================
+    // ES 읽기 경로 — 상품 ID 집합으로 공개 목록 재투영 (T5+6 ES 읽기 경로)
+    // =============================================================
+
+    /**
+     * ES 랭킹 ID 집합으로 공개 상품 목록 재투영 — ES 읽기 경로 전용.
+     *
+     * <p>집계 식은 {@link #findPublicProductsLatest}와 <b>문자 그대로 동일</b>하여
+     * displayPrice·purchasableVariantCount의 PG SoT 일관성을 보장한다.
+     * {@code WHERE p.id IN :ids AND p.status IN :statuses}로 드리프트(status 변경) 항목을 제거한다.
+     * ORDER BY 없음 — 호출자(PublicProductService)가 ES 랭킹 순서로 메모리 재정렬한다.
+     *
+     * <p>ES 페이지 크기는 최대 100이므로 IN 절 성능 문제 없음.
+     *
+     * @param ids      ES 랭킹 순서 상품 ID 목록
+     * @param statuses 노출 허용 status 목록 (ON_SALE, SOLD_OUT)
+     * @return projection 목록 (ORDER BY 없음 — 호출자가 ids 순서로 재정렬)
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.ProductSummaryProjection(
+                p.id,
+                p.name,
+                COALESCE(MIN(v.price), p.basePrice),
+                c.id,
+                c.name,
+                p.status,
+                SUM(CASE WHEN v.isActive = true AND v.stock > 0 THEN 1L ELSE 0L END)
+            )
+            FROM Product p
+            LEFT JOIN p.category c
+            LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
+            WHERE p.id IN :ids AND p.status IN :statuses
+            GROUP BY p.id, p.name, p.basePrice, c.id, c.name, p.status, p.createdAt
+            """)
+    List<ProductSummaryProjection> findPublicProductSummariesByIds(
+            @Param("ids") List<Long> ids,
+            @Param("statuses") List<ProductStatus> statuses);
+
     /**
      * 단건 상품 색인 스냅샷 조회 — ES upsert 이벤트 페이로드 산출 전용.
      *

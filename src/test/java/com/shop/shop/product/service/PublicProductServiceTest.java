@@ -13,6 +13,8 @@ import com.shop.shop.product.repository.ProductImageRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import com.shop.shop.product.repository.ProductVariantRepository;
+import com.shop.shop.product.search.ProductSearchPort;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +38,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,9 +84,17 @@ class PublicProductServiceTest {
 
     @BeforeEach
     void setUp() {
+        // ObjectProvider<ProductSearchPort>: getIfAvailable() → null (ES 미경유, 항상 PG 폴백 경로)
+        // lenient()으로 stub해야 헬퍼 판정 테스트 등에서 UnnecessaryStubbingException 방지
+        @SuppressWarnings("unchecked")
+        ObjectProvider<ProductSearchPort> emptySearchPortProvider = mock(ObjectProvider.class);
+        lenient().when(emptySearchPortProvider.getIfAvailable()).thenReturn(null);
+
         service = new PublicProductService(
                 productRepository, productImageRepository,
-                productOptionRepository, optionValueRepository, productVariantRepository);
+                productOptionRepository, optionValueRepository, productVariantRepository,
+                emptySearchPortProvider,
+                new SimpleMeterRegistry());
     }
 
     // =============================================================

@@ -2,6 +2,8 @@ package com.shop.shop.product.search;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,5 +60,14 @@ public class ProductSearchIndexConfig {
     public ProductSearchIndexBootstrap productSearchIndexBootstrap(
             ProductSearchIndexAdmin productSearchIndexAdmin) {
         return new ProductSearchIndexBootstrap(productSearchIndexAdmin);
+    }
+
+    @Bean
+    public EsProductSearchAdapter esProductSearchAdapter(
+            ElasticsearchClient elasticsearchClient,
+            MeterRegistry meterRegistry,
+            @Value("${shop.search.query.timeout-ms:800}") long timeoutMs,
+            @Value("${shop.search.query.cooldown-ms:5000}") long cooldownMs) {
+        return new EsProductSearchAdapter(elasticsearchClient, meterRegistry, timeoutMs, cooldownMs);
     }
 }

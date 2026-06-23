@@ -95,6 +95,10 @@ shop:
   search:
     indexer:
       enabled: ${SHOP_SEARCH_INDEXER_ENABLED:true}   # 색인 indexer 구독/ES 색인 활성 (운영/로컬 ON). 테스트는 미설정→OFF, indexer 통합 테스트만 ON.
+    query:
+      timeout-ms: ${SHOP_SEARCH_QUERY_TIMEOUT_MS:800}           # ES 검색 요청 타임아웃 (ms). 초과 시 PG 폴백.
+      cooldown-ms: ${SHOP_SEARCH_QUERY_COOLDOWN_MS:5000}         # ES 장애 후 쿨다운 윈도우 (ms). 윈도우 내 요청은 ES 스킵.
+      # keyword 최대 길이(100자)는 PublicProductService의 고정 안전 가드 상수(튜닝 대상 아님).
     kafka:
       retry:
         max-attempts: ${SHOP_SEARCH_KAFKA_RETRY_MAX_ATTEMPTS:3}    # 최초 1회 + 재시도 2회
