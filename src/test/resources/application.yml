@@ -7,6 +7,11 @@ spring:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
       - org.springframework.modulith.events.jpa.JpaEventPublicationAutoConfiguration
       - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration  # DB 없는 컨텍스트 로드 유지
+      # ES 자동설정 제외 — 풀 @SpringBootTest 컨텍스트가 ES 연결/health 시도로 연쇄 실패하지 않도록(ADR-011 T1).
+      # 실엔진 검증은 SearchClientConnectionIntegrationTest(Testcontainers)에서만 수행.
+      # FQCN은 Spring Boot 3.5.15-SNAPSHOT spring-boot-autoconfigure jar에서 실측 확인(검증 게이트 4).
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchClientAutoConfiguration
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
 
   flyway:
     enabled: false  # 테스트 컨텍스트: DataSource 없으므로 Flyway 비활성 (FlywayAutoConfiguration 제외와 이중 보장)

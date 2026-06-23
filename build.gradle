@@ -79,6 +79,11 @@ dependencies {
     runtimeOnly   'io.jsonwebtoken:jjwt-impl:0.12.7'
     runtimeOnly   'io.jsonwebtoken:jjwt-jackson:0.12.7'
 
+    // Elasticsearch 검색 엔진(ADR-011 T1) — 연결·health 와이어링 전용.
+    // 공식 Java client. Spring Boot BOM이 버전 관리(버전 생략).
+    // 인덱스/매핑/쿼리는 후속 Task(T2+3/T4/T5+6) — 본 Task는 의존+설정+health만.
+    implementation 'co.elastic.clients:elasticsearch-java'
+
     // AWS SDK v2 — Cloudflare R2(S3 호환) 저장소 연동. 버전은 awssdk-bom 위임.
     implementation 'software.amazon.awssdk:s3'
 
@@ -98,6 +103,8 @@ dependencies {
     testImplementation 'org.testcontainers:postgresql'
     // MinIO — S3 호환 컨테이너. R2ObjectStorage 라운드트립 통합 테스트 전용. 버전은 testcontainers-bom 위임.
     testImplementation 'org.testcontainers:minio'
+    // Elasticsearch — 검색 엔진 연결·health 와이어링 검증용 실엔진 통합 테스트. 버전은 testcontainers-bom 위임.
+    testImplementation 'org.testcontainers:elasticsearch'
     testCompileOnly   'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly   'org.junit.platform:junit-platform-launcher'

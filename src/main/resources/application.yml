@@ -65,6 +65,12 @@ spring:
       database: ${SHOP_CORE_REDIS_DB:0}  # shop-core 전용 DB index (notification은 DB 1)
       timeout: 2s
 
+  # Elasticsearch 검색 엔진(ADR-011 T1) — 보조 인덱스 연결.
+  # 로컬 단일 노드, 보안 off라 자격증명 불필요. 매니지드 이관 시 username/password/TLS 추가.
+  # 색인/쿼리는 후속 Task — 본 설정은 연결·health 와이어링 전용.
+  elasticsearch:
+    uris: ${SHOP_CORE_SEARCH_URIS:http://localhost:9200}
+
 shop:
   app:
     base-url: ${SHOP_APP_BASE_URL:http://localhost:8080}
@@ -186,6 +192,9 @@ management:
       show-details: when_authorized        # 미인증엔 UP/DOWN만, 상세는 인증 시
       probes:
         enabled: true                      # liveness/readiness (단일 노드 단계 선택, 켜둬도 무해)
+      group:
+        readiness:
+          include: readinessState          # ES(elasticsearch) 컴포넌트 제외 → ES 다운이 readiness DOWN 유발 안 함
   metrics:
     tags:
       application: shop-core               # 037(notification)과 구분되는 공통 태그
