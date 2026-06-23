@@ -1,5 +1,6 @@
 package com.shop.shop.product.search;
 
+import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
 import com.shop.shop.product.event.ProductSearchIndexChangedEvent;
 
 import java.math.BigDecimal;
@@ -49,6 +50,29 @@ public record ProductSearchDocument(
                 event.status(),
                 event.displayPrice(),
                 event.purchasableVariantCount()
+        );
+    }
+
+    /**
+     * {@link ProductSearchSnapshotProjection}에서 문서를 변환하는 정적 팩토리.
+     * T4(060) 풀 재색인 잡이 PG 전량 조회 후 ES 문서로 변환할 때 사용한다.
+     *
+     * <p>status는 {@code ProductStatus} enum → {@link Enum#name()} 변환(String).
+     * 나머지 필드는 projection과 1:1 대응.
+     *
+     * @param snapshot PG 집계 스냅샷 projection
+     * @return ES 색인 문서
+     */
+    public static ProductSearchDocument from(ProductSearchSnapshotProjection snapshot) {
+        return new ProductSearchDocument(
+                snapshot.productId(),
+                snapshot.name(),
+                snapshot.description(),
+                snapshot.categoryId(),
+                snapshot.categoryName(),
+                snapshot.status().name(),
+                snapshot.displayPrice(),
+                snapshot.purchasableVariantCount()
         );
     }
 }

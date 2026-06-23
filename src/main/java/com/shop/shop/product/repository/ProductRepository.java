@@ -4,6 +4,7 @@ import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
 import com.shop.shop.product.dto.ProductSummaryProjection;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -247,4 +248,47 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             GROUP BY p.id, p.name, p.description, c.id, c.name, p.status, p.basePrice
             """)
     Optional<ProductSearchSnapshotProjection> findSearchSnapshot(@Param("productId") long productId);
+
+    // =============================================================
+    // 풀 재색인 keyset 순회 — T4(060) 전량 백필 전용
+    // =============================================================
+
+    /**
+     * 풀 재색인 keyset 페이지네이션 — {@code p.id > lastId ORDER BY p.id ASC} 배치 조회.
+     *
+     * <p>집계 식은 {@link #findSearchSnapshot(long)}과 문자 그대로 동일하여
+     * 검색 색인 문서와 공개 목록의 일관성을 보장한다(검색-목록 SoT).
+     *
+     * <p>OFFSET 깊은 페이지 열화 없이 전량을 안정적으로 순회한다.
+     * {@code WHERE p.id > :lastId}로 커서를 진행하며, 빈 결과가 반환되면 순회 종료.
+     * 반환 타입 {@code List<>}(Page 아님) — count 쿼리가 발생하지 않는다.
+     * {@link Limit}로 SQL LIMIT 직접 푸시다운.
+     *
+     * <p>status 필터 없음 — 전 status 상품을 색인하고 읽기(T5+6)에서 필터링(ADR-011 원칙 4).
+     *
+     * @param lastId 직전 배치 마지막 상품 ID (첫 호출 시 0L)
+     * @param limit  배치 한도 (LIMIT 푸시다운)
+     * @return 스냅샷 projection 목록 (비어 있으면 순회 완료)
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.ProductSearchSnapshotProjection(
+                p.id,
+                p.name,
+                p.description,
+                c.id,
+                c.name,
+                p.status,
+                COALESCE(MIN(v.price), p.basePrice),
+                SUM(CASE WHEN v.isActive = true AND v.stock > 0 THEN 1L ELSE 0L END)
+            )
+            FROM Product p
+            LEFT JOIN p.category c
+            LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
+            WHERE p.id > :lastId
+            GROUP BY p.id, p.name, p.description, c.id, c.name, p.status, p.basePrice
+            ORDER BY p.id ASC
+            """)
+    List<ProductSearchSnapshotProjection> findSearchSnapshotsAfter(
+            @Param("lastId") long lastId,
+            Limit limit);
 }

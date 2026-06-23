@@ -25,7 +25,8 @@ import org.springframework.context.annotation.Bean;
  *
  * <p>이 클래스가 등록하는 빈:
  * <ul>
- *   <li>{@link ProductSearchIndexService} — ES upsert 서비스</li>
+ *   <li>{@link ProductSearchIndexAdmin} — ES 저수준 인덱스/alias/bulk 관리 (T4 공용)</li>
+ *   <li>{@link ProductSearchIndexService} — ES upsert 서비스 (T2+3 증분 indexer)</li>
  *   <li>{@link ProductSearchIndexBootstrap} — 기동 시 인덱스·alias 멱등 생성</li>
  * </ul>
  *
@@ -42,14 +43,20 @@ import org.springframework.context.annotation.Bean;
 public class ProductSearchIndexConfig {
 
     @Bean
+    public ProductSearchIndexAdmin productSearchIndexAdmin(
+            ElasticsearchClient elasticsearchClient,
+            ObjectMapper objectMapper) {
+        return new ProductSearchIndexAdmin(elasticsearchClient, objectMapper);
+    }
+
+    @Bean
     public ProductSearchIndexService productSearchIndexService(ElasticsearchClient elasticsearchClient) {
         return new ProductSearchIndexService(elasticsearchClient);
     }
 
     @Bean
     public ProductSearchIndexBootstrap productSearchIndexBootstrap(
-            ElasticsearchClient elasticsearchClient,
-            ObjectMapper objectMapper) {
-        return new ProductSearchIndexBootstrap(elasticsearchClient, objectMapper);
+            ProductSearchIndexAdmin productSearchIndexAdmin) {
+        return new ProductSearchIndexBootstrap(productSearchIndexAdmin);
     }
 }
