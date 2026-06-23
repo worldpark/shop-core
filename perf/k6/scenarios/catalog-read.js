@@ -1,16 +1,22 @@
 /**
  * scenarios/catalog-read.js
  *
- * 공개 카탈로그 읽기 부하 시나리오 — 가상스레드 A/B 측정용 (Task 006).
+ * 공개 카탈로그 읽기 부하 시나리오 — 가상스레드 A/B 측정용 (Task 006) +
+ *                                    pg_trgm 검색 베이스라인 측정용 (Task 058).
  *
  * 목적:
  *   플랫폼 스레드(기본 200) 이상의 동시성으로 공개 상품 목록/상세 GET을 가압한다.
  *   락 없는 DB 읽기 경로에서 VT vs 플랫폼 스레드의 throughput/p95/p99 차이를 측정한다.
  *   (쓰기 경로는 풀 바운드라 VT 이득이 작을 수 있음 — 읽기가 VT에 더 공정한 기회를 줌.)
  *
+ *   [Task 058 추가] SEARCH_KEYWORD env가 지정된 경우, 목록 호출에 keyword 파라미터를 부착해
+ *   ProductRepository의 LOWER(p.name) LIKE 검색 절(+pg_trgm GIN 인덱스 경로)을 가압한다.
+ *   env 미지정(기본 빈 문자열)이면 현행과 완전히 동일하게 동작한다 — 회귀 0 보장.
+ *
  * 흐름:
  *   setup()  : setupCatalogSeed() — seller 생성·상품 N개 등록+ON_SALE·variant 생성
- *   default(): GET /api/v1/products (목록) + 랜덤 GET /api/v1/products/{id} (상세)
+ *   default(): GET /api/v1/products (목록, SEARCH_KEYWORD 있으면 keyword 파라미터 부착)
+ *              + 랜덤 GET /api/v1/products/{id} (상세)
  *              인증 헤더 불필요 (공개 permitAll 엔드포인트)
  *   handleSummary(): setup_data(sellerToken) 제거, 메트릭 전용 JSON export
  *
@@ -38,6 +44,12 @@
  *   ADMIN_PASSWORD      — 기본 Admin1234!
  *   RUN_TAG             — 런별 유니크 prefix (미지정 시 uuidv4 자동)
  *   SUMMARY_EXPORT_PATH — 메트릭 전용 JSON 출력 경로 (sellerToken 제외)
+ *   SEARCH_KEYWORD      — [Task 058] 검색 가압용 keyword (기본 빈 문자열 = 검색 없음).
+ *                         값이 있으면 목록 URL에 &keyword=<encodeURIComponent 값>을 부착한다.
+ *                         시드 상품명이 'PERF-Catalog-<prefix>-...' 형태이므로
+ *                         keyword=Catalog (≥3그램, 유효 부분문자열)이 표준 가압값이다.
+ *                         단, 'Catalog'는 전 시드 상품에 매치돼 selectivity가 낮으므로
+ *                         (거의 전건 매치) 인덱스 이득이 작게 보일 수 있다 — README §15 참조.
  *
  * 커스텀 메트릭:
  *   read_duration (Trend)   — GET 요청 지연 (목록+상세 통합). p95/p99 비교 주 지표.
@@ -57,6 +69,18 @@ import { setupCatalogSeed } from '../lib/seed.js';
 // catalog-read의 기본 프로파일은 conc (측정 목적 시나리오).
 // ---------------------------------------------------------------
 const PROFILE = __ENV.PROFILE || 'conc';
+
+// ---------------------------------------------------------------
+// [Task 058] 검색 keyword 파라미터화
+// 값이 있으면 목록 URL에 &keyword=<encodeURIComponent 값> 부착.
+// 없으면(기본 빈 문자열) 현행과 완전히 동일하게 동작 — 회귀 0 보장.
+//
+// 표준 가압 예: SEARCH_KEYWORD=Catalog
+//   시드 상품명 'PERF-Catalog-<prefix>-...'의 유효 부분문자열(≥3그램).
+//   pg_trgm GIN 인덱스(V12 idx_products_name_trgm)가 LOWER(p.name) LIKE
+//   LOWER(CONCAT('%', kw, '%')) 좌변과 매칭돼 Bitmap Index Scan을 탄다.
+// ---------------------------------------------------------------
+const SEARCH_KEYWORD = __ENV.SEARCH_KEYWORD || '';
 
 const p = PROFILES[PROFILE];
 if (!p) {
@@ -153,9 +177,12 @@ export default function (data) {
   const productIds = data.productIds;
 
   // ---- 1. 목록 조회 (GET /api/v1/products) -----------------------
+  // [Task 058] SEARCH_KEYWORD env가 지정된 경우 keyword 파라미터를 부착한다.
+  // 미지정(기본 빈 문자열)이면 현행과 동일한 URL — 회귀 0.
+  const keywordParam = SEARCH_KEYWORD ? `&keyword=${encodeURIComponent(SEARCH_KEYWORD)}` : '';
   const listStart = Date.now();
   const listRes = http.get(
-    `${BASE_URL}/api/v1/products?page=0&size=20&sort=latest`,
+    `${BASE_URL}/api/v1/products?page=0&size=20&sort=latest${keywordParam}`,
   );
   const listDuration = Date.now() - listStart;
   readDuration.add(listDuration);

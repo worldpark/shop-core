@@ -1082,3 +1082,142 @@ BASE_URL=http://localhost:8080 k6 run \
 - Grafana/InfluxDB 시계열 파이프라인, 분산 부하(k6 Cloud) — 보류(YAGNI)
 - teardown() self-clean — 후속 Task
 - 순수 결제 고립(풀 시드 방식 (b)) — 후속 옵션 (plan §8)
+
+---
+
+## 15. 058 검색 p95 베이스라인 — pg_trgm GIN 인덱스 적용 전/후 측정
+
+> Task: `docs/tasks/backend/058-backend-shop-core-product-search-pg-trgm-bridge.md` (Requirement C, Test 5-6)
+> Plan: `docs/plans/backend/058-product-search-pg-trgm-bridge-plan.md` §4-2
+
+### 개요
+
+`catalog-read.js`에 `SEARCH_KEYWORD` 환경변수를 추가했다(기본 빈 문자열). 값이 있으면 목록 URL에 `&keyword=<값>`이 붙어 ProductRepository의 `LOWER(p.name) LIKE LOWER(CONCAT('%', kw, '%'))` 검색 절을 가압한다. V12 마이그레이션(`idx_products_name_trgm` GIN 식 인덱스) 적용 전/후로 동일 커맨드를 실행해 p95를 비교한다.
+
+- **기본 동작 보존**: `SEARCH_KEYWORD` 미지정(또는 빈 문자열) 시 현행과 정확히 동일한 URL(`?page=0&size=20&sort=latest`)로 호출 — 회귀 0.
+- **k6는 게이트가 아닌 측정**이다. 이 섹션의 런은 베이스라인 기록 전용이며 `./gradlew test`와 무관하다.
+
+### 전제 조건 (측정 전 필수 확인)
+
+| 항목 | 조건 | 확인 방법 |
+|---|---|---|
+| **깨끗한 DB** | 누적 주문·상품 정리 필수 — 누적 데이터가 쿼리를 열화시켜 baseline 오염 | `TRUNCATE orders, order_items, cart_items, products RESTART IDENTITY CASCADE;` (perf DB에만) |
+| **notification log 모드** | signup(seller) 환영메일이 실 Gmail SMTP로 발송되지 않도록 | notification 프로세스에 `MAIL_MODE=log` 확인, 또는 프로세스 정지 |
+| **bootRun JVM 누수 확인** | 좀비 bootRun 잔존 시 PG 커넥션 고갈(최대 100 exhaustion) | Windows: `tasklist \| findstr java` / Linux: `pgrep -a java` — 앱 인스턴스 1개만 |
+| **admin 부트스트랩** | 처음 실행이면 admin 계정 필요 | `./gradlew test --tests "*AdminAccountSeedTest*" -Dseed.admin.enabled=true` |
+| **인프라 스택** | PG + Redis + Kafka 모두 기동 | `docker compose -f docker/shop/docker-compose.yml up -d` |
+
+### 측정 절차
+
+#### STEP 1 — 적용 전 측정 (V12 미적용 또는 인덱스 DROP 상태)
+
+V12 마이그레이션이 아직 적용되지 않은 상태이거나, 비교를 위해 인덱스를 일시 DROP한 경우에 측정한다.
+
+```sql
+-- 인덱스 DROP (V12 적용 후 전 상태를 재현하는 경우):
+DROP INDEX IF EXISTS idx_products_name_trgm;
+-- 단, DROP 후 재측정 시에는 앱을 재기동하지 않아도 됨(플래너가 인덱스 캐시를 갱신함).
+```
+
+```bash
+# Windows PowerShell (k6 전체 경로)
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SEARCH_KEYWORD=Catalog `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-search-before.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=smoke \
+  -e SEARCH_KEYWORD=Catalog \
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-search-before.json \
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+#### STEP 2 — 적용 후 측정 (V12 적용 상태)
+
+V12 마이그레이션이 적용돼 `idx_products_name_trgm`(lower(name) gin_trgm_ops)이 생성된 상태에서 측정한다.
+
+```bash
+# Windows PowerShell
+mkdir -p build/k6
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SEARCH_KEYWORD=Catalog `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-search-after.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+
+# macOS/Linux
+mkdir -p build/k6
+BASE_URL=http://localhost:8080 k6 run \
+  -e PROFILE=smoke \
+  -e SEARCH_KEYWORD=Catalog \
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-search-after.json \
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+#### STEP 3 — selectivity 보강 측정 (선택, 권고)
+
+`SEARCH_KEYWORD=Catalog`는 시드 전 상품명이 `PERF-Catalog-<prefix>-...`로 공통 접두를 공유하므로 거의 전건 매치 — selectivity가 낮아 인덱스 이득이 작게 보일 수 있다. 매치 건수가 소수인 keyword로 추가 가압해 인덱스 효과를 보완한다.
+
+```bash
+# 예: 특정 RUN_TAG prefix(시드 상품 일부만 매치하는 keyword)
+# SEARCH_KEYWORD 값은 실제 시드된 상품명 일부로 조정한다.
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SEARCH_KEYWORD="<시드 RUN_TAG 일부 또는 고유 접두>" `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-search-selective.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+#### keyword 없이 현행 동작 재확인 (회귀 0 검증)
+
+```bash
+# SEARCH_KEYWORD 미지정 — 현행과 동일한 URL, 기존 동작 보존
+& "C:\Program Files\k6\k6.exe" run `
+  -e PROFILE=smoke `
+  -e BASE_URL=http://localhost:8080 `
+  -e SUMMARY_EXPORT_PATH=build/k6/catalog-read-no-keyword.json `
+  shop-core/perf/k6/scenarios/catalog-read.js
+```
+
+### Docker 대안 (k6 로컬 미설치 시)
+
+```bash
+# Linux/macOS — 검색 가압 버전
+docker run --rm -i \
+  -e BASE_URL=http://host.docker.internal:8080 \
+  -e PROFILE=smoke \
+  -e SEARCH_KEYWORD=Catalog \
+  -v "$(pwd)/shop-core/perf/k6:/scripts" \
+  grafana/k6 run /scripts/scenarios/catalog-read.js
+
+# Windows PowerShell
+docker run --rm -i `
+  -e BASE_URL=http://host.docker.internal:8080 `
+  -e PROFILE=smoke `
+  -e SEARCH_KEYWORD=Catalog `
+  -v "${PWD}/shop-core/perf/k6:/scripts" `
+  grafana/k6 run /scripts/scenarios/catalog-read.js
+```
+
+### trigram 한계 노트
+
+keyword 3그램 미만(2글자 이하, 예: `Ca`)은 trigram 인덱스 효과가 제한적이며 planner가 seq scan으로 폴백할 수 있다(결과 집합은 LIKE와 동등 — 성능만 영향). 측정 시 keyword 길이를 3글자 이상으로 유지하고, selectivity 차이에 따른 인덱스 이득 변화도 기록에 포함할 것.
+
+### 전/후 p95 비교표 (측정 후 사용자가 기입)
+
+| 상태 | SEARCH_KEYWORD | 시드 상품 수 | read_duration p95 | read_duration p99 | http_req_failed | 비고 |
+|---|---|---|---|---|---|---|
+| 적용 전 (V12 없음 / 인덱스 DROP) | Catalog | 50 | _(측정 후 기입)_ | _(측정 후 기입)_ | _(측정 후 기입)_ | seq scan |
+| 적용 후 (V12 적용) | Catalog | 50 | _(측정 후 기입)_ | _(측정 후 기입)_ | _(측정 후 기입)_ | Bitmap Index Scan |
+| 적용 후 (선택 selectivity) | \<고유 prefix\> | 50 | _(측정 후 기입)_ | _(측정 후 기입)_ | _(측정 후 기입)_ | 매치 소수 조건 |
+| keyword 없음 (현행 동작) | (없음) | 50 | _(측정 후 기입)_ | _(측정 후 기입)_ | _(측정 후 기입)_ | 회귀 0 확인용 |
+
+> **산출물 아티팩트**: `build/k6/catalog-read-search-before.json` / `build/k6/catalog-read-search-after.json` (handleSummary로 토큰 제외 export). `build/`는 gitignore 대상 — 일회성·비커밋. 기준으로 삼을 런만 `baselines/`로 복사해 커밋한다.

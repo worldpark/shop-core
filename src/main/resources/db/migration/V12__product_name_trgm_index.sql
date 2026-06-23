@@ -1,0 +1,50 @@
+-- =============================================================================
+-- V12__product_name_trgm_index.sql — products.name 삼중자(trigram) GIN 인덱스 추가
+-- =============================================================================
+-- [ADR-011 §결정 브리지 근거]
+-- 공개 상품 목록 3종 쿼리의 상품명 부분일치 검색(LOWER(p.name) LIKE LOWER(CONCAT('%', kw, '%')))은
+-- 선행 와일드카드로 인해 B-tree 인덱스를 타지 못해 풀스캔이 발생한다(ADR-011 §맥락).
+-- pg_trgm 확장의 GIN 식(expression) 인덱스를 추가해 이 풀스캔을 완화하는 것이
+-- ADR-011 §결정 "브리지(선택)" 항목의 구현이다(backend/058 T0 브리지).
+--
+-- [pg_trgm contrib · 매니지드 PG 호환]
+-- pg_trgm 은 PostgreSQL contrib 번들로 패키징된 공식 확장이다.
+-- postgres:16.4-alpine(compose · Testcontainers 동일 이미지) 및 RDS / CloudSQL / Supabase 등
+-- 주요 매니지드 PostgreSQL에서 CREATE EXTENSION IF NOT EXISTS pg_trgm 한 줄로 활성화된다.
+-- DB 이미지 교체 · 커스텀 빌드 · 추가 확장 설치가 불필요하다(ADR-011 §맥락 — 매니지드 호환 근거).
+--
+-- [인덱스 표현식 lower(name) · 쿼리 좌변 일치 의도]
+-- 인덱스 표현식을 lower(name) 으로 선언한 것은 쿼리 좌변 LOWER(p.name) 과 정확히 일치시키기
+-- 위해서다. PostgreSQL planner 는 인덱스 표현식과 쿼리 좌변 표현식이 동일하고 연산자가
+-- gin_trgm_ops 가 지원하는 like(~~) 이면 idx_products_name_trgm 에 대한
+-- Bitmap Index Scan 을 선택한다. 이 일치 덕분에 ProductRepository 의 JPQL 쿼리 6곳(쿼리/countQuery
+-- 각 3종)을 native SQL 로 재작성하지 않아도 GIN 인덱스를 타게 된다.
+-- 주의: 인덱스 표현식을 name(대소문자 비구분 없음)으로 선언하면 LOWER(p.name) 좌변과 불일치해
+-- 인덱스를 타지 못한다. 반드시 lower(name) 식 인덱스여야 한다.
+--
+-- [CONCURRENTLY 미사용 사유]
+-- Flyway 는 기본적으로 마이그레이션을 트랜잭션 안에서 실행한다.
+-- CREATE INDEX CONCURRENTLY 는 트랜잭션 내 실행이 금지되어 있어
+-- Flyway 트랜잭션 마이그레이션과 함께 사용하면 오류가 발생한다.
+-- 본 환경의 products 테이블은 초기/소량 데이터이므로 일반 CREATE INDEX 로 인덱스 빌드 시간이
+-- 짧아 테이블 쓰기 잠금 부담이 무시할 수 있는 수준이다(V3 idx_products_owner_id · V8 인덱스 2종
+-- 일반 CREATE INDEX 선례 계승). 운영 데이터가 대규모로 늘어난 뒤 적용이 필요하다면 그때
+-- Flyway 트랜잭션 분리(-- flyway:executeInTransaction=false) + CONCURRENTLY 를 별도로 검토한다.
+--
+-- [V1~V11 불변 · V12 신규]
+-- V1~V11 은 Flyway 체크섬으로 보호된다. 수정 금지.
+-- 이 V12 파일이 pg_trgm 인덱스 추가를 전담한다.
+--
+-- [T5+6(backend/061) ES 장애 폴백 재사용]
+-- 본 인덱스가 만드는 pg_trgm 경로는 Elasticsearch 도입 후에도 제거되지 않는다.
+-- ADR-011 §결정 원칙 5(장애 폴백)에 따라 T5+6(backend/061)이 ES 장애 시
+-- graceful-degrade 폴백으로 이 경로를 영구 재사용한다. 교차참조: backend/061.
+-- =============================================================================
+
+-- pg_trgm contrib 확장 활성화 (이미 활성화된 경우 무시)
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- products.name 대소문자 무시 부분일치 검색용 GIN 식 인덱스
+-- 식 인덱스 표현식 lower(name) 이 쿼리 좌변 LOWER(p.name) 과 정확히 일치해
+-- 선행 와일드카드 LIKE 에서도 Bitmap Index Scan 으로 풀린다(ADR-011 T0 브리지).
+CREATE INDEX idx_products_name_trgm ON products USING gin (lower(name) gin_trgm_ops);

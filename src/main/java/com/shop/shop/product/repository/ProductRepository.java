@@ -21,6 +21,17 @@ import java.util.List;
  *
  * <p>정렬은 JPQL ORDER BY 파라미터화 불가 → 정렬별 메서드 3종으로 분리.
  * Service가 PublicProductSort enum에 따라 메서드를 선택한다.
+ *
+ * <p><b>상품명 부분일치 검색 — pg_trgm GIN 인덱스 활용 (ADR-011 T0 브리지)</b><br>
+ * 공개 목록 3종 쿼리의 상품명 검색 절({@code LOWER(p.name) LIKE LOWER(CONCAT('%', kw, '%'))})은
+ * 선행 와일드카드로 인해 B-tree 인덱스를 타지 못하는 구조다.
+ * V12 마이그레이션({@code V12__product_name_trgm_index.sql})이 추가한
+ * {@code idx_products_name_trgm}({@code lower(name) gin_trgm_ops}) GIN 식 인덱스를 통해
+ * 이 풀스캔을 완화한다. 쿼리 좌변 {@code LOWER(p.name)} 이 인덱스 표현식 {@code lower(name)} 과
+ * 정확히 일치하므로 PostgreSQL planner 가 선행 와일드카드여도 Bitmap Index Scan 으로 풀 수 있다.
+ * 쿼리 문구는 변경하지 않았다 — 인덱스 표현식 일치가 GIN 사용을 보장하는 방식이다(ADR-011 §결정 브리지).
+ * 이 pg_trgm 경로는 T5+6(backend/061)에서 Elasticsearch 장애 시 graceful-degrade 폴백으로
+ * 영구 재사용된다(ADR-011 §결정 원칙 5 — 장애 폴백).
  */
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
