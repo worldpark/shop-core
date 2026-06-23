@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -213,6 +214,7 @@ class StockAdjustmentServiceTest {
                 ACTOR_ID, false, PRODUCT_ID, VARIANT_ID, -3, "손상 폐기");
 
         verify(inventoryStockPort).adjustStock(eq(VARIANT_ID), eq(-3), eq(ACTOR_ID), eq("손상 폐기"));
+        verify(productService, times(1)).publishSearchIndexEvent(PRODUCT_ID);
         assertThat(result.delta()).isEqualTo(-3);
         assertThat(result.quantityBefore()).isEqualTo(10);
         assertThat(result.quantityAfter()).isEqualTo(7);
@@ -236,6 +238,7 @@ class StockAdjustmentServiceTest {
                 ACTOR_ID, true, PRODUCT_ID, VARIANT_ID, 10, "재고 보충");
 
         verify(inventoryStockPort).adjustStock(eq(VARIANT_ID), eq(10), eq(ACTOR_ID), eq("재고 보충"));
+        verify(productService, times(1)).publishSearchIndexEvent(PRODUCT_ID);
         assertThat(result.delta()).isEqualTo(10);
         assertThat(result.quantityBefore()).isEqualTo(5);
         assertThat(result.quantityAfter()).isEqualTo(15);

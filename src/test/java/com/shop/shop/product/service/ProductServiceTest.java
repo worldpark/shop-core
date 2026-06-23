@@ -7,14 +7,18 @@ import com.shop.shop.common.exception.ProductNotFoundException;
 import com.shop.shop.product.domain.Category;
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
+import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
+import com.shop.shop.product.event.ProductSearchIndexChangedEvent;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.ProductRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -27,7 +31,11 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,8 +52,18 @@ class ProductServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private ProductService productService;
+
+    @BeforeEach
+    void setUp() {
+        // publishSearchIndexEvent가 findSearchSnapshot을 호출하므로 lenient stub으로 기본 empty 반환.
+        // 개별 테스트에서 색인 이벤트 발행을 검증할 때는 별도로 override한다.
+        lenient().when(productRepository.findSearchSnapshot(anyLong())).thenReturn(Optional.empty());
+    }
 
     // ============================================================
     // register — 성공
@@ -54,7 +72,11 @@ class ProductServiceTest {
     @Test
     @DisplayName("register — 성공: status는 항상 DRAFT")
     void register_success_status_is_draft() {
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productRepository.save(any())).thenAnswer(inv -> {
+            Product p = inv.getArgument(0);
+            setId(p, 10L);
+            return p;
+        });
 
         Product result = productService.register(1L, null, "상품A", "설명", new BigDecimal("10000"));
 
@@ -68,7 +90,11 @@ class ProductServiceTest {
     void register_success_with_category() {
         Category cat = categoryWithId(5L);
         when(categoryRepository.findById(5L)).thenReturn(Optional.of(cat));
-        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(productRepository.save(any())).thenAnswer(inv -> {
+            Product p = inv.getArgument(0);
+            setId(p, 11L);
+            return p;
+        });
 
         Product result = productService.register(1L, 5L, "상품B", null, new BigDecimal("5000"));
 
@@ -269,30 +295,76 @@ class ProductServiceTest {
     }
 
     // ============================================================
+    // 색인 이벤트 발행 — publish-once 검증
+    // ============================================================
+
+    @Test
+    @DisplayName("register — 성공 시 ProductSearchIndexChangedEvent를 정확히 1회 발행한다")
+    void register_publishesSearchIndexEventOnce() {
+        when(productRepository.save(any())).thenAnswer(inv -> {
+            Product p = inv.getArgument(0);
+            setId(p, 10L);
+            return p;
+        });
+        ProductSearchSnapshotProjection snapshot = new ProductSearchSnapshotProjection(
+                10L, "상품A", null, null, null, ProductStatus.DRAFT,
+                new BigDecimal("10000"), 0L);
+        when(productRepository.findSearchSnapshot(10L)).thenReturn(Optional.of(snapshot));
+
+        productService.register(1L, null, "상품A", null, new BigDecimal("10000"));
+
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
+    }
+
+    @Test
+    @DisplayName("update — 성공 시 ProductSearchIndexChangedEvent를 정확히 1회 발행한다")
+    void update_publishesSearchIndexEventOnce() {
+        Product product = productWithOwner(1L);
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        ProductSearchSnapshotProjection snapshot = new ProductSearchSnapshotProjection(
+                10L, "수정상품", null, null, null, ProductStatus.ON_SALE,
+                new BigDecimal("20000"), 0L);
+        when(productRepository.findSearchSnapshot(10L)).thenReturn(Optional.of(snapshot));
+
+        productService.update(1L, false, 10L, null, "수정상품", null,
+                new BigDecimal("20000"), ProductStatus.ON_SALE);
+
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
+    }
+
+    @Test
+    @DisplayName("publishSearchIndexEvent — 스냅샷 empty 시 이벤트 미발행")
+    void publishSearchIndexEvent_noEventWhenSnapshotEmpty() {
+        when(productRepository.findSearchSnapshot(99L)).thenReturn(Optional.empty());
+
+        productService.publishSearchIndexEvent(99L);
+
+        verify(eventPublisher, times(0)).publishEvent(any());
+    }
+
+    // ============================================================
     // helpers
     // ============================================================
 
     private Product productWithOwner(long ownerId) {
         Product product = Product.create(ownerId, null, "상품", "설명", new BigDecimal("1000"));
+        setId(product, 10L);
+        return product;
+    }
+
+    private void setId(Object entity, long id) {
         try {
-            var idField = Product.class.getDeclaredField("id");
+            var idField = entity.getClass().getDeclaredField("id");
             idField.setAccessible(true);
-            idField.set(product, 10L);
+            idField.set(entity, id);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return product;
     }
 
     private Category categoryWithId(long id) {
         Category cat = Category.of("테스트", "test-" + id, null, 0);
-        try {
-            var idField = Category.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(cat, id);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        setId(cat, id);
         return cat;
     }
 }

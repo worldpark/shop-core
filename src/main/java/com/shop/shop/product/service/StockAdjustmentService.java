@@ -80,7 +80,14 @@ public class StockAdjustmentService {
 
         // 5. inventory 위임 (음수 재고→409, variant 미존재→404 inventory 책임)
         // 포트가 방금 적재한 원장을 StockLedgerView로 즉시 반환 — 재조회 불필요
-        return inventoryStockPort.adjustStock(variantId, delta, actorId, memo);
+        StockLedgerView result = inventoryStockPort.adjustStock(variantId, delta, actorId, memo);
+
+        // 6. 재고 변동 → purchasableVariantCount 재산출 → 색인 upsert
+        // 같은 TX 내 auto-flush로 stock UPDATE가 flush된 후 스냅샷 쿼리가 최신 재고를 반영한다(결정 3).
+        // 주문 체크아웃/취소 경로는 포함하지 않는다(결정 5-범위 — 핵심 경로 비차단·order 회귀 0).
+        productService.publishSearchIndexEvent(productId);
+
+        return result;
     }
 
     /**

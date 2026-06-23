@@ -2,6 +2,7 @@ package com.shop.shop.product.repository;
 
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
+import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
 import com.shop.shop.product.dto.ProductSummaryProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 상품 JPA 리포지토리.
@@ -206,4 +208,43 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
      * @return 해당 상태의 상품 수
      */
     long countByStatusIn(Collection<ProductStatus> statuses);
+
+    // =============================================================
+    // 색인 스냅샷 — 검색 색인 문서 산출 (displayPrice/purchasable SoT)
+    // =============================================================
+
+    /**
+     * 단건 상품 색인 스냅샷 조회 — ES upsert 이벤트 페이로드 산출 전용.
+     *
+     * <p>{@code displayPrice}·{@code purchasableVariantCount} 집계 식은
+     * {@code findPublicProductsLatest}와 <b>문자 그대로 동일</b>하여 검색-목록 일관성을 보장한다(검색-목록 SoT).
+     * description은 공개 목록 투영에는 없으나 색인 문서에는 필요해 SELECT·GROUP BY에 포함한다.
+     *
+     * <p>LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true:
+     * 활성 variant가 없으면 {@code displayPrice=p.basePrice}, {@code purchasableVariantCount=0}.
+     *
+     * <p>같은 {@code @Transactional} 내에서 호출 시 Hibernate auto-flush로
+     * 직전 변경(재고 조정 등)이 flush된 후 이 쿼리가 실행되므로 최신 상태를 반영한다.
+     *
+     * @param productId 조회할 상품 ID
+     * @return 색인 스냅샷 projection (상품 미존재 시 empty)
+     */
+    @Query("""
+            SELECT new com.shop.shop.product.dto.ProductSearchSnapshotProjection(
+                p.id,
+                p.name,
+                p.description,
+                c.id,
+                c.name,
+                p.status,
+                COALESCE(MIN(v.price), p.basePrice),
+                SUM(CASE WHEN v.isActive = true AND v.stock > 0 THEN 1L ELSE 0L END)
+            )
+            FROM Product p
+            LEFT JOIN p.category c
+            LEFT JOIN ProductVariant v ON v.product = p AND v.isActive = true
+            WHERE p.id = :productId
+            GROUP BY p.id, p.name, p.description, c.id, c.name, p.status, p.basePrice
+            """)
+    Optional<ProductSearchSnapshotProjection> findSearchSnapshot(@Param("productId") long productId);
 }

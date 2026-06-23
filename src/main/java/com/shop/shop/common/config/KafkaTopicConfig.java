@@ -37,6 +37,10 @@ public class KafkaTopicConfig {
     private static final String PAYMENT_FAILED = "payment-failed";
     // Outbox 스모크 검증 전용 토픽 (notification 미구독, platform 모듈)
     private static final String SHOP_CORE_SMOKE_TEST = "shop-core-smoke-test";
+    // 상품 색인 전용 토픽 (notification 미구독 — shop-core product-search-indexer 전용)
+    private static final String PRODUCT_SEARCH_INDEX_CHANGED = "product-search-index-changed";
+    // DLQ 토픽: 독성 이벤트 격리 (DeadLetterPublishingRecoverer suffix ".DLQ" 일치)
+    private static final String PRODUCT_SEARCH_INDEX_CHANGED_DLQ = PRODUCT_SEARCH_INDEX_CHANGED + ".DLQ";
 
     @Bean
     public NewTopic memberRegisteredTopic() {
@@ -71,6 +75,16 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic shopCoreSmokeTestTopic() {
         return topic(SHOP_CORE_SMOKE_TEST);
+    }
+
+    @Bean
+    public NewTopic productSearchIndexChangedTopic() {
+        return topic(PRODUCT_SEARCH_INDEX_CHANGED);
+    }
+
+    @Bean
+    public NewTopic productSearchIndexChangedDlqTopic() {
+        return topic(PRODUCT_SEARCH_INDEX_CHANGED_DLQ);
     }
 
     private static NewTopic topic(String name) {

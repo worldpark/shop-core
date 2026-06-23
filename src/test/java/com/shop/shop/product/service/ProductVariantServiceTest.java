@@ -7,7 +7,10 @@ import com.shop.shop.common.exception.VariantNotFoundException;
 import com.shop.shop.product.domain.OptionValue;
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductOption;
+import com.shop.shop.product.domain.ProductStatus;
 import com.shop.shop.product.domain.ProductVariant;
+import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
+import com.shop.shop.product.event.ProductSearchIndexChangedEvent;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.OptionValueRepository;
 import com.shop.shop.product.repository.ProductOptionRepository;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -31,6 +35,11 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -59,6 +68,9 @@ class ProductVariantServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private ProductOptionRepository productOptionRepository;
 
     @Mock
@@ -81,6 +93,8 @@ class ProductVariantServiceTest {
     void setUp() {
         productVariantService = new ProductVariantService(
                 productService, productOptionRepository, optionValueRepository, productVariantRepository);
+        // publishSearchIndexEvent → findSearchSnapshot이 lenient 기본 empty를 반환(색인 이벤트 비발행)
+        lenient().when(productRepository.findSearchSnapshot(anyLong())).thenReturn(Optional.empty());
     }
 
     // ============================================================
@@ -101,6 +115,7 @@ class ProductVariantServiceTest {
             setId(v, VARIANT_ID);
             return v;
         });
+        when(productRepository.findSearchSnapshot(PRODUCT_ID)).thenReturn(Optional.of(snapshotFor(PRODUCT_ID)));
 
         ProductVariant result = productVariantService.createVariant(
                 SELLER_ID, false, PRODUCT_ID, "SKU-001", new BigDecimal("10000"), 5, true, List.of());
@@ -109,6 +124,7 @@ class ProductVariantServiceTest {
         assertThat(result.getPrice()).isEqualByComparingTo("10000");
         assertThat(result.getStock()).isEqualTo(5);
         assertThat(result.isActive()).isTrue();
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
     }
 
     @Test
@@ -125,12 +141,14 @@ class ProductVariantServiceTest {
             setId(v, VARIANT_ID);
             return v;
         });
+        when(productRepository.findSearchSnapshot(PRODUCT_ID)).thenReturn(Optional.of(snapshotFor(PRODUCT_ID)));
 
         // actorId=SELLER_ID이지만 actorIsAdmin=true이므로 소유권 스킵
         ProductVariant result = productVariantService.createVariant(
                 SELLER_ID, true, PRODUCT_ID, "SKU-ADM", new BigDecimal("5000"), 3, false, List.of());
 
         assertThat(result.getSku()).isEqualTo("SKU-ADM");
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
     }
 
     @Test
@@ -150,12 +168,14 @@ class ProductVariantServiceTest {
             setId(v, VARIANT_ID);
             return v;
         });
+        when(productRepository.findSearchSnapshot(PRODUCT_ID)).thenReturn(Optional.of(snapshotFor(PRODUCT_ID)));
 
         ProductVariant result = productVariantService.createVariant(
                 SELLER_ID, false, PRODUCT_ID, "SKU-RED", new BigDecimal("10000"), 5, true, List.of(101L));
 
         assertThat(result.getSku()).isEqualTo("SKU-RED");
         assertThat(result.getOptionValues()).hasSize(1);
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
     }
 
     // ============================================================
@@ -342,6 +362,7 @@ class ProductVariantServiceTest {
         when(optionValueRepository.findByOption_ProductId(PRODUCT_ID)).thenReturn(List.of());
         when(productOptionRepository.findByProductIdOrderById(PRODUCT_ID)).thenReturn(List.of());
         when(productVariantRepository.findByProductId(PRODUCT_ID)).thenReturn(List.of(variant));
+        when(productRepository.findSearchSnapshot(PRODUCT_ID)).thenReturn(Optional.of(snapshotFor(PRODUCT_ID)));
 
         // 자기 자신의 SKU로 업데이트 → 중복 아님
         ProductVariant result = productVariantService.updateVariant(
@@ -350,11 +371,39 @@ class ProductVariantServiceTest {
 
         assertThat(result.getPrice()).isEqualByComparingTo("2000");
         assertThat(result.getStock()).isEqualTo(10);
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
+    }
+
+    // ============================================================
+    // deleteVariant — 성공
+    // ============================================================
+
+    @Test
+    @DisplayName("deleteVariant — 성공: variant 삭제 후 색인 이벤트 1회 발행")
+    void deleteVariant_success_publishesSearchIndexEventOnce() {
+        Product product = productWithOwner(SELLER_ID);
+        ProductVariant variant = ProductVariant.create(product, "SKU-DEL",
+                new BigDecimal("1000"), 5, true, Collections.emptySet());
+        setId(variant, VARIANT_ID);
+
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productVariantRepository.findById(VARIANT_ID)).thenReturn(Optional.of(variant));
+        when(productRepository.findSearchSnapshot(PRODUCT_ID)).thenReturn(Optional.of(snapshotFor(PRODUCT_ID)));
+
+        productVariantService.deleteVariant(SELLER_ID, false, PRODUCT_ID, VARIANT_ID);
+
+        verify(eventPublisher, times(1)).publishEvent(isA(ProductSearchIndexChangedEvent.class));
     }
 
     // ============================================================
     // helpers
     // ============================================================
+
+    private ProductSearchSnapshotProjection snapshotFor(long productId) {
+        return new ProductSearchSnapshotProjection(
+                productId, "상품", null, null, null, ProductStatus.ON_SALE,
+                new BigDecimal("10000"), 1L);
+    }
 
     private Product productWithOwner(long ownerId) {
         Product product = Product.create(ownerId, null, "상품", "설명", new BigDecimal("10000"));

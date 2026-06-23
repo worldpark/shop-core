@@ -6,9 +6,12 @@ import com.shop.shop.common.exception.ProductNotFoundException;
 import com.shop.shop.product.domain.Category;
 import com.shop.shop.product.domain.Product;
 import com.shop.shop.product.domain.ProductStatus;
+import com.shop.shop.product.dto.ProductSearchSnapshotProjection;
+import com.shop.shop.product.event.ProductSearchIndexChangedEvent;
 import com.shop.shop.product.repository.CategoryRepository;
 import com.shop.shop.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
 
 import com.shop.shop.common.exception.BusinessException;
 
@@ -39,6 +44,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 상품 등록.
@@ -48,6 +54,7 @@ public class ProductService {
      *   <li>basePrice 음수 방어(Bean Validation이 1차, 서비스가 2차)</li>
      *   <li>categoryId가 있으면 카테고리 존재 검증</li>
      *   <li>Product.create(status=DRAFT 강제)</li>
+     *   <li>save 후 색인 이벤트 발행(IDENTITY 전략으로 save 후 id 항상 세팅)</li>
      * </ol>
      *
      * @param ownerId     소유자 userId (long)
@@ -64,7 +71,10 @@ public class ProductService {
         validateBasePrice(basePrice);
         Category category = resolveCategory(categoryId);
         Product product = Product.create(ownerId, category, name, description, basePrice);
-        return productRepository.save(product);
+        // save가 반환한 영속 엔티티(IDENTITY로 id 채워짐)를 사용한다 — 색인 이벤트가 id를 참조하므로.
+        Product saved = productRepository.save(product);
+        publishSearchIndexEvent(saved.getId());
+        return saved;
     }
 
     /**
@@ -103,6 +113,7 @@ public class ProductService {
         validateBasePrice(basePrice);
         Category category = resolveCategory(categoryId);
         product.update(category, name, description, basePrice, status);
+        publishSearchIndexEvent(productId);
         return product;
     }
 
@@ -189,5 +200,36 @@ public class ProductService {
         }
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new CategoryNotFoundException(categoryId));
+    }
+
+    /**
+     * 색인 스냅샷을 조회해 {@link ProductSearchIndexChangedEvent}를 Outbox에 발행한다.
+     *
+     * <p>같은 {@code @Transactional} 내에서 호출하므로 Hibernate auto-flush로 직전 변경이
+     * flush된 후 스냅샷 쿼리가 실행되어 최신 상태를 반영한다(결정 3 — 재고 일관성).
+     * ES 직접 쓰기 없음 — dual-write 금지(ADR-011). Outbox({@code event_publication})에 적재 후
+     * 커밋 시 Kafka로 외부화된다.
+     *
+     * <p>상품 미존재 시(예: 등록 후 즉시 롤백되는 경우) 스냅샷 조회가 empty를 반환하므로
+     * 이벤트를 발행하지 않는다.
+     *
+     * @param productId 색인할 상품 ID
+     */
+    public void publishSearchIndexEvent(long productId) {
+        productRepository.findSearchSnapshot(productId).ifPresent(snapshot -> {
+            ProductSearchIndexChangedEvent event = new ProductSearchIndexChangedEvent(
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    snapshot.productId(),
+                    snapshot.name(),
+                    snapshot.description(),
+                    snapshot.categoryId(),
+                    snapshot.categoryName(),
+                    snapshot.status().name(),
+                    snapshot.displayPrice(),
+                    snapshot.purchasableVariantCount()
+            );
+            eventPublisher.publishEvent(event);
+        });
     }
 }

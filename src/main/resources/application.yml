@@ -91,6 +91,17 @@ shop:
     payment:
       separated: ${SHOP_DOMAIN_PAYMENT_SEPARATED:false}
 
+  # 상품 색인 Kafka 컨슈머 재시도·DLQ 설정 (SearchIndexKafkaConsumerConfig)
+  search:
+    indexer:
+      enabled: ${SHOP_SEARCH_INDEXER_ENABLED:true}   # 색인 indexer 구독/ES 색인 활성 (운영/로컬 ON). 테스트는 미설정→OFF, indexer 통합 테스트만 ON.
+    kafka:
+      retry:
+        max-attempts: ${SHOP_SEARCH_KAFKA_RETRY_MAX_ATTEMPTS:3}    # 최초 1회 + 재시도 2회
+        backoff-ms: ${SHOP_SEARCH_KAFKA_RETRY_BACKOFF_MS:1000}
+      dlq:
+        suffix: ${SHOP_SEARCH_KAFKA_DLQ_SUFFIX:.DLQ}
+
   order:
     pending-expiry:
       enabled: ${SHOP_ORDER_EXPIRY_ENABLED:true}    # 운영 활성 (테스트는 false로 명시 비활성)

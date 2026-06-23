@@ -52,6 +52,8 @@ public class ProductVariantService {
     private final OptionValueRepository optionValueRepository;
     private final ProductVariantRepository productVariantRepository;
 
+    // ProductService.publishSearchIndexEvent를 재사용 — 스냅샷 산출 식의 단일 출처
+
     /**
      * variant 생성.
      *
@@ -80,7 +82,11 @@ public class ProductVariantService {
         Set<OptionValue> optionValues = resolveAndValidateOptionValues(productId, ids, null);
 
         ProductVariant variant = ProductVariant.create(product, sku, price, stock, isActive, optionValues);
-        return productVariantRepository.save(variant);
+        // save가 반환한 영속 엔티티(IDENTITY로 id 채워짐)를 반환한다 — 응답 매핑이 id를 참조하므로.
+        ProductVariant saved = productVariantRepository.save(variant);
+        // variant 추가 → displayPrice/purchasableVariantCount 재산출 → 색인 upsert
+        productService.publishSearchIndexEvent(productId);
+        return saved;
     }
 
     /**
@@ -116,6 +122,8 @@ public class ProductVariantService {
         Set<OptionValue> optionValues = resolveAndValidateOptionValues(productId, ids, variantId);
 
         variant.update(sku, price, stock, isActive, optionValues);
+        // variant 수정 → displayPrice/purchasableVariantCount 재산출 → 색인 upsert
+        productService.publishSearchIndexEvent(productId);
         return variant;
     }
 
@@ -139,6 +147,9 @@ public class ProductVariantService {
                 .orElseThrow(VariantNotFoundException::new);
 
         productVariantRepository.delete(variant);
+        // variant 삭제 후에도 product는 존재 → displayPrice/purchasableVariantCount 재산출 upsert
+        // (variant 전체 삭제 시: displayPrice=basePrice, purchasableVariantCount=0)
+        productService.publishSearchIndexEvent(productId);
     }
 
     /**
