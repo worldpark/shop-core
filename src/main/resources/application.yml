@@ -116,6 +116,9 @@ shop:
   # [Task 064] 미완료(INCOMPLETE) 발행 상시 회복 스케줄러 — 주기적으로 일정 시간 이상 미완료인 발행을 재제출.
   #   리더 1노드만 실행(SchedulerLeaderGuard, Task 035). 063(재기동 회복)과 상호보완·동시 ON 무해.
   events:
+    # [Task 065] 미완료 발행 건수 Micrometer 게이지 활성 (운영 ON). 테스트 yml 미설정 → 빈 미생성.
+    metrics:
+      enabled: ${SHOP_EVENTS_METRICS_ENABLED:true}
     republish:
       enabled: ${SHOP_EVENTS_REPUBLISH_ENABLED:true}        # 상시 회복 스케줄러 활성 (테스트는 false로 명시 비활성)
       interval: ${SHOP_EVENTS_REPUBLISH_INTERVAL:PT1M}      # 스케줄 fixed-delay 주기 (기본 1분)
