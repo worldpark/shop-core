@@ -4,6 +4,8 @@ import com.shop.shop.order.dto.ApplicableCouponResponse;
 import com.shop.shop.order.dto.CouponClaimRequest;
 import com.shop.shop.order.dto.UserCouponResponse;
 import com.shop.shop.order.service.CouponServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,7 @@ import java.util.List;
  * <p>레이어: CouponRestController → CouponServiceResponse → CouponService → Repository.
  * 비즈니스 로직 없음 — ServiceResponse에 전적으로 위임.
  */
+@Tag(name = "coupon", description = "쿠폰 — 발급·내 쿠폰함·적용 가능 조회 (CONSUMER 이상)")
 @RestController
 @RequestMapping("/api/v1/coupons")
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class CouponRestController {
      * @param req  쿠폰 코드
      * @return 발급된 쿠폰 정보
      */
+    @Operation(summary = "쿠폰 발급")
     @PostMapping
     public ResponseEntity<UserCouponResponse> claim(
             Authentication auth,

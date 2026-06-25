@@ -2,6 +2,8 @@ package com.shop.shop.payment.controller;
 
 import com.shop.shop.payment.dto.OrderCancelResponse;
 import com.shop.shop.payment.service.PaymentServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Security REST 체인: {@code /api/v1/orders/{asterisk}/cancel} hasRole("CONSUMER") 명시 추가됨.
  * {@code /api/v1/orders/..} hasRole("CONSUMER")가 이미 덮지만 의도 명시 + 회귀 방지.
  */
+@Tag(name = "payment", description = "결제 — 결제 처리·상태 조회 (CONSUMER 이상)")
 @RestController
 @RequestMapping("/api/v1/orders/{orderId}/cancel")
 @RequiredArgsConstructor
@@ -48,6 +51,7 @@ public class PaymentCancellationRestController {
      * @param auth    JWT 인증 (principal = userId(long))
      * @return 취소 결과 200
      */
+    @Operation(summary = "주문 취소")
     @PostMapping
     public ResponseEntity<OrderCancelResponse> cancel(
             @PathVariable long orderId,

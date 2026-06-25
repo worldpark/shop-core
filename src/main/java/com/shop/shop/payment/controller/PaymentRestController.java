@@ -3,6 +3,8 @@ package com.shop.shop.payment.controller;
 import com.shop.shop.payment.dto.PaymentRequest;
 import com.shop.shop.payment.dto.PaymentResponse;
 import com.shop.shop.payment.service.PaymentServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>비즈니스 로직 없음 — {@link PaymentServiceResponse} 위임.
  * Authentication principal = userId(long) (JWT 필터 주입).
  */
+@Tag(name = "payment", description = "결제 — 결제 처리·상태 조회 (CONSUMER 이상)")
 @RestController
 @RequestMapping("/api/v1/orders/{orderId}/payment")
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class PaymentRestController {
      * @param auth     JWT 인증
      * @return 결제 응답 200
      */
+    @Operation(summary = "결제 처리 (모의 PG 승인)")
     @PostMapping
     public ResponseEntity<PaymentResponse> pay(
             @PathVariable long orderId,

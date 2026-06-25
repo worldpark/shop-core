@@ -2,6 +2,8 @@ package com.shop.shop.platform.controller;
 
 import com.shop.shop.platform.dto.DummyEventPublishResponse;
 import com.shop.shop.platform.service.DummyEventServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>엔드포인트: {@code POST /api/v1/platform/smoke/events}
  */
+@Tag(name = "platform", description = "플랫폼 — Transactional Outbox 스모크 검증")
 @RestController
 @RequestMapping("/api/v1/platform/smoke")
 @RequiredArgsConstructor
@@ -30,6 +33,7 @@ public class DummyEventController {
      * @param message 발행 메시지 (optional, 기본값: "smoke-test")
      * @return 발행된 이벤트 정보 DTO
      */
+    @Operation(summary = "더미 이벤트 발행 — Outbox 스모크 검증")
     @PostMapping("/events")
     public ResponseEntity<DummyEventPublishResponse> publishSmokeEvent(
             @RequestParam(required = false, defaultValue = "smoke-test") String message) {

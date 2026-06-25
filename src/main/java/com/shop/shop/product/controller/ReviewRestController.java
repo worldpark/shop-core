@@ -5,6 +5,9 @@ import com.shop.shop.product.dto.ReviewCreateRequest;
 import com.shop.shop.product.dto.ReviewResponse;
 import com.shop.shop.product.dto.ReviewUpdateRequest;
 import com.shop.shop.product.service.ReviewServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>비즈니스 로직 없음 — ReviewServiceResponse 위임. principal은 Authentication.
  */
+@Tag(name = "review", description = "리뷰 — 작성·수정·삭제·공개 목록 조회")
 @RestController
 @RequiredArgsConstructor
 public class ReviewRestController {
@@ -43,6 +47,7 @@ public class ReviewRestController {
      * 리뷰 작성.
      * POST /api/v1/reviews → 201
      */
+    @Operation(summary = "리뷰 작성")
     @PostMapping("/api/v1/reviews")
     public ResponseEntity<ReviewResponse> create(
             Authentication auth,
@@ -83,6 +88,8 @@ public class ReviewRestController {
      * 상품 리뷰 목록 + 집계 조회 (공개).
      * GET /api/v1/products/{productId}/reviews → 200
      */
+    @Operation(summary = "상품 리뷰 목록 + 집계 조회 (공개)")
+    @SecurityRequirements
     @GetMapping("/api/v1/products/{productId}/reviews")
     public ResponseEntity<ProductReviewSummaryResponse> getProductReviews(
             @PathVariable long productId,

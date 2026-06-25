@@ -218,5 +218,19 @@ management:
       export:
         enabled: true
 
+# API 문서화 (Task 062) — springdoc-openapi.
+# 기본(local/dev): 스펙·UI 노출 ON. prod 프로파일에서 override로 OFF(아래 application-prod.yml).
+# enabled 키를 환경변수로도 끌 수 있게 한다(운영 점검·사고 대응 시 즉시 차단).
+springdoc:
+  api-docs:
+    enabled: ${SHOP_CORE_OPENAPI_ENABLED:true}      # /v3/api-docs(JSON·YAML) 생성 ON/OFF
+    path: /v3/api-docs                               # 기본값 명시(스펙 경로 SSOT — openApiDocsChain 매처와 일치)
+  swagger-ui:
+    enabled: ${SHOP_CORE_SWAGGER_UI_ENABLED:true}    # /swagger-ui.html(UI) ON/OFF
+    path: /swagger-ui.html                           # 기본값 명시
+    # 운영 편의: 태그·메서드 알파벳 정렬(메타데이터만, 동작 무관)
+    tags-sorter: alpha
+    operations-sorter: method
+
 server:
   port: 8080

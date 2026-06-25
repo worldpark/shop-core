@@ -4,6 +4,8 @@ import com.shop.shop.common.dto.PageResponse;
 import com.shop.shop.member.dto.RejectRequest;
 import com.shop.shop.member.dto.SellerApplicationSummaryResponse;
 import com.shop.shop.member.service.AdminSellerApplicationServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>비즈니스 로직 없음 — {@link AdminSellerApplicationServiceResponse}에 전적으로 위임 (forbidden-rule).
  */
+@Tag(name = "admin-seller-application", description = "관리자 판매자 신청 관리 — 목록·승인·반려 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/seller-applications")
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class AdminSellerApplicationRestController {
      * @param size   페이지 크기 (기본값 20)
      * @return 200 + PageResponse&lt;SellerApplicationSummaryResponse&gt;
      */
+    @Operation(summary = "판매자 신청 목록 조회 (ADMIN)")
     @GetMapping
     public ResponseEntity<PageResponse<SellerApplicationSummaryResponse>> list(
             @RequestParam(required = false) String status,

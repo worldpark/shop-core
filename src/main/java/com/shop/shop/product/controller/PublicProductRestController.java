@@ -4,6 +4,9 @@ import com.shop.shop.common.dto.PageResponse;
 import com.shop.shop.product.dto.PublicProductDetailResponse;
 import com.shop.shop.product.dto.PublicProductSummaryResponse;
 import com.shop.shop.product.service.PublicProductServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>경로: GET /api/v1/products (목록), GET /api/v1/products/{productId} (상세)
  */
+@Tag(name = "product", description = "상품 — 공개 목록·상세 조회")
+@SecurityRequirements
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -37,6 +42,7 @@ public class PublicProductRestController {
      * @param size       페이지 크기 (기본 20, 최대 100 클램프는 Service 처리)
      * @return 공개 상품 목록 페이지
      */
+    @Operation(summary = "공개 상품 목록 조회")
     @GetMapping
     public ResponseEntity<PageResponse<PublicProductSummaryResponse>> list(
             @RequestParam(required = false) String keyword,
@@ -56,6 +62,7 @@ public class PublicProductRestController {
      * @param productId 조회할 상품 ID
      * @return 공개 상품 상세 DTO
      */
+    @Operation(summary = "공개 상품 상세 조회")
     @GetMapping("/{productId}")
     public ResponseEntity<PublicProductDetailResponse> detail(@PathVariable long productId) {
         PublicProductDetailResponse response = publicProductServiceResponse.detail(productId);

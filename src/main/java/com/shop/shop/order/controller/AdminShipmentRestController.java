@@ -4,6 +4,8 @@ import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipRequest;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.service.OrderFulfillmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>레이어: AdminShipmentRestController → OrderFulfillmentService → Repository
  */
+@Tag(name = "admin-order", description = "관리자 주문·배송 관리 (ADMIN 전용)")
 @RestController
 @RequiredArgsConstructor
 class AdminShipmentRestController {
@@ -43,6 +46,7 @@ class AdminShipmentRestController {
      * @param req        배송 시작 요청 (carrier/trackingNumber 필수)
      * @return 200 OK + 갱신된 {@link ShipmentResponse}
      */
+    @Operation(summary = "배송 시작 (ADMIN)")
     @PostMapping("/api/v1/admin/shipments/{shipmentId}/ship")
     ResponseEntity<ShipmentResponse> ship(
             @PathVariable long shipmentId,

@@ -3,6 +3,9 @@ package com.shop.shop.member.controller;
 import com.shop.shop.member.dto.PasswordResetConfirmRequest;
 import com.shop.shop.member.dto.PasswordResetRequest;
 import com.shop.shop.member.service.PasswordResetServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +29,8 @@ import java.util.Map;
  * - 성공 200, 무효/만료/사용 토큰 → InvalidPasswordResetTokenException(400)
  * - 비밀번호 정책/일치 위반 → @Valid 400
  */
+@Tag(name = "auth", description = "인증 — 로그인·토큰 재발급·로그아웃·비밀번호 재설정")
+@SecurityRequirements
 @RestController
 @RequestMapping("/api/v1/auth/password-reset")
 @RequiredArgsConstructor
@@ -41,6 +46,7 @@ public class PasswordResetRestController {
      * 이메일 유효성 검증(@Valid) 후 서비스 위임.
      * 항상 200 + 동일 본문 반환 (enumeration 방지).
      */
+    @Operation(summary = "비밀번호 재설정 이메일 요청")
     @PostMapping("/request")
     public ResponseEntity<Map<String, String>> request(
             @Valid @RequestBody PasswordResetRequest req) {

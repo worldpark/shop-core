@@ -4,6 +4,8 @@ import com.shop.shop.product.dto.CategoryCreateRequest;
 import com.shop.shop.product.dto.CategoryResponse;
 import com.shop.shop.product.dto.CategoryUpdateRequest;
 import com.shop.shop.product.service.CategoryServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 비ADMIN → 403, 비인증 → 401.
  * 비즈니스 로직 없음 — {@link CategoryServiceResponse}에 위임.
  */
+@Tag(name = "admin-category", description = "관리자 카테고리 관리 — 생성·수정·삭제 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/categories")
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class AdminCategoryRestController {
      * @param req 생성 요청 DTO (@Valid 검증)
      * @return 200 CategoryResponse
      */
+    @Operation(summary = "카테고리 생성 (ADMIN)")
     @PostMapping
     public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CategoryCreateRequest req) {
         return ResponseEntity.ok(categoryServiceResponse.create(req));

@@ -4,6 +4,8 @@ import com.shop.shop.cart.dto.CartItemAddRequest;
 import com.shop.shop.cart.dto.CartItemQuantityUpdateRequest;
 import com.shop.shop.cart.dto.CartResponse;
 import com.shop.shop.cart.service.CartServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 모든 엔드포인트는 hasRole("CONSUMER") 이상 인증 필요 (SecurityConfig에 명시).
  * Authentication 주입: JWT 필터 후 principal=userId(long).
  */
+@Tag(name = "cart", description = "장바구니 — 조회·담기·수량 변경·삭제 (CONSUMER 이상)")
 @RestController
 @RequestMapping("/api/v1/cart")
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class CartRestController {
      * @param authentication JWT principal (userId)
      * @return 200 + CartResponse
      */
+    @Operation(summary = "내 장바구니 조회")
     @GetMapping
     public ResponseEntity<CartResponse> getCart(Authentication authentication) {
         CartResponse response = cartServiceResponse.getCart(authentication);
@@ -56,6 +60,7 @@ public class CartRestController {
      * @param request        담기 요청 (@Valid: variantId NotNull, quantity Min(1))
      * @return 200 + 갱신된 CartResponse
      */
+    @Operation(summary = "장바구니 담기")
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addItem(
             Authentication authentication,

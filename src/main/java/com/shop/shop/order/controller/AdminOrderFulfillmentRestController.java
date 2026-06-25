@@ -3,6 +3,8 @@ package com.shop.shop.order.controller;
 import com.shop.shop.order.dto.CreateShipmentRequest;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.service.OrderFulfillmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,7 @@ import java.util.List;
  *
  * <p>레이어: AdminOrderFulfillmentRestController → OrderFulfillmentService → Repository
  */
+@Tag(name = "admin-order", description = "관리자 주문·배송 관리 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/orders/{orderId}/shipments")
 @RequiredArgsConstructor
@@ -45,6 +48,7 @@ public class AdminOrderFulfillmentRestController {
      * @param req     배송 생성 요청 (optional body)
      * @return 201 Created + {@link ShipmentResponse}
      */
+    @Operation(summary = "배송 생성 (ADMIN)")
     @PostMapping
     public ResponseEntity<ShipmentResponse> create(
             @PathVariable long orderId,

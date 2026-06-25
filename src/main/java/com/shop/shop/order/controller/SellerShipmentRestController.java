@@ -4,6 +4,8 @@ import com.shop.shop.order.dto.DeliverResponse;
 import com.shop.shop.order.dto.ShipRequest;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.spi.SellerFulfillmentFacade;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>레이어: SellerShipmentRestController → SellerFulfillmentFacade(spi) → 구현체(service)
  */
+@Tag(name = "seller-order", description = "판매자 주문·배송 관리 (SELLER 이상)")
 @RestController
 @RequiredArgsConstructor
 class SellerShipmentRestController {
@@ -44,6 +47,7 @@ class SellerShipmentRestController {
      * @param auth       SecurityContext 인증 객체
      * @return 200 OK + 갱신된 {@link ShipmentResponse}
      */
+    @Operation(summary = "판매자 배송 시작 (SELLER 이상)")
     @PostMapping("/api/v1/seller/shipments/{shipmentId}/ship")
     ResponseEntity<ShipmentResponse> ship(
             @PathVariable long shipmentId,

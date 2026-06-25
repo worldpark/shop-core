@@ -1,0 +1,7 @@
+# prod 표면 최소화 (Task 062) — 스펙/UI 차단. api-authorization-rule 정합(민감 표면 과다 노출 방지).
+# enabled=false면 핸들러 자체가 미등록 → 경로 접근 시 404(시큐리티 permit 무관하게 도달 불가).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

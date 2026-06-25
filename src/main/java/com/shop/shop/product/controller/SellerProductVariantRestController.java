@@ -4,6 +4,8 @@ import com.shop.shop.product.dto.ProductVariantCreateRequest;
 import com.shop.shop.product.dto.ProductVariantResponse;
 import com.shop.shop.product.dto.ProductVariantUpdateRequest;
 import com.shop.shop.product.service.ProductVariantServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,7 @@ import java.util.List;
  * 소유권 검사는 ProductService에서 수행 (타인 상품 → 404).
  * 비즈니스 로직 없음 — {@link ProductVariantServiceResponse}에 위임.
  */
+@Tag(name = "seller-product", description = "판매자 상품 관리 — 등록·수정 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/products/{productId}/variants")
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class SellerProductVariantRestController {
      * @param auth      JWT 인증 객체
      * @return 200 variant 목록 응답 DTO
      */
+    @Operation(summary = "상품 variant 목록 조회 (SELLER 이상)")
     @GetMapping
     public ResponseEntity<List<ProductVariantResponse>> listVariants(
             @PathVariable long productId,

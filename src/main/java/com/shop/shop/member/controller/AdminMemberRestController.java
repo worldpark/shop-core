@@ -5,6 +5,8 @@ import com.shop.shop.member.domain.Role;
 import com.shop.shop.member.dto.MemberSummaryResponse;
 import com.shop.shop.member.dto.RoleChangeRequest;
 import com.shop.shop.member.service.AdminMemberServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>레이어: AdminMemberRestController → AdminMemberServiceResponse → MemberService → MemberRepository
  */
+@Tag(name = "admin-member", description = "관리자 회원 관리 — 목록 조회·권한 변경 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/members")
 @RequiredArgsConstructor
@@ -43,6 +46,7 @@ public class AdminMemberRestController {
      * @param size    페이지 크기 (기본값 20)
      * @return 200 PageResponse&lt;MemberSummaryResponse&gt;
      */
+    @Operation(summary = "회원 목록 조회/검색 (ADMIN)")
     @GetMapping
     public ResponseEntity<PageResponse<MemberSummaryResponse>> list(
             @RequestParam(required = false) String keyword,

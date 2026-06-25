@@ -3,6 +3,8 @@ package com.shop.shop.order.controller;
 import com.shop.shop.order.dto.AdminCouponCreateRequest;
 import com.shop.shop.order.dto.AdminCouponResponse;
 import com.shop.shop.order.service.CouponServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>레이어: AdminCouponRestController → CouponServiceResponse → CouponService → Repository.
  * 비즈니스 로직 없음 — ServiceResponse에 전적으로 위임.
  */
+@Tag(name = "admin-coupon", description = "관리자 쿠폰 관리 — 쿠폰 정의 생성 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/coupons")
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class AdminCouponRestController {
      * @param req 쿠폰 정의 생성 요청
      * @return 생성된 쿠폰 정의
      */
+    @Operation(summary = "쿠폰 정의 생성 (ADMIN)")
     @PostMapping
     public ResponseEntity<AdminCouponResponse> createCoupon(
             @Valid @RequestBody AdminCouponCreateRequest req) {

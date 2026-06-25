@@ -4,6 +4,9 @@ import com.shop.shop.member.dto.LoginRequest;
 import com.shop.shop.member.dto.RefreshRequest;
 import com.shop.shop.member.dto.TokenResponse;
 import com.shop.shop.member.service.AuthServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>공개 엔드포인트: POST /login, POST /refresh (SecurityConfig permitAll)
  * <p>인증 필요: POST /logout (SecurityConfig authenticated)
  */
+@Tag(name = "auth", description = "인증 — 로그인·토큰 재발급·로그아웃·비밀번호 재설정")
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -33,6 +37,8 @@ public class AuthRestController {
      * 로그인 — access/refresh token 발급.
      * POST /api/v1/auth/login
      */
+    @Operation(summary = "로그인 — JWT access/refresh 토큰 발급")
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse response = authServiceResponse.login(request);
@@ -43,6 +49,8 @@ public class AuthRestController {
      * Access token 재발급.
      * POST /api/v1/auth/refresh
      */
+    @Operation(summary = "access token 재발급")
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         TokenResponse response = authServiceResponse.refresh(request);
@@ -54,6 +62,7 @@ public class AuthRestController {
      * POST /api/v1/auth/logout
      * Authorization: Bearer {accessToken} 헤더 필수.
      */
+    @Operation(summary = "로그아웃 — refresh 삭제 + access blacklist 등록")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestHeader(value = "Authorization", required = false) String authorization) {

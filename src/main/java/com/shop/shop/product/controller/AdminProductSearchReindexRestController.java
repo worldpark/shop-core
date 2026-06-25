@@ -2,6 +2,8 @@ package com.shop.shop.product.controller;
 
 import com.shop.shop.product.dto.ReindexStatusResponse;
 import com.shop.shop.product.service.ProductSearchReindexServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link com.shop.shop.product.service.ProductSearchReindexService}가 담당한다
  * ({@code ObjectProvider<ProductSearchIndexAdmin>}).
  */
+@Tag(name = "admin-product", description = "관리자 상품 관리 — 검색 인덱스 재색인 (ADMIN 전용)")
 @RestController
 @RequestMapping("/api/v1/admin/products/search-index")
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class AdminProductSearchReindexRestController {
      *
      * @return 202 Accepted (RUNNING) 또는 409 Conflict (already running)
      */
+    @Operation(summary = "풀 재색인 잡 시작 (ADMIN)")
     @PostMapping("/reindex")
     public ResponseEntity<ReindexStatusResponse> reindex() {
         try {

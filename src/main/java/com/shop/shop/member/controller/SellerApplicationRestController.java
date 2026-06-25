@@ -3,6 +3,8 @@ package com.shop.shop.member.controller;
 import com.shop.shop.member.dto.SellerApplicationRequest;
 import com.shop.shop.member.dto.SellerApplicationResponse;
 import com.shop.shop.member.service.SellerApplicationServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>비즈니스 로직 없음 — {@link SellerApplicationServiceResponse}에 전적으로 위임 (forbidden-rule).
  */
+@Tag(name = "seller-application", description = "판매자 신청 — 제출·내 상태 조회")
 @RestController
 @RequestMapping("/api/v1/seller-applications")
 @RequiredArgsConstructor
@@ -37,6 +40,7 @@ public class SellerApplicationRestController {
      * @param auth 인증 객체 (principal = userId long)
      * @return 201 Created + 신청 응답 DTO
      */
+    @Operation(summary = "판매자 신청 제출")
     @PostMapping
     public ResponseEntity<SellerApplicationResponse> create(
             @Valid @RequestBody SellerApplicationRequest req,

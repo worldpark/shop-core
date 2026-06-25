@@ -3,6 +3,8 @@ package com.shop.shop.order.controller;
 import com.shop.shop.order.dto.CreateShipmentRequest;
 import com.shop.shop.order.dto.ShipmentResponse;
 import com.shop.shop.order.spi.SellerFulfillmentFacade;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -25,6 +27,7 @@ import java.util.List;
  * <p>레이어: SellerOrderFulfillmentRestController → SellerFulfillmentFacade(spi) → 구현체(service)
  * web→member.spi 직접 호출 금지(facade 내부 email→sellerId 해석).
  */
+@Tag(name = "seller-order", description = "판매자 주문·배송 관리 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/orders/{orderId}/shipments")
 @RequiredArgsConstructor
@@ -45,6 +48,7 @@ public class SellerOrderFulfillmentRestController {
      * @param auth    SecurityContext 인증 객체 (email 추출)
      * @return 201 Created + {@link ShipmentResponse}
      */
+    @Operation(summary = "판매자 배송 생성 (SELLER 이상)")
     @PostMapping
     public ResponseEntity<ShipmentResponse> create(
             @PathVariable long orderId,

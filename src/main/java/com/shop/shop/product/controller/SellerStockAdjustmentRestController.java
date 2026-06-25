@@ -4,6 +4,8 @@ import com.shop.shop.product.dto.StockAdjustmentRequest;
 import com.shop.shop.product.dto.StockAdjustmentResponse;
 import com.shop.shop.product.dto.StockLedgerResponse;
 import com.shop.shop.product.service.StockAdjustmentServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>GET  {@code /ledger} — 재고 변동 원장 조회</li>
  * </ul>
  */
+@Tag(name = "seller-product", description = "판매자 상품 관리 — 등록·수정 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/products/{productId}/variants/{variantId}")
 @RequiredArgsConstructor
@@ -47,6 +50,7 @@ public class SellerStockAdjustmentRestController {
      * @param auth      JWT 인증 객체
      * @return 200 조정 결과 응답 DTO
      */
+    @Operation(summary = "재고 조정 (SELLER 이상)")
     @PostMapping("/stock-adjustments")
     public ResponseEntity<StockAdjustmentResponse> adjustStock(
             @PathVariable long productId,

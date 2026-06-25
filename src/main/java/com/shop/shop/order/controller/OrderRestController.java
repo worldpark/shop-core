@@ -1,10 +1,16 @@
 package com.shop.shop.order.controller;
 
 import com.shop.shop.common.dto.PageResponse;
+import com.shop.shop.common.exception.ErrorResponse;
 import com.shop.shop.order.dto.OrderCreateRequest;
 import com.shop.shop.order.dto.OrderResponse;
 import com.shop.shop.order.dto.OrderSummaryResponse;
 import com.shop.shop.order.service.OrderServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
  * GET  /api/v1/orders     — 내 주문 목록 (200 OK)
  * GET  /api/v1/orders/{id} — 내 주문 상세 (200 OK)
  */
+@Tag(name = "order", description = "주문 — 생성·목록·상세 조회 (CONSUMER 이상)")
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -50,6 +57,9 @@ public class OrderRestController {
      * @param request        배송지 정보
      * @return 201 + 생성된 주문 상세
      */
+    @Operation(summary = "주문 생성")
+    @ApiResponse(responseCode = "401", description = "미인증",
+            content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
             Authentication authentication,
@@ -65,6 +75,7 @@ public class OrderRestController {
      * @param pageable       페이지 요청 (기본: page=0, size=10, created_at DESC)
      * @return 200 + 주문 요약 목록 페이지
      */
+    @Operation(summary = "내 주문 목록 조회")
     @GetMapping
     public ResponseEntity<PageResponse<OrderSummaryResponse>> getMyOrders(
             Authentication authentication,
@@ -82,6 +93,7 @@ public class OrderRestController {
      * @param orderId        주문 ID
      * @return 200 + 주문 상세
      */
+    @Operation(summary = "내 주문 상세 조회")
     @GetMapping("/{orderId}")
     public ResponseEntity<OrderResponse> getMyOrder(
             Authentication authentication,

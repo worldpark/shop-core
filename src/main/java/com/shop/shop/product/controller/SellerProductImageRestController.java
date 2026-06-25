@@ -2,6 +2,8 @@ package com.shop.shop.product.controller;
 
 import com.shop.shop.product.dto.ProductImageResponse;
 import com.shop.shop.product.service.ProductImageServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,6 +28,7 @@ import java.util.List;
  * 소유권 검사는 ProductService에서 수행 (타인 상품 → 404).
  * 비즈니스 로직 없음 — {@link ProductImageServiceResponse}에 위임.
  */
+@Tag(name = "seller-product", description = "판매자 상품 관리 — 등록·수정 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/products/{productId}/images")
 @RequiredArgsConstructor
@@ -40,6 +43,7 @@ public class SellerProductImageRestController {
      * @param auth      JWT 인증 객체
      * @return 200 이미지 목록 응답 DTO
      */
+    @Operation(summary = "상품 이미지 목록 조회 (SELLER 이상)")
     @GetMapping
     public ResponseEntity<List<ProductImageResponse>> listImages(
             @PathVariable long productId,

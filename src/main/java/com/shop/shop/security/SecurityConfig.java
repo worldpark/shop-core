@@ -28,19 +28,24 @@ import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import java.util.Set;
 
 /**
- * 전역 보안 설정 — 3체인(actuator/REST/View) 구조.
+ * 전역 보안 설정 — 4체인(actuator/docs/REST/View) 구조 (Task 062 docs 체인 신설).
  *
  * <p>Actuator 체인 (@Order(0)):
  * - CSRF disable + STATELESS. 무변경.
  *
- * <p>REST 체인 (@Order(1), securityMatcher /api/v1/**):
+ * <p>OpenAPI 문서 체인 (@Order(1), securityMatcher 문서 경로):
+ * - /v3/api-docs**, /swagger-ui** permitAll. CSRF off + STATELESS.
+ * - springdoc 경로는 /api/v1/** 도 actuator도 아니므로 View 체인에 걸리면 302 /login.
+ *   이 전용 체인이 먼저 매칭해 도달성을 보장한다(036 actuator 선례 동일 패턴).
+ *
+ * <p>REST 체인 (@Order(2), securityMatcher /api/v1/**):
  * - STATELESS, CSRF disable (JWT 기반 — CSRF 비대상)
  * - {@link #apiJwtAuthenticationFilter}: Bearer 헤더 소스 + principal=userId(Long)
  * - POST /login, POST /refresh: permitAll
  * - 그 외 /api/v1/**: authenticated
  * - 미인증: RestAuthenticationEntryPoint (401 JSON). 무변경.
  *
- * <p>View 체인 (@Order(2), 나머지 전체):
+ * <p>View 체인 (@Order(3), 나머지 전체):
  * - JWT 쿠키 인증 + STATELESS (formLogin·세션 생성 제거, 054 cutover)
  * - {@link #silentRefreshFilter}: access 만료 + refresh 유효 시 무음 재발급 (View JWT 필터 앞)
  * - {@link #viewJwtAuthenticationFilter}: access_token 쿠키 소스 + principal getName()=email
@@ -51,7 +56,7 @@ import java.util.Set;
  * - CookieRequestCache (052 유지)
  * - JSESSIONID 미생성 (STATELESS)
  *
- * <p>RoleHierarchy 빈(ROLE_ADMIN > ROLE_SELLER > ROLE_CONSUMER)은 두 체인이 공유.
+ * <p>RoleHierarchy 빈(ROLE_ADMIN > ROLE_SELLER > ROLE_CONSUMER)은 REST·View 체인이 공유.
  */
 @Configuration
 @EnableWebSecurity
@@ -82,13 +87,47 @@ public class SecurityConfig {
     }
 
     /**
-     * REST API 보안 체인.
-     * securityMatcher("/api/v1/**") — 이 체인이 먼저 매칭.
-     * 필터 빈: apiJwtAuthenticationFilter (Bearer 헤더 소스 + principal=userId(Long)).
-     * API 체인 authorize 규칙·RestAuthenticationEntryPoint/RestAccessDeniedHandler 무변경.
+     * API 문서(OpenAPI 스펙 + Swagger UI) 전용 보안 체인 (@Order(1) — REST/View 체인보다 먼저 매칭).
+     *
+     * <p>springdoc 경로(/v3/api-docs**, /swagger-ui**)는 /api/v1/** 도 actuator 엔드포인트도
+     * 아니므로 지정 매처가 없으면 View 체인(@Order(3))의 anyRequest().authenticated()에 걸려
+     * 302 /login으로 리다이렉트된다(Task 036 actuator와 동일 함정). 이 전용 체인이 가장 먼저
+     * 문서 경로만 매칭해 permitAll로 도달성을 보장한다. 다른 세 체인은 매처/필터 무변경.
+     *
+     * <p>noop 안전성: springdoc.api-docs.enabled / swagger-ui.enabled=false(prod)면 핸들러 자체가
+     * 미등록되어 경로가 404가 되므로, 이 체인의 permitAll이 prod에서 표면을 열지 않는다(404 우선).
+     *
+     * <p>CSRF: 스펙·UI는 GET 읽기 전용이라 CSRF 비대상. Swagger UI "Try it out"의 상태 변경
+     * 호출은 대상 경로가 /api/v1/**라 REST 체인(@Order(2), CSRF off + Bearer)이 처리한다.
      */
     @Bean
     @Order(1)
+    public SecurityFilterChain openApiDocsChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher(
+                    "/v3/api-docs/**",      // 그룹 스펙: /v3/api-docs/{group}
+                    "/v3/api-docs",         // 기본 스펙 JSON
+                    "/v3/api-docs.yaml",    // YAML
+                    "/swagger-ui/**",       // Swagger UI 정적 리소스(webjars)
+                    "/swagger-ui.html"      // UI 진입점(→ /swagger-ui/index.html 리다이렉트)
+            )
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+            .csrf(csrf -> csrf.disable())                          // 읽기 전용 + 정적 — 폼/브라우저 CSRF 대상 아님
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));  // 세션 미생성(JSESSIONID 없음)
+
+        return http.build();
+    }
+
+    /**
+     * REST API 보안 체인.
+     * securityMatcher("/api/v1/**") — 이 체인이 먼저 매칭(openApiDocsChain 다음).
+     * 필터 빈: apiJwtAuthenticationFilter (Bearer 헤더 소스 + principal=userId(Long)).
+     * API 체인 authorize 규칙·RestAuthenticationEntryPoint/RestAccessDeniedHandler 무변경.
+     * @Order(2): 기존 @Order(1)에서 +1 — 매처·필터·authorize·CSRF·EntryPoint 일체 무변경.
+     */
+    @Bean
+    @Order(2)
     public SecurityFilterChain restChain(
             HttpSecurity http,
             JwtAuthenticationFilter apiJwtAuthenticationFilter,
@@ -159,9 +198,11 @@ public class SecurityConfig {
      *
      * <p>무변경: CSRF(CookieCsrfTokenRepository), CookieRequestCache(052), userDetailsService,
      * authorize 매처 전체.
+     * @Order(3): 기존 @Order(2)에서 +1 (Task 062 openApiDocsChain @Order(1) 삽입으로 인한 재배치).
+     * 매처 없음(나머지 전체)·필터·authorize·CSRF·EntryPoint 일체 무변경.
      */
     @Bean
-    @Order(2)
+    @Order(3)
     public SecurityFilterChain viewChain(
             HttpSecurity http,
             UserDetailsService userDetailsService,

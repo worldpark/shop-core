@@ -79,6 +79,14 @@ dependencies {
     runtimeOnly   'io.jsonwebtoken:jjwt-impl:0.12.7'
     runtimeOnly   'io.jsonwebtoken:jjwt-jackson:0.12.7'
 
+    // API 문서화 (Task 062) — springdoc-openapi (webmvc-ui starter).
+    // /v3/api-docs(OpenAPI 3 JSON·YAML) 자동 생성 + Swagger UI(/swagger-ui.html) 번들.
+    // Spring Boot BOM 미관리이므로 버전 명시 — jjwt·redisson 선례와 동일 정책. SNAPSHOT/와일드카드 금지.
+    // 2.8.x = Spring Boot 3.5(Spring 6.2 / MVC) 호환 라인. starter는 자동설정으로
+    // SpringDocConfiguration·SwaggerUiConfig·정적 리소스 핸들러를 추가하며 기존 시큐리티
+    // 필터체인을 교체하지 않는다(문서 경로 permit은 openApiDocsChain 전용 체인에서 명시 처리).
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9'
+
     // Elasticsearch 검색 엔진(ADR-011 T1) — 연결·health 와이어링 전용.
     // 공식 Java client. Spring Boot BOM이 버전 관리(버전 생략).
     // 인덱스/매핑/쿼리는 후속 Task(T2+3/T4/T5+6) — 본 Task는 의존+설정+health만.

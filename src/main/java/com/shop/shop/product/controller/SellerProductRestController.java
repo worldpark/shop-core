@@ -4,6 +4,8 @@ import com.shop.shop.product.dto.ProductCreateRequest;
 import com.shop.shop.product.dto.ProductResponse;
 import com.shop.shop.product.dto.ProductUpdateRequest;
 import com.shop.shop.product.service.ProductServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
  * RoleHierarchy(ADMIN > SELLER > CONSUMER)로 ADMIN 함의. CONSUMER → 403, 비인증 → 401.
  * 비즈니스 로직 없음 — {@link ProductServiceResponse}에 위임.
  */
+@Tag(name = "seller-product", description = "판매자 상품 관리 — 등록·수정 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/products")
 @RequiredArgsConstructor
@@ -37,6 +40,7 @@ public class SellerProductRestController {
      * @param auth JWT 인증 객체 (principal=userId long)
      * @return 200 ProductResponse (status=DRAFT)
      */
+    @Operation(summary = "상품 등록 (SELLER 이상)")
     @PostMapping
     public ResponseEntity<ProductResponse> register(
             @Valid @RequestBody ProductCreateRequest req,

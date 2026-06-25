@@ -5,6 +5,8 @@ import com.shop.shop.product.dto.OptionValueResponse;
 import com.shop.shop.product.dto.ProductOptionCreateRequest;
 import com.shop.shop.product.dto.ProductOptionResponse;
 import com.shop.shop.product.service.ProductOptionServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,7 @@ import java.util.List;
  * 소유권 검사는 ProductService에서 수행 (타인 상품 → 404).
  * 비즈니스 로직 없음 — {@link ProductOptionServiceResponse}에 위임.
  */
+@Tag(name = "seller-product", description = "판매자 상품 관리 — 등록·수정 (SELLER 이상)")
 @RestController
 @RequestMapping("/api/v1/seller/products/{productId}/options")
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class SellerProductOptionRestController {
      * @param auth      JWT 인증 객체
      * @return 200 옵션 목록 (옵션값 포함)
      */
+    @Operation(summary = "상품 옵션 목록 조회 (SELLER 이상)")
     @GetMapping
     public ResponseEntity<List<ProductOptionResponse>> listOptions(
             @PathVariable long productId,

@@ -3,6 +3,8 @@ package com.shop.shop.member.controller;
 import com.shop.shop.member.dto.PasswordChangeRequest;
 import com.shop.shop.member.dto.ProfileUpdateRequest;
 import com.shop.shop.member.service.AccountServiceResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>권한: authenticated (CONSUMER/SELLER/ADMIN 모두 본인 계정 관리 가능).
  * SecurityConfig anyRequest().authenticated()가 커버.
  */
+@Tag(name = "member", description = "회원 — 회원가입·내 정보 조회")
 @RestController
 @RequestMapping("/api/v1/members")
 @RequiredArgsConstructor
@@ -41,6 +44,7 @@ public class MemberAccountRestController {
      * confirm 불일치 시 400 (@PasswordMatches 필드 위반).
      * 성공 시 204 No Content (비번/해시 응답 비노출).
      */
+    @Operation(summary = "비밀번호 변경")
     @PatchMapping("/me/password")
     public ResponseEntity<Void> changePassword(Authentication authentication,
                                                @Valid @RequestBody PasswordChangeRequest request) {
