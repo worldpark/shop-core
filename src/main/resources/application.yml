@@ -39,9 +39,16 @@ spring:
     events:
       externalization:
         enabled: true  # Spring Modulith Event Publication Registry 기반 Kafka 외부화 활성
+      # [Task 063] 기동 시 미완료(INCOMPLETE, completion_date IS NULL) 발행을 자동 재제출한다.
+      #   동작: 컨텍스트 기동 완료 시점(SmartInitializingSingleton)에 PersistentApplicationEventMulticaster가
+      #         이 플래그를 읽어, 미완료 publication의 원 리스너를 재호출 → 외부화 리스너가 Kafka로 재발행한다.
+      #   대상: completion_date IS NULL 인 건만. 이미 완료된 발행은 재제출되지 않는다(정상 흐름 불변).
+      #   성격: at-least-once 회복 — 컨슈머 멱등 전제(ADR-002). 재발행이 중복 전달을 유발할 수 있다.
+      #   다중 노드 주의: 여러 노드 동시 기동 시 각 노드가 미완료분을 재발행 → Kafka 중복 게시 가능.
+      #                  컨슈머 멱등으로 무해. "상시 회복을 리더 1노드만"으로 좁히는 건 Task 064(리더 가드) 영역.
+      republish-outstanding-events-on-restart: ${SHOP_CORE_REPUBLISH_ON_RESTART:true}
       # JPA 변형(spring-modulith-starter-jpa) 사용 중이므로 아래 JDBC 전용 프로퍼티는 실효 없음.
       # ddl-auto=validate가 Hibernate 자동 DDL을 이미 차단하므로 추가 비활성 플래그는 불필요.
-      # 단, Task 명시 사항을 준수하고 향후 JDBC 변형 전환 시에도 안전하도록 명시적으로 기재한다.
       jdbc:
         schema-initialization:
           enabled: false
